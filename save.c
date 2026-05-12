@@ -4,11 +4,11 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format:
+// Save File Format v2:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
-//                + uint8 inventory[9] + int inventoryCount[9]
+//                + uint8 inventory[36] + int inventoryCount[36]
 //   World:       RLE per column: (uint8 block, uint16 count) pairs
 //----------------------------------------------------------------------------------
 
@@ -21,7 +21,6 @@ bool SaveExists(const char *path)
 
 bool SaveWorld(const char *path)
 {
-    // Ensure saves directory exists
     mkdir("saves");
 
     FILE *f = fopen(path, "wb");
@@ -30,7 +29,7 @@ bool SaveWorld(const char *path)
     // Header
     fwrite(SAVE_MAGIC, 1, 4, f);
     uint32_t version = SAVE_VERSION;
-    uint32_t seed = 0; // seed not stored globally, write 0 placeholder
+    uint32_t seed = worldSeed;
     uint32_t ww = WORLD_WIDTH;
     uint32_t wh = WORLD_HEIGHT;
     fwrite(&version, sizeof(uint32_t), 1, f);
@@ -50,8 +49,8 @@ bool SaveWorld(const char *path)
     fwrite(&player.velocity.y, sizeof(float), 1, f);
     fwrite(&player.onGround, sizeof(bool), 1, f);
     fwrite(&player.selectedSlot, sizeof(int), 1, f);
-    fwrite(player.inventory, sizeof(uint8_t), HOTBAR_SLOTS, f);
-    fwrite(player.inventoryCount, sizeof(int), HOTBAR_SLOTS, f);
+    fwrite(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f);
+    fwrite(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f);
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {
@@ -79,34 +78,48 @@ bool LoadWorld(const char *path)
 
     // Header
     char magic[4];
-    fread(magic, 1, 4, f);
+    if (fread(magic, 1, 4, f) != 4) { fclose(f); return false; }
     if (memcmp(magic, SAVE_MAGIC, 4) != 0) { fclose(f); return false; }
 
     uint32_t version, seed, ww, wh;
-    fread(&version, sizeof(uint32_t), 1, f);
-    fread(&seed, sizeof(uint32_t), 1, f);
-    fread(&ww, sizeof(uint32_t), 1, f);
-    fread(&wh, sizeof(uint32_t), 1, f);
+    if (fread(&version, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&seed, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&ww, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&wh, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
 
-    if (version != SAVE_VERSION || ww != WORLD_WIDTH || wh != WORLD_HEIGHT) {
+    if (ww != WORLD_WIDTH || wh != WORLD_HEIGHT) {
         fclose(f);
         return false;
     }
 
+    worldSeed = seed;
+
     // Day/Night
-    fread(&dayNight.timeOfDay, sizeof(float), 1, f);
-    fread(&dayNight.daySpeed, sizeof(float), 1, f);
-    fread(&dayNight.lightLevel, sizeof(float), 1, f);
+    if (fread(&dayNight.timeOfDay, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&dayNight.daySpeed, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&dayNight.lightLevel, sizeof(float), 1, f) != 1) { fclose(f); return false; }
 
     // Player
-    fread(&player.position.x, sizeof(float), 1, f);
-    fread(&player.position.y, sizeof(float), 1, f);
-    fread(&player.velocity.x, sizeof(float), 1, f);
-    fread(&player.velocity.y, sizeof(float), 1, f);
-    fread(&player.onGround, sizeof(bool), 1, f);
-    fread(&player.selectedSlot, sizeof(int), 1, f);
-    fread(player.inventory, sizeof(uint8_t), HOTBAR_SLOTS, f);
-    fread(player.inventoryCount, sizeof(int), HOTBAR_SLOTS, f);
+    if (fread(&player.position.x, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&player.position.y, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&player.velocity.x, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&player.velocity.y, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&player.onGround, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&player.selectedSlot, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+
+    if (version >= 2) {
+        // v2: full 36-slot inventory
+        if (fread(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
+        if (fread(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
+    } else {
+        // v1 compat: only 9 hotbar slots, clear the rest
+        if (fread(player.inventory, sizeof(uint8_t), HOTBAR_SLOTS, f) != HOTBAR_SLOTS) { fclose(f); return false; }
+        if (fread(player.inventoryCount, sizeof(int), HOTBAR_SLOTS, f) != HOTBAR_SLOTS) { fclose(f); return false; }
+        for (int i = HOTBAR_SLOTS; i < INVENTORY_SLOTS; i++) {
+            player.inventory[i] = BLOCK_AIR;
+            player.inventoryCount[i] = 0;
+        }
+    }
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {

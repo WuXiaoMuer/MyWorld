@@ -1,0 +1,35 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "make",
+            "args": ["-f", "Makefile"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Build MyWorld with GNU Make"
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "make",
+            "args": ["-f", "Makefile", "clean"],
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Clean build artifacts"
+        },
+        {
+            "label": "rebuild",
+            "type": "shell",
+            "command": "make",
+            "args": ["-f", "Makefile", "clean", "all"],
+            "group": "build",
+            "problemMatcher": ["$gcc"],
+            "detail": "Clean and rebuild"
+        }
+    ]
+}

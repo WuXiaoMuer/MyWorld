@@ -36,13 +36,18 @@
 #define HOTBAR_SLOTS        9
 #define INVENTORY_ROWS      4
 #define INVENTORY_COLS      9
+#define INVENTORY_SLOTS     (INVENTORY_ROWS * INVENTORY_COLS)
 
 #define BREAK_RANGE         6
 #define PLACE_RANGE         6
 
+#define MAX_CRAFT_RECIPES   16
+
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        1
+#define SAVE_VERSION        2
 #define SAVE_PATH           "saves/world.mwsav"
+
+#define DEATH_Y             (WORLD_HEIGHT * BLOCK_SIZE + 500)
 
 //----------------------------------------------------------------------------------
 // Block Types
@@ -76,6 +81,17 @@ typedef struct {
 } BlockInfo;
 
 //----------------------------------------------------------------------------------
+// Crafting
+//----------------------------------------------------------------------------------
+typedef struct {
+    BlockType input;
+    int inputCount;
+    BlockType output;
+    int outputCount;
+    const char *name;
+} CraftingRecipe;
+
+//----------------------------------------------------------------------------------
 // Data Structures
 //----------------------------------------------------------------------------------
 typedef struct {
@@ -83,8 +99,8 @@ typedef struct {
     Vector2 velocity;
     bool onGround;
     int selectedSlot;
-    uint8_t inventory[HOTBAR_SLOTS];
-    int inventoryCount[HOTBAR_SLOTS];
+    uint8_t inventory[INVENTORY_SLOTS];
+    int inventoryCount[INVENTORY_SLOTS];
 } Player;
 
 typedef struct {
@@ -112,19 +128,23 @@ extern DayNightCycle dayNight;
 
 extern Texture2D blockAtlas;
 extern bool showDebug;
+extern bool inventoryOpen;
+extern unsigned int worldSeed;
 
 extern const BlockInfo blockInfo[BLOCK_COUNT];
+extern CraftingRecipe craftRecipes[MAX_CRAFT_RECIPES];
+extern int craftRecipeCount;
 
 //----------------------------------------------------------------------------------
 // Function Declarations
 //----------------------------------------------------------------------------------
 
-// noise.h
+// noise.c
 unsigned int hash2D(int x, int y, unsigned int seed);
 float valueNoise(float x, float y, unsigned int seed);
 float fbm(float x, float y, int octaves, float persistence, unsigned int seed);
 
-// world.h
+// world.c
 void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int worldY);
 void GenerateBlockAtlas(void);
 void GenerateWorld(unsigned int seed);
@@ -135,7 +155,7 @@ void InvalidateChunkAt(int worldBlockX, int worldBlockY);
 void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
 
-// player.h
+// player.c
 void InitPlayer(void);
 bool AddToInventory(BlockType item);
 void PlayerPhysics(float dt);
@@ -145,25 +165,32 @@ void InitCameraSystem(void);
 void UpdateCameraSystem(float dt);
 void UpdateHotbar(void);
 
-// daynight.h
+// daynight.c
 void InitDayNight(void);
 void UpdateDayNight(float dt);
 Color GetSkyColor(void);
 
-// rendering.h
+// rendering.c
 void DrawWorld(void);
 void DrawWater(void);
 void DrawPlayerSprite(void);
 void DrawHotbar(void);
 void DrawCrosshair(void);
 void DrawDebugInfo(void);
+void DrawInventoryScreen(void);
 
-// save.h
+// save.c
 bool SaveExists(const char *path);
 bool SaveWorld(const char *path);
 bool LoadWorld(const char *path);
 
-// game.h
+// crafting.c
+void InitCraftingRecipes(void);
+bool CanCraft(int recipeIndex);
+void Craft(int recipeIndex);
+void DrawCraftingPanel(int panelX, int panelY);
+
+// game.c
 void InitGame(void);
 void UpdateGame(float dt);
 void DrawGame(void);

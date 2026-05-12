@@ -19,7 +19,7 @@ void InitPlayer(void)
     player.onGround = false;
     player.selectedSlot = 0;
 
-    for (int i = 0; i < HOTBAR_SLOTS; i++) {
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
         player.inventory[i] = BLOCK_AIR;
         player.inventoryCount[i] = 0;
     }
@@ -36,13 +36,15 @@ void InitPlayer(void)
 //----------------------------------------------------------------------------------
 bool AddToInventory(BlockType item)
 {
-    for (int i = 0; i < HOTBAR_SLOTS; i++) {
+    // Try to stack in existing slots
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
         if (player.inventory[i] == item && player.inventoryCount[i] < 64) {
             player.inventoryCount[i]++;
             return true;
         }
     }
-    for (int i = 0; i < HOTBAR_SLOTS; i++) {
+    // Find empty slot
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
         if (player.inventory[i] == BLOCK_AIR) {
             player.inventory[i] = item;
             player.inventoryCount[i] = 1;
@@ -140,13 +142,37 @@ void PlayerPhysics(float dt)
     if (player.position.x < 0) player.position.x = 0;
     if (player.position.x > (WORLD_WIDTH - 1) * BLOCK_SIZE)
         player.position.x = (WORLD_WIDTH - 1) * BLOCK_SIZE;
+
+    // Death from falling out of world
+    if (player.position.y > DEATH_Y) {
+        // Lose all items, respawn
+        for (int i = 0; i < INVENTORY_SLOTS; i++) {
+            player.inventory[i] = BLOCK_AIR;
+            player.inventoryCount[i] = 0;
+        }
+        int spawnX = WORLD_WIDTH / 2;
+        int spawnY = 0;
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[spawnX][y] != BLOCK_AIR && world[spawnX][y] != BLOCK_WATER) {
+                spawnY = y - 3;
+                break;
+            }
+        }
+        player.position = (Vector2){ spawnX * BLOCK_SIZE, spawnY * BLOCK_SIZE };
+        player.velocity = (Vector2){ 0, 0 };
+        player.onGround = false;
+        player.selectedSlot = 0;
+        InitCameraSystem();
+    }
 }
 
 //----------------------------------------------------------------------------------
-// Block Interaction
+// Block Interaction (disabled when inventory is open)
 //----------------------------------------------------------------------------------
 void PlayerBlockInteraction(void)
 {
+    if (inventoryOpen) return;
+
     Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
     int blockX = (int)(mouseWorld.x / BLOCK_SIZE);
     int blockY = (int)(mouseWorld.y / BLOCK_SIZE);
@@ -237,6 +263,8 @@ void UpdateCameraSystem(float dt)
 //----------------------------------------------------------------------------------
 void UpdateHotbar(void)
 {
+    if (inventoryOpen) return;
+
     for (int i = 0; i < HOTBAR_SLOTS; i++) {
         if (IsKeyPressed(KEY_ONE + i)) player.selectedSlot = i;
     }

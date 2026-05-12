@@ -2,6 +2,143 @@
 #include <math.h>
 #include <stdio.h>
 
+// Held item state for inventory drag-and-drop
+static uint8_t heldItem = BLOCK_AIR;
+static int heldCount = 0;
+
+static void DrawSlot(int x, int y, int slotSize, int slotIndex, bool highlight)
+{
+    Color bg = highlight ? (Color){255, 255, 255, 200} : (Color){80, 80, 80, 200};
+    DrawRectangle(x, y, slotSize, slotSize, bg);
+    DrawRectangleLines(x, y, slotSize, slotSize, DARKGRAY);
+
+    if (player.inventory[slotIndex] != BLOCK_AIR) {
+        Rectangle src = { (float)(player.inventory[slotIndex] * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+        Rectangle dst = { (float)(x + 4), (float)(y + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
+        DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+
+        if (player.inventoryCount[slotIndex] > 1) {
+            DrawText(TextFormat("%d", player.inventoryCount[slotIndex]),
+                     x + slotSize - 20, y + slotSize - 16, 12, WHITE);
+        }
+    }
+}
+
+void DrawInventoryScreen(void)
+{
+    if (!inventoryOpen) return;
+
+    int slotSize = 44;
+    int padding = 4;
+    int gridW = INVENTORY_COLS * slotSize + (INVENTORY_COLS - 1) * padding;
+    int gridH = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
+    int gridX = (SCREEN_WIDTH - gridW - 320) / 2;  // Leave room for crafting panel
+    int gridY = (SCREEN_HEIGHT - gridH) / 2;
+
+    // Dim overlay
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 150});
+
+    // Inventory panel background
+    DrawRectangle(gridX - 10, gridY - 30, gridW + 20, gridH + 50, (Color){50, 50, 50, 230});
+    DrawRectangleLines(gridX - 10, gridY - 30, gridW + 20, gridH + 50, (Color){100, 100, 100, 255});
+    DrawText("Inventory", gridX, gridY - 22, 18, WHITE);
+
+    Vector2 mouse = GetMousePosition();
+
+    // Draw inventory grid
+    for (int row = 0; row < INVENTORY_ROWS; row++) {
+        for (int col = 0; col < INVENTORY_COLS; col++) {
+            int idx = row * INVENTORY_COLS + col;
+            int x = gridX + col * (slotSize + padding);
+            int y = gridY + row * (slotSize + padding);
+
+            Rectangle slotRect = { (float)x, (float)y, (float)slotSize, (float)slotSize };
+            bool hover = CheckCollisionPointRec(mouse, slotRect);
+            bool selected = (row == 0 && col == player.selectedSlot);
+
+            DrawSlot(x, y, slotSize, idx, selected || hover);
+
+            // Row labels for hotbar
+            if (row == 0) {
+                DrawText(TextFormat("%d", col + 1), x + 3, y + 2, 10, (Color){200, 200, 200, 150});
+            }
+
+            // Handle click
+            if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                if (heldItem == BLOCK_AIR && player.inventory[idx] != BLOCK_AIR) {
+                    // Pick up item
+                    heldItem = player.inventory[idx];
+                    heldCount = player.inventoryCount[idx];
+                    player.inventory[idx] = BLOCK_AIR;
+                    player.inventoryCount[idx] = 0;
+                } else if (heldItem != BLOCK_AIR && player.inventory[idx] == BLOCK_AIR) {
+                    // Place held item
+                    player.inventory[idx] = heldItem;
+                    player.inventoryCount[idx] = heldCount;
+                    heldItem = BLOCK_AIR;
+                    heldCount = 0;
+                } else if (heldItem != BLOCK_AIR && player.inventory[idx] == heldItem) {
+                    // Stack
+                    int space = 64 - player.inventoryCount[idx];
+                    int toAdd = heldCount > space ? space : heldCount;
+                    player.inventoryCount[idx] += toAdd;
+                    heldCount -= toAdd;
+                    if (heldCount <= 0) {
+                        heldItem = BLOCK_AIR;
+                        heldCount = 0;
+                    }
+                } else if (heldItem != BLOCK_AIR && player.inventory[idx] != BLOCK_AIR) {
+                    // Swap held and slot
+                    uint8_t tmpItem = player.inventory[idx];
+                    int tmpCount = player.inventoryCount[idx];
+                    player.inventory[idx] = heldItem;
+                    player.inventoryCount[idx] = heldCount;
+                    heldItem = tmpItem;
+                    heldCount = tmpCount;
+                }
+            }
+
+            // Right click to pick up half
+            if (hover && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && heldItem == BLOCK_AIR
+                && player.inventory[idx] != BLOCK_AIR) {
+                heldItem = player.inventory[idx];
+                heldCount = (player.inventoryCount[idx] + 1) / 2;
+                player.inventoryCount[idx] -= heldCount;
+                if (player.inventoryCount[idx] <= 0) {
+                    player.inventory[idx] = BLOCK_AIR;
+                    player.inventoryCount[idx] = 0;
+                }
+            }
+        }
+    }
+
+    // Draw held item following mouse
+    if (heldItem != BLOCK_AIR) {
+        int mx = (int)mouse.x - slotSize / 2;
+        int my = (int)mouse.y - slotSize / 2;
+        Rectangle src = { (float)(heldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+        Rectangle dst = { (float)(mx + 4), (float)(my + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
+        DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+        if (heldCount > 1) {
+            DrawText(TextFormat("%d", heldCount), mx + slotSize - 20, my + slotSize - 16, 12, WHITE);
+        }
+    }
+
+    // Crafting panel
+    int craftX = gridX + gridW + 20;
+    int craftY = gridY - 10;
+    DrawCraftingPanel(craftX, craftY);
+
+    // Drop held item if inventory closes with held item
+    if (IsKeyPressed(KEY_E) || IsKeyPressed(KEY_ESCAPE)) {
+        if (heldItem != BLOCK_AIR) {
+            AddToInventory(heldItem);
+            heldItem = BLOCK_AIR;
+            heldCount = 0;
+        }
+    }
+}
+
 void DrawWorld(void)
 {
     float viewLeft = camera.target.x - (SCREEN_WIDTH / 2.0f) / camera.zoom;

@@ -19,6 +19,11 @@ DayNightCycle dayNight = { 0 };
 
 Texture2D blockAtlas = { 0 };
 bool showDebug = false;
+bool inventoryOpen = false;
+unsigned int worldSeed = 0;
+
+CraftingRecipe craftRecipes[MAX_CRAFT_RECIPES];
+int craftRecipeCount = 0;
 
 //----------------------------------------------------------------------------------
 // Program Entry Point

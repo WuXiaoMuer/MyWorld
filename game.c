@@ -5,14 +5,15 @@
 void InitGame(void)
 {
     srand((unsigned int)time(NULL));
-    unsigned int seed = (unsigned int)rand();
+    worldSeed = (unsigned int)rand();
 
     GenerateBlockAtlas();
+    InitCraftingRecipes();
 
     if (SaveExists(SAVE_PATH)) {
         LoadWorld(SAVE_PATH);
     } else {
-        GenerateWorld(seed);
+        GenerateWorld(worldSeed);
         InitPlayer();
     }
 
@@ -23,10 +24,18 @@ void InitGame(void)
 
 void UpdateGame(float dt)
 {
+    // Toggle inventory
+    if (IsKeyPressed(KEY_E)) {
+        inventoryOpen = !inventoryOpen;
+    }
+
     if (IsKeyPressed(KEY_F3)) showDebug = !showDebug;
 
-    UpdatePlayer(dt);
-    UpdateCameraSystem(dt);
+    // Don't update player movement when inventory is open
+    if (!inventoryOpen) {
+        UpdatePlayer(dt);
+        UpdateCameraSystem(dt);
+    }
     UpdateChunks();
     UpdateHotbar();
     UpdateDayNight(dt);
@@ -40,7 +49,7 @@ void DrawGame(void)
     BeginMode2D(camera);
     DrawWorld();
     DrawWater();
-    DrawCrosshair();
+    if (!inventoryOpen) DrawCrosshair();
     DrawPlayerSprite();
     EndMode2D();
 
@@ -52,6 +61,10 @@ void DrawGame(void)
 
     DrawHotbar();
     DrawDebugInfo();
+
+    // Inventory screen (drawn on top of everything)
+    DrawInventoryScreen();
+
     DrawFPS(SCREEN_WIDTH - 80, 10);
 
     EndDrawing();
