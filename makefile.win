@@ -13,10 +13,10 @@ CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-mwindows"
 CFLAGS   = $(INCS) "-O2" "-pipe" "-mwindows"
 WINDRESFLAGS = 
 RES      = MyWorld_private.res
-OBJ      = main.o $(RES)
+OBJ      = daynight.o player.o main.o save.o game.o noise.o rendering.o world.o $(RES)
 BIN      = MyWorld.exe
-LINKOBJ  = "main.o" "MyWorld_private.res"
-CLEANOBJ = "main.o" "MyWorld_private.res" "MyWorld.exe"
+LINKOBJ  = "daynight.o" "player.o" "main.o" "save.o" "game.o" "noise.o" "rendering.o" "world.o" "MyWorld_private.res"
+CLEANOBJ = "daynight.o" "player.o" "main.o" "save.o" "game.o" "noise.o" "rendering.o" "world.o" "MyWorld_private.res" "MyWorld.exe"
 
 .PHONY: all all-before all-after clean clean-custom
 
@@ -29,8 +29,29 @@ MyWorld.exe: $(OBJ)
 
 	$(CXX) $(LINKOBJ) -o "MyWorld.exe" $(LIBS)
 
-main.o: main.c
+daynight.o: daynight.c types.h
+	$(CC) -c "daynight.c" -o "daynight.o" $(CFLAGS) 
+
+player.o: player.c types.h
+	$(CC) -c "player.c" -o "player.o" $(CFLAGS) 
+
+main.o: main.c types.h
 	$(CC) -c "main.c" -o "main.o" $(CFLAGS) 
+
+save.o: save.c types.h
+	$(CC) -c "save.c" -o "save.o" $(CFLAGS) 
+
+game.o: game.c types.h
+	$(CC) -c "game.c" -o "game.o" $(CFLAGS) 
+
+noise.o: noise.c types.h
+	$(CC) -c "noise.c" -o "noise.o" $(CFLAGS) 
+
+rendering.o: rendering.c types.h
+	$(CC) -c "rendering.c" -o "rendering.o" $(CFLAGS) 
+
+world.o: world.c types.h
+	$(CC) -c "world.c" -o "world.o" $(CFLAGS) 
 
 MyWorld_private.res: MyWorld_private.rc 
 	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS) 
