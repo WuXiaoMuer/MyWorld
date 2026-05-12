@@ -50,3 +50,15 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Compiled Resource files
+*.res
+
+# IDE files (Red Panda C++)
+*.bookmarks
+*.debug
+*.dev
+*.layout
+
+# Third-party binary libraries
+lib/

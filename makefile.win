@@ -1,0 +1,37 @@
+# Project: MyWorld
+# Makefile created by Red Panda C++ 3.1.2871
+
+CXX      = "g++.exe"
+CC       = "gcc.exe"
+WINDRES  = "windres.exe"
+RM       = del /q /f
+CD       = cd /d
+LIBS     = "-LE:/github/MyWorld/lib" "-Wl,--stack,12582912" "-s" "-lraylib" "-lopengl32" "-lgdi32" "-lwinmm" "-static"
+INCS     = "-IE:/github/MyWorld/include"
+CXXINCS  = "-IE:/github/MyWorld/include"
+CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-mwindows"
+CFLAGS   = $(INCS) "-O2" "-pipe" "-mwindows"
+WINDRESFLAGS = 
+RES      = MyWorld_private.res
+OBJ      = main.o $(RES)
+BIN      = MyWorld.exe
+LINKOBJ  = "main.o" "MyWorld_private.res"
+CLEANOBJ = "main.o" "MyWorld_private.res" "MyWorld.exe"
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before $(BIN) all-after
+
+clean: clean-custom
+	-$(RM) $(CLEANOBJ) >NUL 2>&1
+
+MyWorld.exe: $(OBJ)
+
+	$(CXX) $(LINKOBJ) -o "MyWorld.exe" $(LIBS)
+
+main.o: main.c
+	$(CC) -c "main.c" -o "main.o" $(CFLAGS) 
+
+MyWorld_private.res: MyWorld_private.rc 
+	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS) 
+
