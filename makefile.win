@@ -13,10 +13,10 @@ CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-mwindows"
 CFLAGS   = $(INCS) "-O2" "-pipe" "-mwindows"
 WINDRESFLAGS = 
 RES      = MyWorld_private.res
-OBJ      = player.o save.o daynight.o rendering.o world.o main.o noise.o game.o $(RES)
+OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o $(RES)
 BIN      = MyWorld.exe
-LINKOBJ  = "player.o" "save.o" "daynight.o" "rendering.o" "world.o" "main.o" "noise.o" "game.o" "MyWorld_private.res"
-CLEANOBJ = "player.o" "save.o" "daynight.o" "rendering.o" "world.o" "main.o" "noise.o" "game.o" "MyWorld_private.res" "MyWorld.exe"
+LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "MyWorld_private.res"
+CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "MyWorld_private.res" "MyWorld.exe"
 
 .PHONY: all all-before all-after clean clean-custom
 
@@ -29,29 +29,32 @@ MyWorld.exe: $(OBJ)
 
 	$(CXX) $(LINKOBJ) -o "MyWorld.exe" $(LIBS)
 
-player.o: player.c types.h
-	$(CC) -c "player.c" -o "player.o" $(CFLAGS) 
+noise.o: noise.c types.h
+	$(CC) -c "noise.c" -o "noise.o" $(CFLAGS) 
+
+main.o: main.c types.h
+	$(CC) -c "main.c" -o "main.o" $(CFLAGS) 
+
+crafting.o: crafting.c types.h
+	$(CC) -c "crafting.c" -o "crafting.o" $(CFLAGS) 
 
 save.o: save.c types.h
 	$(CC) -c "save.c" -o "save.o" $(CFLAGS) 
+
+world.o: world.c types.h
+	$(CC) -c "world.c" -o "world.o" $(CFLAGS) 
+
+game.o: game.c types.h
+	$(CC) -c "game.c" -o "game.o" $(CFLAGS) 
+
+player.o: player.c types.h
+	$(CC) -c "player.c" -o "player.o" $(CFLAGS) 
 
 daynight.o: daynight.c types.h
 	$(CC) -c "daynight.c" -o "daynight.o" $(CFLAGS) 
 
 rendering.o: rendering.c types.h
 	$(CC) -c "rendering.c" -o "rendering.o" $(CFLAGS) 
-
-world.o: world.c types.h
-	$(CC) -c "world.c" -o "world.o" $(CFLAGS) 
-
-main.o: main.c types.h
-	$(CC) -c "main.c" -o "main.o" $(CFLAGS) 
-
-noise.o: noise.c types.h
-	$(CC) -c "noise.c" -o "noise.o" $(CFLAGS) 
-
-game.o: game.c types.h
-	$(CC) -c "game.c" -o "game.o" $(CFLAGS) 
 
 MyWorld_private.res: MyWorld_private.rc 
 	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS) 

@@ -4,11 +4,12 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format v2:
+// Save File Format v3:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
-//                + uint8 inventory[36] + int inventoryCount[36]
+//                + uint8 inventory[36] + int inventoryCount[36] + int toolDurability[36]
+//                + int health + int hunger + int oxygen + int xp
 //   World:       RLE per column: (uint8 block, uint16 count) pairs
 //----------------------------------------------------------------------------------
 
@@ -23,7 +24,10 @@ bool SaveWorld(const char *path)
 {
     mkdir("saves");
 
-    FILE *f = fopen(path, "wb");
+    // Write to tmp first for crash safety
+    char tmpPath[256];
+    snprintf(tmpPath, sizeof(tmpPath), "%s.tmp", path);
+    FILE *f = fopen(tmpPath, "wb");
     if (!f) return false;
 
     // Header
@@ -51,6 +55,11 @@ bool SaveWorld(const char *path)
     fwrite(&player.selectedSlot, sizeof(int), 1, f);
     fwrite(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f);
     fwrite(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f);
+    fwrite(player.toolDurability, sizeof(int), INVENTORY_SLOTS, f);
+    fwrite(&player.health, sizeof(int), 1, f);
+    fwrite(&player.hunger, sizeof(int), 1, f);
+    fwrite(&player.oxygen, sizeof(int), 1, f);
+    fwrite(&player.xp, sizeof(int), 1, f);
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {
@@ -68,6 +77,13 @@ bool SaveWorld(const char *path)
     }
 
     fclose(f);
+
+    // Atomic replace: remove old file, rename tmp
+    remove(path);
+    if (rename(tmpPath, path) != 0) {
+        remove(tmpPath);
+        return false;
+    }
     return true;
 }
 
@@ -108,7 +124,7 @@ bool LoadWorld(const char *path)
     if (fread(&player.selectedSlot, sizeof(int), 1, f) != 1) { fclose(f); return false; }
 
     if (version >= 2) {
-        // v2: full 36-slot inventory
+        // v2+: full 36-slot inventory
         if (fread(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
         if (fread(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
     } else {
@@ -120,6 +136,33 @@ bool LoadWorld(const char *path)
             player.inventoryCount[i] = 0;
         }
     }
+
+    if (version >= 3) {
+        // v3: tool durability + player status
+        if (fread(player.toolDurability, sizeof(int), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
+        if (fread(&player.health, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+        if (fread(&player.hunger, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+        if (fread(&player.oxygen, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+        if (fread(&player.xp, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+    } else {
+        // v2 compat: default values
+        for (int i = 0; i < INVENTORY_SLOTS; i++) {
+            if (IsTool((BlockType)player.inventory[i])) {
+                player.toolDurability[i] = GetToolMaxDurability((BlockType)player.inventory[i]);
+            } else {
+                player.toolDurability[i] = 0;
+            }
+        }
+        player.health = MAX_HEALTH;
+        player.hunger = MAX_HUNGER;
+        player.oxygen = MAX_OXYGEN;
+        player.xp = 0;
+    }
+    player.oxygenTimer = 0.0f;
+    player.hungerTimer = 0.0f;
+    player.regenTimer = 0.0f;
+    player.drownTimer = 0.0f;
+    player.hungerDamageTimer = 0.0f;
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {
@@ -139,7 +182,8 @@ bool LoadWorld(const char *path)
     fclose(f);
 
     // Invalidate all loaded chunks so they regenerate textures
-    for (int i = 0; i < loadedChunkCount; i++) {
+    for (int i = 0; i < MAX_CHUNKS; i++) {
+        if (loadedChunks[i].chunkX == CHUNK_EMPTY) continue;
         if (loadedChunks[i].textureValid) {
             UnloadTexture(loadedChunks[i].texture);
         }

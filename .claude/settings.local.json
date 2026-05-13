@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f *.o)",
+      "Bash(make -f Makefile)",
+      "Bash(timeout 3 ./MyWorld.exe)"
+    ]
+  }
+}

@@ -5,6 +5,7 @@
 #include <raymath.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <limits.h>
 
 //----------------------------------------------------------------------------------
 // Constants
@@ -20,6 +21,7 @@
 #define CHUNK_SIZE          16
 #define MAX_CHUNKS          64
 #define CHUNKS_LOADED       12
+#define CHUNK_EMPTY         INT_MAX
 
 #define SEA_LEVEL           128
 #define TERRAIN_BASE        120
@@ -41,13 +43,49 @@
 #define BREAK_RANGE         6
 #define PLACE_RANGE         6
 
-#define MAX_CRAFT_RECIPES   16
+#define MAX_CRAFT_RECIPES   32
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        2
+#define SAVE_VERSION        3
 #define SAVE_PATH           "saves/world.mwsav"
 
 #define DEATH_Y             (WORLD_HEIGHT * BLOCK_SIZE + 500)
+#define MESSAGE_DURATION    2.0f
+
+// Player status
+#define MAX_HEALTH          20
+#define MAX_HUNGER          20
+#define MAX_OXYGEN          10
+#define MAX_XP              100
+#define HUNGER_DRAIN_RATE   (0.5f / 60.0f)  // 0.5 per minute
+#define HUNGER_SPRINT_MULT  2.0f
+#define HEALTH_REGEN_RATE   (1.0f / 2.0f)   // 1 HP per 2 seconds
+#define HEALTH_REGEN_HUNGER 18              // Need hunger > 18 to regen
+#define OXYGEN_DRAIN_RATE   1.0f            // 1 per second underwater
+#define DROWN_DAMAGE_RATE   (2.0f / 1.0f)   // 2 hearts per second when out of oxygen
+#define HUNGER_DAMAGE_RATE  (1.0f / 2.0f)   // 1 heart per 2 seconds at 0 hunger
+
+// Tool durability
+#define DURABILITY_WOOD     60
+#define DURABILITY_STONE    132
+#define DURABILITY_IRON     251
+
+// Food restoration values (hunger points)
+#define FOOD_RAW_PORK_VALUE    3
+#define FOOD_COOKED_PORK_VALUE 8
+#define FOOD_APPLE_VALUE       4
+#define FOOD_BREAD_VALUE       5
+
+// Mob system
+#define MAX_MOBS            32
+#define MOB_SPAWN_INTERVAL  3.0f
+#define MOB_SPAWN_DIST_MIN  400.0f
+#define MOB_SPAWN_DIST_MAX  800.0f
+#define MOB_DESPAWN_DIST    1200.0f
+#define MOB_AI_INTERVAL     0.5f
+#define MOB_CONTACT_COOLDOWN 1.0f
+#define MOB_DEATH_TIME      0.3f
+#define MOB_GRAVITY         980.0f
 
 //----------------------------------------------------------------------------------
 // Block Types
@@ -68,6 +106,33 @@ typedef enum {
     BLOCK_BRICK,
     BLOCK_GLASS,
     BLOCK_BEDROCK,
+    // New terrain blocks
+    BLOCK_GRAVEL,
+    BLOCK_CLAY,
+    BLOCK_SANDSTONE,
+    // Decorative blocks
+    BLOCK_TORCH,
+    BLOCK_FLOWER,
+    BLOCK_TALL_GRASS,
+    BLOCK_FURNACE,
+    // Tools (not placeable)
+    TOOL_WOOD_PICKAXE,
+    TOOL_WOOD_AXE,
+    TOOL_WOOD_SWORD,
+    TOOL_WOOD_SHOVEL,
+    TOOL_STONE_PICKAXE,
+    TOOL_STONE_AXE,
+    TOOL_STONE_SWORD,
+    TOOL_STONE_SHOVEL,
+    TOOL_IRON_PICKAXE,
+    TOOL_IRON_AXE,
+    TOOL_IRON_SWORD,
+    TOOL_IRON_SHOVEL,
+    // Food (not placeable)
+    FOOD_RAW_PORK,
+    FOOD_COOKED_PORK,
+    FOOD_APPLE,
+    FOOD_BREAD,
     BLOCK_COUNT
 } BlockType;
 
@@ -92,6 +157,31 @@ typedef struct {
 } CraftingRecipe;
 
 //----------------------------------------------------------------------------------
+// Mob System
+//----------------------------------------------------------------------------------
+typedef enum {
+    MOB_NONE = 0,
+    MOB_PIG,
+    MOB_ZOMBIE,
+    MOB_TYPE_COUNT
+} MobType;
+
+typedef struct {
+    MobType type;
+    Vector2 position;
+    Vector2 velocity;
+    int health;
+    int maxHealth;
+    bool facingRight;
+    bool onGround;
+    float aiTimer;
+    int aiState;        // 0=idle, 1=wander/chase
+    float contactCooldown;
+    float deathTimer;   // >0 = dying
+    bool active;
+} Mob;
+
+//----------------------------------------------------------------------------------
 // Data Structures
 //----------------------------------------------------------------------------------
 typedef struct {
@@ -101,12 +191,24 @@ typedef struct {
     int selectedSlot;
     uint8_t inventory[INVENTORY_SLOTS];
     int inventoryCount[INVENTORY_SLOTS];
+    int toolDurability[INVENTORY_SLOTS];
+    // Status
+    int health;
+    int hunger;
+    int oxygen;
+    int xp;
+    float oxygenTimer;
+    float hungerTimer;
+    float regenTimer;
+    float drownTimer;
+    float hungerDamageTimer;
 } Player;
 
 typedef struct {
     int chunkX;
     Texture2D texture;
     bool textureValid;
+    int waterTopY[CHUNK_SIZE]; // Topmost water Y per column, -1 if none
 } Chunk;
 
 typedef struct {
@@ -120,7 +222,6 @@ typedef struct {
 //----------------------------------------------------------------------------------
 extern uint8_t world[WORLD_WIDTH][WORLD_HEIGHT];
 extern Chunk loadedChunks[MAX_CHUNKS];
-extern int loadedChunkCount;
 
 extern Player player;
 extern Camera2D camera;
@@ -129,7 +230,17 @@ extern DayNightCycle dayNight;
 extern Texture2D blockAtlas;
 extern bool showDebug;
 extern bool inventoryOpen;
+extern bool gamePaused;
 extern unsigned int worldSeed;
+
+extern char messageText[128];
+extern float messageTimer;
+
+extern Mob mobs[MAX_MOBS];
+extern float mobSpawnTimer;
+
+extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
+extern Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
 
 extern const BlockInfo blockInfo[BLOCK_COUNT];
 extern CraftingRecipe craftRecipes[MAX_CRAFT_RECIPES];
@@ -149,7 +260,7 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
 void GenerateBlockAtlas(void);
 void GenerateWorld(unsigned int seed);
 Chunk* GetChunk(int chunkX);
-void UnloadChunk(int index);
+void UnloadChunk(int chunkX);
 void GenerateChunkTexture(Chunk *chunk);
 void InvalidateChunkAt(int worldBlockX, int worldBlockY);
 void UpdateChunks(void);
@@ -158,12 +269,20 @@ bool IsBlockSolid(int bx, int by);
 // player.c
 void InitPlayer(void);
 bool AddToInventory(BlockType item);
+float GetToolMiningSpeed(BlockType tool, BlockType block);
+bool IsTool(BlockType item);
+int GetToolMaxDurability(BlockType tool);
+bool IsFood(BlockType item);
+int GetFoodValue(BlockType item);
 void PlayerPhysics(float dt);
 void PlayerBlockInteraction(void);
 void UpdatePlayer(float dt);
+void UpdatePlayerStatus(float dt);
 void InitCameraSystem(void);
 void UpdateCameraSystem(float dt);
 void UpdateHotbar(void);
+float GetMiningProgress(void);
+bool IsPlayerUnderwater(void);
 
 // daynight.c
 void InitDayNight(void);
@@ -175,9 +294,14 @@ void DrawWorld(void);
 void DrawWater(void);
 void DrawPlayerSprite(void);
 void DrawHotbar(void);
+void DrawPlayerStatus(void);
 void DrawCrosshair(void);
 void DrawDebugInfo(void);
 void DrawInventoryScreen(void);
+void DrawMessage(void);
+void DrawPauseMenu(void);
+void DrawDeathScreen(float dt);
+void DrawBackground(void);
 
 // save.c
 bool SaveExists(const char *path);
@@ -189,6 +313,29 @@ void InitCraftingRecipes(void);
 bool CanCraft(int recipeIndex);
 void Craft(int recipeIndex);
 void DrawCraftingPanel(int panelX, int panelY);
+
+// mob.c
+void InitMobs(void);
+void UpdateMobs(float dt);
+void DrawMobs(void);
+Mob* SpawnMob(MobType type, float x, float y);
+void DamageMob(Mob *mob, int damage);
+bool IsPlayerNearMob(Mob *mob, float range);
+
+// sound.c
+void InitSounds(void);
+void UnloadSounds(void);
+void PlaySoundBreak(BlockType block);
+void PlaySoundPlace(BlockType block);
+void PlaySoundJump(void);
+void PlaySoundLand(void);
+void PlaySoundHurt(void);
+void PlaySoundDeath(void);
+void PlaySoundEat(void);
+void PlaySoundUIClick(void);
+void PlaySoundCraft(void);
+void PlaySoundXP(void);
+void PlaySoundDrop(void);
 
 // game.c
 void InitGame(void);

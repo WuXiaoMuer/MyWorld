@@ -8,7 +8,9 @@ void InitGame(void)
     worldSeed = (unsigned int)rand();
 
     GenerateBlockAtlas();
+    InitSounds();
     InitCraftingRecipes();
+    InitMobs();
 
     if (SaveExists(SAVE_PATH)) {
         LoadWorld(SAVE_PATH);
@@ -24,16 +26,27 @@ void InitGame(void)
 
 void UpdateGame(float dt)
 {
+    // Update message timer
+    if (messageTimer > 0.0f) messageTimer -= dt;
+
     // Toggle inventory
     if (IsKeyPressed(KEY_E)) {
         inventoryOpen = !inventoryOpen;
+        if (inventoryOpen) gamePaused = false;
+    }
+
+    // Toggle pause (only when inventory is closed)
+    if (IsKeyPressed(KEY_ESCAPE) && !inventoryOpen) {
+        gamePaused = !gamePaused;
     }
 
     if (IsKeyPressed(KEY_F3)) showDebug = !showDebug;
 
-    // Don't update player movement when inventory is open
-    if (!inventoryOpen) {
+    // Don't update gameplay when paused or inventory open
+    if (!gamePaused && !inventoryOpen) {
         UpdatePlayer(dt);
+        UpdatePlayerStatus(dt);
+        UpdateMobs(dt);
         UpdateCameraSystem(dt);
     }
     UpdateChunks();
@@ -46,24 +59,29 @@ void DrawGame(void)
     BeginDrawing();
     ClearBackground(GetSkyColor());
 
+    DrawBackground();
+
     BeginMode2D(camera);
     DrawWorld();
     DrawWater();
-    if (!inventoryOpen) DrawCrosshair();
+    DrawMobs();
+    if (!inventoryOpen && !gamePaused) DrawCrosshair();
     DrawPlayerSprite();
     EndMode2D();
 
-    // Dark overlay for night
     if (dayNight.lightLevel < 1.0f) {
-        unsigned char alpha = (unsigned char)(200 * (1.0f - dayNight.lightLevel));
-        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 20, alpha});
+        unsigned char alpha = (unsigned char)(120 * (1.0f - dayNight.lightLevel));
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){5, 5, 25, alpha});
     }
 
     DrawHotbar();
+    DrawPlayerStatus();
     DrawDebugInfo();
+    DrawMessage();
 
-    // Inventory screen (drawn on top of everything)
     DrawInventoryScreen();
+    DrawPauseMenu();
+    DrawDeathScreen(GetFrameTime());
 
     DrawFPS(SCREEN_WIDTH - 80, 10);
 
@@ -74,12 +92,13 @@ void UnloadGame(void)
 {
     SaveWorld(SAVE_PATH);
 
-    for (int i = 0; i < loadedChunkCount; i++) {
-        if (loadedChunks[i].textureValid) {
+    for (int i = 0; i < MAX_CHUNKS; i++) {
+        if (loadedChunks[i].chunkX != CHUNK_EMPTY && loadedChunks[i].textureValid) {
             UnloadTexture(loadedChunks[i].texture);
         }
     }
     UnloadTexture(blockAtlas);
+    UnloadSounds();
 }
 
 void UpdateDrawFrame(void)
