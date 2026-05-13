@@ -9,7 +9,7 @@ static const int mobMaxHealth[] = { 0, 10, 20 };       // NONE, PIG, ZOMBIE
 static const float mobSpeed[] = { 0, 40.0f, 60.0f };
 static const int mobWidth[] = { 0, 16, 12 };
 static const int mobHeight[] = { 0, 12, 28 };
-static const int mobDamage[] = { 0, 0, 2 };            // contact damage
+static const int mobDamage[] = { 0, 0, 4 };            // contact damage
 
 void InitMobs(void)
 {
@@ -199,7 +199,12 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
         float kbDir = (player.position.x < mob->position.x) ? -1.0f : 1.0f;
         player.velocity.x = kbDir * 200.0f;
         player.velocity.y = -150.0f;
+        player.knockbackTimer = 0.2f;
 
+        player.damageFlashTimer = 0.3f;
+        SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2.0f,
+                             player.position.y + PLAYER_HEIGHT / 2.0f,
+                             (Color){200, 50, 50, 255});
         PlaySoundHurt();
     }
 }
@@ -207,16 +212,21 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
 void DamageMob(Mob *mob, int damage)
 {
     mob->health -= damage;
+    SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
+                         mob->position.y + mobHeight[mob->type] / 2.0f,
+                         (Color){180, 30, 30, 255});
     if (mob->health <= 0) {
         mob->deathTimer = MOB_DEATH_TIME;
         mob->velocity.x = 0;
 
         // Drop items
+        float dropX = mob->position.x + mobWidth[mob->type] / 2;
+        float dropY = mob->position.y;
         if (mob->type == MOB_PIG) {
-            AddToInventory(FOOD_RAW_PORK);
+            SpawnItemEntity(FOOD_RAW_PORK, 1, dropX, dropY);
         } else if (mob->type == MOB_ZOMBIE) {
-            // Zombies have a small chance to drop nothing or an apple
-            if (rand() % 4 == 0) AddToInventory(FOOD_APPLE);
+            if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
+            if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
         }
         PlaySoundDeath();
         player.xp += (mob->type == MOB_ZOMBIE) ? 5 : 3;
@@ -303,6 +313,17 @@ void UpdateMobs(float dt)
             continue;
         }
 
+        // Ambient mob sounds (closer = more likely)
+        {
+            float dist = fabsf(dx);
+            if (dist < 300.0f && mob->deathTimer <= 0) {
+                float soundChance = (1.0f - dist / 300.0f) * 0.003f;
+                if ((float)rand() / RAND_MAX < soundChance) {
+                    PlaySoundMob(mob->type);
+                }
+            }
+        }
+
         // Death animation
         if (mob->deathTimer > 0) {
             mob->deathTimer -= dt;
@@ -322,15 +343,28 @@ void UpdateMobs(float dt)
                 if (IsBlockSolid(bx, y)) { exposed = false; break; }
             }
             if (exposed) {
-                mob->health -= (int)(dt * 5.0f); // ~5 damage/sec
+                mob->burnTimer += dt * 5.0f; // ~5 damage/sec
+                while (mob->burnTimer >= 1.0f) {
+                    mob->health--;
+                    mob->burnTimer -= 1.0f;
+                }
                 if (mob->health <= 0) {
                     mob->deathTimer = MOB_DEATH_TIME;
                     mob->velocity.x = 0;
+                    // Drop items like normal death
+                    float dropX = mob->position.x + mobWidth[mob->type] / 2;
+                    float dropY = mob->position.y;
+                    if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
+                    if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
                     PlaySoundDeath();
                     player.xp += 5;
                     if (player.xp > MAX_XP) player.xp = MAX_XP;
                 }
+            } else {
+                mob->burnTimer = 0.0f;
             }
+        } else if (mob->type == MOB_ZOMBIE) {
+            mob->burnTimer = 0.0f;
         }
 
         // AI

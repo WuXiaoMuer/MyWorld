@@ -9,7 +9,7 @@ INCS     = -I./include
 CFLAGS   = $(INCS) -O2 -pipe -mwindows
 LIBS     = -L./lib -Wl,--stack,12582912 -s -lraylib -lopengl32 -lgdi32 -lwinmm -static
 
-SRCS     = main.c noise.c world.c player.c daynight.c rendering.c save.c game.c crafting.c sound.c mob.c
+SRCS     = main.c noise.c world.c player.c daynight.c rendering.c save.c game.c crafting.c sound.c mob.c light.c particles.c entities.c
 OBJS     = $(SRCS:.c=.o)
 RES      = MyWorld_private.res
 BIN      = MyWorld.exe

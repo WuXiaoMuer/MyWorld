@@ -57,11 +57,7 @@ void InitPlayer(void)
         player.toolDurability[i] = 0;
     }
     player.inventory[0] = BLOCK_PLANKS;
-    player.inventoryCount[0] = 64;
-    player.inventory[1] = BLOCK_DIRT;
-    player.inventoryCount[1] = 32;
-    player.inventory[2] = BLOCK_COBBLESTONE;
-    player.inventoryCount[2] = 32;
+    player.inventoryCount[0] = 16;
 
     // Status
     player.health = MAX_HEALTH;
@@ -73,6 +69,14 @@ void InitPlayer(void)
     player.regenTimer = 0.0f;
     player.drownTimer = 0.0f;
     player.hungerDamageTimer = 0.0f;
+    player.facingRight = true;
+    player.wasInWater = false;
+    player.footstepTimer = 0.0f;
+    player.sprinting = false;
+    player.knockbackTimer = 0.0f;
+    player.damageFlashTimer = 0.0f;
+    player.playerDead = false;
+    player.fallPeakVel = 0.0f;
 }
 
 //----------------------------------------------------------------------------------
@@ -90,8 +94,7 @@ bool AddToInventory(BlockType item)
                 return true;
             }
         }
-        snprintf(messageText, sizeof(messageText), "Inventory full!");
-        messageTimer = MESSAGE_DURATION;
+        ShowMessage("Inventory full!", (Color){240, 80, 80, 255});
         return false;
     }
 
@@ -185,18 +188,65 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
 //----------------------------------------------------------------------------------
 void PlayerPhysics(float dt)
 {
-    player.velocity.x = 0;
-    if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) player.velocity.x = -MOVE_SPEED;
-    if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) player.velocity.x = MOVE_SPEED;
-
-    if ((IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) && player.onGround) {
-        player.velocity.y = JUMP_VELOCITY;
-        player.onGround = false;
-        PlaySoundJump();
+    // Knockback preserves horizontal velocity
+    if (player.knockbackTimer > 0.0f) {
+        player.knockbackTimer -= dt;
+    } else {
+        player.velocity.x = 0;
+        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) player.velocity.x = -MOVE_SPEED;
+        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) player.velocity.x = MOVE_SPEED;
     }
 
-    player.velocity.y += GRAVITY * dt;
-    if (player.velocity.y > 800.0f) player.velocity.y = 800.0f;
+    // Sprint
+    bool wantsSprint = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    player.sprinting = wantsSprint && player.onGround && player.hunger > 0 && player.velocity.x != 0;
+    if (player.sprinting) player.velocity.x *= SPRINT_SPEED_MULT;
+
+    // Update facing direction
+    if (player.velocity.x > 0.1f) player.facingRight = true;
+    else if (player.velocity.x < -0.1f) player.facingRight = false;
+
+    // Footstep sounds
+    bool isMoving = fabsf(player.velocity.x) > 10.0f && player.onGround;
+    if (isMoving) {
+        float stepInterval = player.sprinting ? 0.2f : 0.35f;
+        player.footstepTimer -= dt;
+        if (player.footstepTimer <= 0.0f) {
+            player.footstepTimer = stepInterval;
+            PlaySoundFootstep();
+        }
+    } else {
+        player.footstepTimer = 0.0f;
+    }
+
+    // Water physics
+    bool inWater = IsPlayerUnderwater();
+    // Water splash on entry
+    if (inWater && !player.wasInWater) {
+        PlaySoundSplash();
+        SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                             player.position.y + PLAYER_HEIGHT / 2,
+                             (Color){100, 160, 220, 200});
+    }
+    player.wasInWater = inWater;
+    if (inWater) {
+        player.velocity.x *= WATER_SPEED_MULT;
+        if (IsKeyDown(KEY_SPACE)) {
+            player.velocity.y = WATER_SWIM_VEL;
+        }
+    } else {
+        // Normal jump
+        if ((IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) && player.onGround) {
+            player.velocity.y = JUMP_VELOCITY;
+            player.onGround = false;
+            PlaySoundJump();
+        }
+    }
+
+    float gravityScale = inWater ? WATER_GRAVITY_MULT : 1.0f;
+    player.velocity.y += GRAVITY * gravityScale * dt;
+    float maxFall = inWater ? WATER_MAX_FALL : 800.0f;
+    if (player.velocity.y > maxFall) player.velocity.y = maxFall;
 
     // Horizontal collision
     float newX = player.position.x + player.velocity.x * dt;
@@ -254,6 +304,11 @@ void PlayerPhysics(float dt)
         if (blocked) break;
     }
 
+    // Track peak fall velocity
+    if (player.velocity.y > 0) {
+        if (player.velocity.y > player.fallPeakVel) player.fallPeakVel = player.velocity.y;
+    }
+
     bool wasOnGround = player.onGround;
     player.onGround = false;
     if (blocked) {
@@ -261,11 +316,28 @@ void PlayerPhysics(float dt)
             newY = (int)(bottom / BLOCK_SIZE) * BLOCK_SIZE - PLAYER_HEIGHT;
             player.onGround = true;
             if (!wasOnGround && player.velocity.y > 100.0f) PlaySoundLand();
+            // Fall damage
+            if (player.fallPeakVel > 300.0f) {
+                int damage = (int)((player.fallPeakVel - 300.0f) / 100.0f);
+                if (damage > 0) {
+                    player.health -= damage;
+                    if (player.health < 0) player.health = 0;
+                    player.damageFlashTimer = 0.3f;
+                    SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                                         player.position.y + PLAYER_HEIGHT,
+                                         (Color){200, 50, 50, 255});
+                    PlaySoundHurt();
+                    ShowMessage("Ouch! Fall damage!", (Color){240, 100, 100, 255});
+                }
+            }
+            player.fallPeakVel = 0.0f;
         } else if (player.velocity.y < 0) {
             newY = (int)(top / BLOCK_SIZE) * BLOCK_SIZE + BLOCK_SIZE;
         }
         player.velocity.y = 0;
     }
+    // Reset peak vel when not falling (e.g., in water, on ground)
+    if (player.onGround || player.velocity.y <= 0) player.fallPeakVel = 0.0f;
     player.position.y = newY;
 
     if (player.position.x < 0) player.position.x = 0;
@@ -348,8 +420,12 @@ void PlayerBlockInteraction(void)
                                 player.inventory[slot] = BLOCK_AIR;
                                 player.inventoryCount[slot] = 0;
                                 player.toolDurability[slot] = 0;
-                                snprintf(messageText, sizeof(messageText), "Tool broke!");
-                                messageTimer = MESSAGE_DURATION;
+                                ShowMessage("Tool broke!", (Color){240, 80, 80, 255});
+                            } else {
+                                int maxDur = GetToolMaxDurability(selectedTool);
+                                if (maxDur > 0 && player.toolDurability[slot] == maxDur / 5) {
+                                    ShowMessage("Tool is wearing out!", (Color){240, 200, 80, 255});
+                                }
                             }
                         }
                     }
@@ -372,16 +448,38 @@ void PlayerBlockInteraction(void)
 
             if (miningProgress >= 1.0f) {
                 world[blockX][blockY] = BLOCK_AIR;
-                AddToInventory(bt);
+                SpawnBlockParticles(blockX, blockY, bt);
+                // Coal ore drops coal item instead of the ore block
+                uint8_t dropItem = (bt == BLOCK_COAL_ORE) ? ITEM_COAL : bt;
+                SpawnItemEntity(dropItem, 1, blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
                 PlaySoundBreak(bt);
+                UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
                 if (blockX % CHUNK_SIZE == 0) InvalidateChunkAt(blockX - 1, blockY);
                 if (blockX % CHUNK_SIZE == CHUNK_SIZE - 1) InvalidateChunkAt(blockX + 1, blockY);
                 miningProgress = 0.0f;
                 miningBlockX = -1;
 
+                // Sand/gravel gravity: make blocks above fall
+                for (int fy = blockY - 1; fy >= 0; fy--) {
+                    uint8_t above = world[blockX][fy];
+                    if (above == BLOCK_AIR) break;
+                    if (above == BLOCK_SAND || above == BLOCK_GRAVEL) {
+                        world[blockX][fy] = BLOCK_AIR;
+                        // Find where it lands
+                        int landY = fy + 1;
+                        while (landY < WORLD_HEIGHT && world[blockX][landY] == BLOCK_AIR) landY++;
+                        landY--;
+                        world[blockX][landY] = above;
+                        InvalidateChunkAt(blockX, fy);
+                        InvalidateChunkAt(blockX, landY);
+                    } else {
+                        break; // Non-gravity block stops the chain
+                    }
+                }
+
                 // Leaves have a chance to drop apples
-                if (bt == BLOCK_LEAVES && (hash2D(blockX, blockY, 12345) % 10) == 0) {
+                if (bt == BLOCK_LEAVES && (hash2D(blockX, blockY, 12345) % 20) == 0) {
                     AddToInventory(FOOD_APPLE);
                 }
 
@@ -394,8 +492,12 @@ void PlayerBlockInteraction(void)
                         player.inventory[slot] = BLOCK_AIR;
                         player.inventoryCount[slot] = 0;
                         player.toolDurability[slot] = 0;
-                        snprintf(messageText, sizeof(messageText), "Tool broke!");
-                        messageTimer = MESSAGE_DURATION;
+                        ShowMessage("Tool broke!", (Color){240, 80, 80, 255});
+                    } else {
+                        int maxDur = GetToolMaxDurability(selectedTool);
+                        if (maxDur > 0 && player.toolDurability[slot] == maxDur / 5) {
+                            ShowMessage("Tool is wearing out!", (Color){240, 200, 80, 255});
+                        }
                     }
                 }
             }
@@ -417,7 +519,7 @@ void PlayerBlockInteraction(void)
             }
             PlaySoundEat();
             snprintf(messageText, sizeof(messageText), "Ate %s (+%d hunger)", blockInfo[selectedTool].name, foodVal);
-            messageTimer = MESSAGE_DURATION;
+            ShowMessage(messageText, (Color){80, 220, 80, 255});
             return;
         }
 
@@ -441,6 +543,7 @@ void PlayerBlockInteraction(void)
                         player.inventory[player.selectedSlot] = BLOCK_AIR;
                     }
                     PlaySoundPlace(selectedTool);
+                    UpdateLightAt(blockX, blockY);
                     InvalidateChunkAt(blockX, blockY);
                     if (blockX % CHUNK_SIZE == 0) InvalidateChunkAt(blockX - 1, blockY);
                     if (blockX % CHUNK_SIZE == CHUNK_SIZE - 1) InvalidateChunkAt(blockX + 1, blockY);
@@ -455,11 +558,22 @@ float GetMiningProgress(void)
     return miningProgress;
 }
 
+int GetMiningBlockX(void)
+{
+    return miningBlockX;
+}
+
+int GetMiningBlockY(void)
+{
+    return miningBlockY;
+}
+
 //----------------------------------------------------------------------------------
 // Player Update
 //----------------------------------------------------------------------------------
 void UpdatePlayer(float dt)
 {
+    if (player.playerDead) return;
     PlayerPhysics(dt);
     PlayerBlockInteraction();
 }
@@ -477,7 +591,7 @@ bool IsPlayerUnderwater(void)
 
 void UpdatePlayerStatus(float dt)
 {
-    if (gamePaused || inventoryOpen) return;
+    if (gamePaused || inventoryOpen || player.playerDead) return;
 
     bool underwater = IsPlayerUnderwater();
 
@@ -495,12 +609,12 @@ void UpdatePlayerStatus(float dt)
                 player.drownTimer -= 1.0f / DROWN_DAMAGE_RATE;
                 player.health -= 2;
                 if (player.health < 0) player.health = 0;
+                player.damageFlashTimer = 0.3f;
                 PlaySoundHurt();
             }
         }
     } else {
         // Recover oxygen when out of water
-        player.oxygenTimer = 0.0f;
         player.drownTimer = 0.0f;
         if (player.oxygen < MAX_OXYGEN) {
             player.oxygenTimer += dt;
@@ -514,7 +628,7 @@ void UpdatePlayerStatus(float dt)
 
     // --- Hunger ---
     float hungerRate = HUNGER_DRAIN_RATE;
-    // TODO: multiply by HUNGER_SPRINT_MULT when sprinting
+    if (player.sprinting) hungerRate *= HUNGER_SPRINT_MULT;
     player.hungerTimer += dt;
     if (player.hungerTimer >= 1.0f / hungerRate) {
         player.hungerTimer -= 1.0f / hungerRate;
@@ -528,6 +642,7 @@ void UpdatePlayerStatus(float dt)
             player.hungerDamageTimer -= 1.0f / HUNGER_DAMAGE_RATE;
             player.health--;
             if (player.health < 0) player.health = 0;
+            player.damageFlashTimer = 0.3f;
             PlaySoundHurt();
         }
     } else {
@@ -546,30 +661,45 @@ void UpdatePlayerStatus(float dt)
     }
 
     // --- Death ---
-    if (player.health <= 0) {
+    if (player.health <= 0 && !player.playerDead) {
+        player.playerDead = true;
+        player.health = 0;
         PlaySoundDeath();
-        // Lose all items, respawn
-        for (int i = 0; i < INVENTORY_SLOTS; i++) {
-            player.inventory[i] = BLOCK_AIR;
-            player.inventoryCount[i] = 0;
-            player.toolDurability[i] = 0;
-        }
-        int spawnX, spawnY;
-        FindSpawnPoint(&spawnX, &spawnY);
-        player.position = (Vector2){ spawnX * BLOCK_SIZE, spawnY * BLOCK_SIZE };
-        player.velocity = (Vector2){ 0, 0 };
-        player.onGround = false;
-        player.selectedSlot = 0;
-        player.health = MAX_HEALTH;
-        player.hunger = MAX_HUNGER;
-        player.oxygen = MAX_OXYGEN;
-        player.oxygenTimer = 0.0f;
-        player.hungerTimer = 0.0f;
-        player.regenTimer = 0.0f;
-        player.drownTimer = 0.0f;
-        player.hungerDamageTimer = 0.0f;
-        InitCameraSystem();
     }
+}
+
+void RespawnPlayer(void)
+{
+    // Lose non-hotbar items on death
+    for (int i = HOTBAR_SLOTS; i < INVENTORY_SLOTS; i++) {
+        player.inventory[i] = BLOCK_AIR;
+        player.inventoryCount[i] = 0;
+        player.toolDurability[i] = 0;
+    }
+    int spawnX, spawnY;
+    FindSpawnPoint(&spawnX, &spawnY);
+    player.position = (Vector2){ spawnX * BLOCK_SIZE, spawnY * BLOCK_SIZE };
+    player.velocity = (Vector2){ 0, 0 };
+    player.onGround = false;
+    player.selectedSlot = 0;
+    player.health = MAX_HEALTH;
+    player.hunger = MAX_HUNGER;
+    player.oxygen = MAX_OXYGEN;
+    player.xp = 0;
+    player.oxygenTimer = 0.0f;
+    player.hungerTimer = 0.0f;
+    player.regenTimer = 0.0f;
+    player.drownTimer = 0.0f;
+    player.hungerDamageTimer = 0.0f;
+    player.damageFlashTimer = 0.0f;
+    player.knockbackTimer = 0.0f;
+    player.sprinting = false;
+    player.playerDead = false;
+    player.facingRight = true;
+    player.wasInWater = false;
+    player.footstepTimer = 0.0f;
+    player.fallPeakVel = 0.0f;
+    InitCameraSystem();
 }
 
 //----------------------------------------------------------------------------------
@@ -613,7 +743,7 @@ void UpdateHotbar(void)
     if (player.selectedSlot != oldSlot) {
         BlockType item = (BlockType)player.inventory[player.selectedSlot];
         if (item != BLOCK_AIR) {
-            snprintf(messageText, sizeof(messageText), "%s", blockInfo[item].name);
+            ShowMessage(blockInfo[item].name, (Color){220, 220, 220, 255});
             messageTimer = 0.8f;
         }
     }

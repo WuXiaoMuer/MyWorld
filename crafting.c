@@ -4,86 +4,51 @@ void InitCraftingRecipes(void)
 {
     craftRecipeCount = 0;
 
-    // Basic material recipes
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_WOOD, 1, BLOCK_PLANKS, 4, "Wood -> 4 Planks"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_PLANKS, 2, TOOL_WOOD_PICKAXE, 1, "2 Planks -> Wood Pick"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_PLANKS, 2, TOOL_WOOD_AXE, 1, "2 Planks -> Wood Axe"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_PLANKS, 1, TOOL_WOOD_SWORD, 1, "1 Plank -> Wood Sword"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_PLANKS, 2, TOOL_WOOD_SHOVEL, 1, "2 Planks -> Wood Shovel"
-    };
+    #define ADD_RECIPE(in, inC, out, outC, n) do { \
+        if (craftRecipeCount < MAX_CRAFT_RECIPES) \
+            craftRecipes[craftRecipeCount++] = (CraftingRecipe){in, inC, out, outC, n}; \
+    } while(0)
 
-    // Stone tools
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_COBBLESTONE, 3, TOOL_STONE_PICKAXE, 1, "3 Cobble -> Stone Pick"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_COBBLESTONE, 3, TOOL_STONE_AXE, 1, "3 Cobble -> Stone Axe"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_COBBLESTONE, 2, TOOL_STONE_SWORD, 1, "2 Cobble -> Stone Sword"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_COBBLESTONE, 2, TOOL_STONE_SHOVEL, 1, "2 Cobble -> Stone Shovel"
-    };
+    // --- Basic materials ---
+    ADD_RECIPE(BLOCK_WOOD, 1, BLOCK_PLANKS, 4, "Wood -> 4 Planks");
+    ADD_RECIPE(BLOCK_PLANKS, 2, ITEM_STICK, 4, "2 Planks -> 4 Sticks");
 
-    // Iron tools
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_IRON_ORE, 3, TOOL_IRON_PICKAXE, 1, "3 Iron Ore -> Iron Pick"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_IRON_ORE, 3, TOOL_IRON_AXE, 1, "3 Iron Ore -> Iron Axe"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_IRON_ORE, 2, TOOL_IRON_SWORD, 1, "2 Iron Ore -> Iron Sword"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_IRON_ORE, 2, TOOL_IRON_SHOVEL, 1, "2 Iron Ore -> Iron Shovel"
-    };
+    // --- Wood tools ---
+    ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_PICKAXE, 1, "3 Planks -> Wood Pick");
+    ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_AXE, 1, "3 Planks -> Wood Axe");
+    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SWORD, 1, "2 Planks -> Wood Sword");
+    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SHOVEL, 1, "2 Planks -> Wood Shovel");
 
-    // Block crafting
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_COBBLESTONE, 4, BLOCK_STONE, 4, "4 Cobble -> 4 Stone"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_SAND, 4, BLOCK_GLASS, 4, "4 Sand -> 4 Glass"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_STONE, 4, BLOCK_BRICK, 4, "4 Stone -> 4 Brick"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_STONE, 8, BLOCK_FURNACE, 1, "8 Stone -> Furnace"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_PLANKS, 4, BLOCK_TORCH, 4, "4 Planks -> 4 Torches"
-    };
+    // --- Stone tools ---
+    ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_PICKAXE, 1, "3 Cobble -> Stone Pick");
+    ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_AXE, 1, "3 Cobble -> Stone Axe");
+    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SWORD, 1, "2 Cobble -> Stone Sword");
+    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SHOVEL, 1, "2 Cobble -> Stone Shovel");
 
-    // New block recipes
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_SAND, 4, BLOCK_SANDSTONE, 4, "4 Sand -> 4 Sandstone"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_GRAVEL, 4, BLOCK_COBBLESTONE, 4, "4 Gravel -> 4 Cobblestone"
-    };
+    // --- Iron tools ---
+    ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_PICKAXE, 1, "3 Iron Ingot -> Iron Pick");
+    ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_AXE, 1, "3 Iron Ingot -> Iron Axe");
+    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SWORD, 1, "2 Iron Ingot -> Iron Sword");
+    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SHOVEL, 1, "2 Iron Ingot -> Iron Shovel");
 
-    // Food recipes
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        FOOD_RAW_PORK, 1, FOOD_COOKED_PORK, 1, "Raw Pork -> Cooked Pork"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_PLANKS, 3, FOOD_BREAD, 1, "3 Planks -> Bread"
-    };
-    craftRecipes[craftRecipeCount++] = (CraftingRecipe){
-        BLOCK_LEAVES, 4, FOOD_APPLE, 1, "4 Leaves -> Apple"
-    };
+    // --- Smelting ---
+    ADD_RECIPE(BLOCK_IRON_ORE, 1, ITEM_IRON_INGOT, 1, "Iron Ore -> Iron Ingot");
+    ADD_RECIPE(FOOD_RAW_PORK, 1, FOOD_COOKED_PORK, 1, "Raw Pork -> Cooked Pork");
+    ADD_RECIPE(BLOCK_COBBLESTONE, 4, BLOCK_STONE, 4, "4 Cobble -> 4 Stone");
+    ADD_RECIPE(BLOCK_SAND, 4, BLOCK_GLASS, 4, "4 Sand -> 4 Glass");
+
+    // --- Block crafting ---
+    ADD_RECIPE(BLOCK_STONE, 4, BLOCK_BRICK, 4, "4 Stone -> 4 Brick");
+    ADD_RECIPE(BLOCK_STONE, 8, BLOCK_FURNACE, 1, "8 Stone -> Furnace");
+    ADD_RECIPE(ITEM_STICK, 2, BLOCK_TORCH, 4, "2 Sticks -> 4 Torches");
+    ADD_RECIPE(BLOCK_SAND, 4, BLOCK_SANDSTONE, 4, "4 Sand -> 4 Sandstone");
+    ADD_RECIPE(BLOCK_GRAVEL, 4, BLOCK_COBBLESTONE, 4, "4 Gravel -> 4 Cobble");
+
+    // --- Food ---
+    ADD_RECIPE(BLOCK_PLANKS, 8, FOOD_BREAD, 1, "8 Planks -> Bread");
+    ADD_RECIPE(BLOCK_LEAVES, 8, FOOD_APPLE, 1, "8 Leaves -> Apple");
+
+    #undef ADD_RECIPE
 }
 
 bool CanCraft(int recipeIndex)
@@ -150,62 +115,114 @@ void Craft(int recipeIndex)
     PlaySoundCraft();
 }
 
-void DrawCraftingPanel(int panelX, int panelY)
+void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad)
 {
-    int slotSize = 36;
-    int padding = 3;
-    int panelW = 360;
-    int panelH = craftRecipeCount * (slotSize + padding) + 40;
+    extern int craftScrollOffset; // from rendering.c
 
-    if (panelY + panelH > SCREEN_HEIGHT - 10) panelY = SCREEN_HEIGHT - panelH - 10;
-    if (panelY < 10) panelY = 10;
-
-    DrawRectangle(panelX, panelY, panelW, panelH, (Color){40, 40, 40, 220});
-    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){100, 100, 100, 255});
-
-    DrawText("Crafting", panelX + 10, panelY + 8, 18, WHITE);
-
-    int y = panelY + 30;
     Vector2 mouse = GetMousePosition();
 
-    for (int i = 0; i < craftRecipeCount; i++) {
+    // Title
+    DrawText("Crafting", panelX, panelY, 16, (Color){220, 210, 230, 255});
+    panelY += 22;
+
+    // Scroll with mouse wheel
+    Rectangle panelArea = { (float)panelX, (float)panelY, (float)panelW, (float)(visibleCount * (slotH + pad)) };
+    if (CheckCollisionPointRec(mouse, panelArea)) {
+        int wheel = (int)GetMouseWheelMove();
+        if (wheel != 0) {
+            craftScrollOffset -= wheel * 2;
+            if (craftScrollOffset < 0) craftScrollOffset = 0;
+            if (craftScrollOffset > craftRecipeCount - visibleCount)
+                craftScrollOffset = craftRecipeCount - visibleCount;
+            if (craftScrollOffset < 0) craftScrollOffset = 0;
+        }
+    }
+
+    int startIdx = craftScrollOffset;
+    int endIdx = startIdx + visibleCount;
+    if (endIdx > craftRecipeCount) endIdx = craftRecipeCount;
+
+    for (int i = startIdx; i < endIdx; i++) {
         CraftingRecipe *r = &craftRecipes[i];
-        int x = panelX + 8;
-        int slotY = y + i * (slotSize + padding);
+        int x = panelX;
+        int slotY = panelY + (i - startIdx) * (slotH + pad);
 
         bool canCraft = CanCraft(i);
-        Color bgColor = canCraft ? (Color){60, 80, 60, 200} : (Color){60, 40, 40, 200};
+        Color bgColor = canCraft ? (Color){55, 75, 55, 200} : (Color){55, 45, 45, 180};
 
-        Rectangle btnRect = { (float)x, (float)slotY, (float)(panelW - 16), (float)slotSize };
+        Rectangle btnRect = { (float)x, (float)slotY, (float)panelW, (float)slotH };
         bool hover = CheckCollisionPointRec(mouse, btnRect);
         if (hover) {
-            bgColor = canCraft ? (Color){80, 120, 80, 220} : (Color){80, 50, 50, 220};
+            bgColor = canCraft ? (Color){70, 100, 70, 220} : (Color){70, 50, 50, 200};
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && canCraft) {
                 Craft(i);
             }
         }
 
         DrawRectangle((int)btnRect.x, (int)btnRect.y, (int)btnRect.width, (int)btnRect.height, bgColor);
-        DrawRectangleLines((int)btnRect.x, (int)btnRect.y, (int)btnRect.width, (int)btnRect.height, DARKGRAY);
+        DrawRectangleLines((int)btnRect.x, (int)btnRect.y, (int)btnRect.width, (int)btnRect.height, (Color){80, 75, 90, 150});
+
+        int iconSize = slotH - 6;
+        int textY = slotY + (slotH - 12) / 2;
 
         // Input icon
         if (r->input < BLOCK_COUNT && blockAtlas.id > 0) {
             Rectangle srcIn = { (float)(r->input * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
-            Rectangle dstIn = { (float)(x + 4), (float)(slotY + 2), 32, 32 };
+            Rectangle dstIn = { (float)(x + 3), (float)(slotY + 3), (float)iconSize, (float)iconSize };
             DrawTexturePro(blockAtlas, srcIn, dstIn, (Vector2){0, 0}, 0, WHITE);
         }
-        DrawText(TextFormat("x%d", r->inputCount), x + 38, slotY + 10, 12, (Color){200, 200, 200, 255});
+        // Show player's count / required count
+        {
+            int have = 0;
+            for (int s = 0; s < INVENTORY_SLOTS; s++) {
+                if (player.inventory[s] == r->input) have += player.inventoryCount[s];
+            }
+            Color countColor = have >= r->inputCount ? (Color){120, 220, 120, 255} : (Color){200, 160, 160, 255};
+            DrawText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
+        }
 
-        DrawText("->", x + 72, slotY + 10, 12, WHITE);
+        DrawText(">", x + iconSize + 35, textY, 11, (Color){180, 180, 180, 200});
 
         // Output icon
         if (r->output < BLOCK_COUNT && blockAtlas.id > 0) {
             Rectangle srcOut = { (float)(r->output * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
-            Rectangle dstOut = { (float)(x + 100), (float)(slotY + 2), 32, 32 };
+            Rectangle dstOut = { (float)(x + iconSize + 50), (float)(slotY + 3), (float)iconSize, (float)iconSize };
             DrawTexturePro(blockAtlas, srcOut, dstOut, (Vector2){0, 0}, 0, WHITE);
         }
-        DrawText(TextFormat("x%d", r->outputCount), x + 134, slotY + 10, 12, (Color){200, 200, 200, 255});
+        DrawText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){200, 200, 200, 255});
 
-        DrawText(r->name, x + 170, slotY + 10, 11, (Color){160, 160, 160, 255});
+        // Recipe name
+        DrawText(r->name, x + iconSize * 2 + 85, textY, 10, (Color){150, 145, 160, 220});
+    }
+
+    // Scrollbar
+    if (craftRecipeCount > visibleCount) {
+        int trackX = panelX + panelW - 5;
+        int trackY = panelY;
+        int trackH = visibleCount * (slotH + pad);
+        DrawRectangle(trackX, trackY, 4, trackH, (Color){30, 28, 35, 200});
+
+        float viewRatio = (float)visibleCount / craftRecipeCount;
+        float scrollRatio = (float)craftScrollOffset / (craftRecipeCount - visibleCount);
+        int thumbH = (int)(trackH * viewRatio);
+        if (thumbH < 12) thumbH = 12;
+        int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
+        DrawRectangle(trackX, thumbY, 4, thumbH, (Color){120, 115, 130, 200});
+    }
+
+    // Fade arrows at top/bottom when scrollable
+    int listH = visibleCount * (slotH + pad);
+    if (craftScrollOffset > 0) {
+        DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){45, 42, 50, 180});
+        DrawText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){180, 175, 190, 150});
+    }
+    if (endIdx < craftRecipeCount) {
+        DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){45, 42, 50, 180});
+        DrawText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){180, 175, 190, 150});
+    }
+
+    // "No recipes" if empty
+    if (craftRecipeCount == 0) {
+        DrawText("No recipes", panelX + 8, panelY + 20, 14, (Color){120, 115, 130, 180});
     }
 }

@@ -22,6 +22,7 @@ bool SaveExists(const char *path)
 
 bool SaveWorld(const char *path)
 {
+    if (player.playerDead) return false;
     mkdir("saves");
 
     // Write to tmp first for crash safety
@@ -163,6 +164,9 @@ bool LoadWorld(const char *path)
     player.regenTimer = 0.0f;
     player.drownTimer = 0.0f;
     player.hungerDamageTimer = 0.0f;
+    player.damageFlashTimer = 0.0f;
+    player.sprinting = false;
+    player.playerDead = false;
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {

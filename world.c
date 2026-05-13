@@ -30,6 +30,10 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Flower",      {255,80,80,255},    {255,200,50,255},   false, true,  true},
     {"Tall Grass",  {50,160,30,255},    {40,130,20,255},    false, true,  true},
     {"Furnace",     {100,100,100,255},  {60,60,60,255},     true,  false, true},
+    // Items (not placeable, not solid)
+    {"Stick",       {160,120,60,255},   {130,95,45,255},    false, false, false},
+    {"Coal",        {40,40,40,255},     {25,25,25,255},     false, false, false},
+    {"Iron Ingot",  {220,210,200,255},  {190,180,170,255},  false, false, false},
     // Tools (not placeable, not solid)
     {"Wood Pick",   {180,140,80,255},   {140,100,50,255},   false, false, false},
     {"Wood Axe",    {180,140,80,255},   {140,100,50,255},   false, false, false},
@@ -329,6 +333,20 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 if (x >= 6 && x <= 9 && y >= 7 && y <= 9) c = (Color){80, 40, 10, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
+        break;
+
+    // Item icons (atlas only)
+    case ITEM_STICK:
+        for (int y = 3; y < 14; y++) { ImageDrawPixel(img, px + 7, py + y, base); ImageDrawPixel(img, px + 8, py + y, detail); }
+        break;
+    case ITEM_COAL:
+        for (int y = 5; y < 12; y++) for (int x = 5; x < 12; x++) ImageDrawPixel(img, px + x, py + y, base);
+        for (int y = 6; y < 10; y++) for (int x = 7; x < 10; x++) ImageDrawPixel(img, px + x, py + y, detail);
+        break;
+    case ITEM_IRON_INGOT:
+        for (int y = 6; y < 11; y++) for (int x = 4; x < 13; x++) ImageDrawPixel(img, px + x, py + y, base);
+        for (int y = 7; y < 10; y++) for (int x = 5; x < 12; x++) ImageDrawPixel(img, px + x, py + y, detail);
+        for (int x = 4; x < 13; x++) ImageDrawPixel(img, px + x, py + 6, (Color){240, 230, 220, 255});
         break;
 
     // Tool icons (atlas only, not used for world rendering)

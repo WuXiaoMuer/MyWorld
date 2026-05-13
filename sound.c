@@ -1,11 +1,14 @@
 #include "sound.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <sys/stat.h>
 
 // Sound globals defined in main.c
 
 static unsigned int soundSeed = 12345;
+static float bgmVolume = 0.3f;
 
 static float fast_sine(float t) {
     t = t - (int)t;
@@ -152,9 +155,166 @@ static float dropGen(float t, float freq, unsigned int *rng) {
     return noise * env * 0.3f;
 }
 
+// Footstep - soft thud
+static float footstepGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 18.0f);
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float tone = fast_sine(t * 100.0f) * 0.4f;
+    return (noise * 0.25f + tone) * env;
+}
+
+// Zombie groan - low rumble with modulation
+static float zombieGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = 1.0f - t * 2.0f;
+    if (env < 0) env = 0;
+    env *= env; // ease-in
+    float pitch = 80.0f + fast_sine(t * 3.0f) * 15.0f;
+    float s = fast_sine(t * pitch) * 0.5f;
+    float s2 = fast_sine(t * pitch * 1.01f) * 0.3f; // slight detune for roughness
+    return (s + s2) * env;
+}
+
+// Pig oink - short nasal sound
+static float pigGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = expf(-t * 10.0f);
+    float pitch = 400.0f + fast_sine(t * 40.0f) * 50.0f;
+    float s = fast_sine(t * pitch) * 0.4f;
+    float nasal = fast_sine(t * pitch * 2.0f) * 0.2f;
+    return (s + nasal) * env;
+}
+
+// Water splash - noise burst with filter
+static float splashGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 5.0f);
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float tone = fast_sine(t * 200.0f) * 0.3f;
+    float bubble = fast_sine(t * 600.0f * (1.0f - t)) * 0.2f;
+    return (noise * 0.4f + tone + bubble) * env;
+}
+
+//----------------------------------------------------------------------------------
+// Ambient BGM Generator
+//----------------------------------------------------------------------------------
+// Chord frequencies (Am, F, C, G) - each root + fifth + octave
+static const float chordFreqs[4][3] = {
+    { 220.00f, 329.63f, 440.00f },  // Am: A3, E4, A4
+    { 174.61f, 261.63f, 349.23f },  // F:  F3, C4, F4
+    { 261.63f, 392.00f, 523.25f },  // C:  C4, G4, C5
+    { 196.00f, 293.66f, 392.00f },  // G:  G3, D4, G4
+};
+
+static void GenerateBGMWave(short *samples, int totalFrames, int sampleRate)
+{
+    float chordDuration = 7.5f; // seconds per chord
+    int chordFrames = (int)(chordDuration * sampleRate);
+
+    for (int i = 0; i < totalFrames; i++) {
+        float t = (float)i / (float)sampleRate;
+        int chordIdx = (i / chordFrames) % 4;
+        float chordT = (float)(i % chordFrames) / (float)chordFrames; // 0..1 within chord
+
+        float sample = 0.0f;
+
+        // Pad: three sine tones per chord with slow crossfade
+        for (int n = 0; n < 3; n++) {
+            float freq = chordFreqs[chordIdx][n];
+            float phase = t * freq;
+            float sine = fast_sine(phase);
+
+            // Slow amplitude modulation for organic feel
+            float mod = 0.7f + 0.3f * fast_sine(t * 0.3f + n * 0.7f);
+
+            // Crossfade at chord boundaries
+            float fade = 1.0f;
+            if (chordT < 0.08f) fade = chordT / 0.08f;
+            else if (chordT > 0.92f) fade = (1.0f - chordT) / 0.08f;
+
+            sample += sine * mod * fade * 0.12f;
+        }
+
+        // Low sub-bass drone (constant, very quiet)
+        sample += fast_sine(t * 55.0f) * 0.04f;
+
+        // Soft high shimmer (filtered noise-like)
+        float shimmer = fast_sine(t * 1760.0f) * fast_sine(t * 0.5f) * 0.015f;
+        sample += shimmer;
+
+        // Gentle wind-like noise (very subtle)
+        unsigned int rng = (unsigned int)(i * 1103515245 + 12345);
+        float noise = (float)(rng % 1000) / 500.0f - 1.0f;
+        float windEnv = 0.5f + 0.5f * fast_sine(t * 0.15f);
+        sample += noise * windEnv * 0.01f;
+
+        // Clamp and convert
+        if (sample > 1.0f) sample = 1.0f;
+        if (sample < -1.0f) sample = -1.0f;
+        samples[i] = (short)(sample * 32000);
+    }
+}
+
+static void InitBGM(void)
+{
+    if (!IsAudioDeviceReady()) return;
+
+    int sr = 22050;
+    float duration = 15.0f;
+    int frames = (int)(duration * sr);
+    int dataSize = frames * 2;
+
+    short *samples = (short *)malloc(dataSize);
+    if (!samples) return;
+
+    GenerateBGMWave(samples, frames, sr);
+
+    // Ensure saves directory exists
+    mkdir("saves");
+
+    // Save WAV to file
+    const char *bgmPath = "saves/bgm.wav";
+    FILE *f = fopen(bgmPath, "wb");
+    if (!f) { free(samples); return; }
+
+    // WAV header
+    int wavSize = 44 + dataSize;
+    int chunkSize = wavSize - 8;
+    int fmtSize = 16;
+    short audioFmt = 1, numChannels = 1, blockAlign = 2, bitsPerSample = 16;
+    int byteRate = sr * 2;
+
+    fwrite("RIFF", 1, 4, f);
+    fwrite(&chunkSize, 4, 1, f);
+    fwrite("WAVE", 1, 4, f);
+    fwrite("fmt ", 1, 4, f);
+    fwrite(&fmtSize, 4, 1, f);
+    fwrite(&audioFmt, 2, 1, f);
+    fwrite(&numChannels, 2, 1, f);
+    fwrite(&sr, 4, 1, f);
+    fwrite(&byteRate, 4, 1, f);
+    fwrite(&blockAlign, 2, 1, f);
+    fwrite(&bitsPerSample, 2, 1, f);
+    fwrite("data", 1, 4, f);
+    fwrite(&dataSize, 4, 1, f);
+    fwrite(samples, 1, dataSize, f);
+
+    fclose(f);
+    free(samples);
+
+    bgm = LoadMusicStream(bgmPath);
+    if (bgm.stream.buffer) {
+        SetMusicVolume(bgm, bgmVolume);
+        PlayMusicStream(bgm);
+    }
+}
+
 void InitSounds(void)
 {
-    InitAudioDevice();
+    // InitAudioDevice() is called in background thread before this
     if (!IsAudioDeviceReady()) return;
 
     int sr = 22050;
@@ -207,10 +367,44 @@ void InitSounds(void)
     w = GenerateWave(0.1f, sr, dropGen);
     sndDrop = LoadSoundFromWave(w);
     UnloadWave(w);
+
+    w = GenerateWave(0.08f, sr, footstepGen);
+    sndFootstep = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.5f, sr, zombieGen);
+    sndZombie = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.2f, sr, pigGen);
+    sndPig = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.4f, sr, splashGen);
+    sndSplash = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    InitBGM();
+}
+
+void UpdateBGM(void)
+{
+    if (!IsAudioDeviceReady()) return;
+    if (!bgm.stream.buffer) return;
+    UpdateMusicStream(bgm);
+}
+
+void SetBGMVolume(float volume)
+{
+    bgmVolume = volume;
+    if (bgm.stream.buffer) {
+        SetMusicVolume(bgm, bgmVolume);
+    }
 }
 
 void UnloadSounds(void)
 {
+    if (!audioReady) return;
     UnloadSound(sndBreak);
     UnloadSound(sndBreakStone);
     UnloadSound(sndPlace);
@@ -223,6 +417,11 @@ void UnloadSounds(void)
     UnloadSound(sndCraft);
     UnloadSound(sndXP);
     UnloadSound(sndDrop);
+    UnloadSound(sndFootstep);
+    UnloadSound(sndZombie);
+    UnloadSound(sndPig);
+    UnloadSound(sndSplash);
+    if (bgm.stream.buffer) UnloadMusicStream(bgm);
     CloseAudioDevice();
 }
 
@@ -286,4 +485,20 @@ void PlaySoundXP(void) {
 void PlaySoundDrop(void) {
     if (!IsAudioDeviceReady()) return;
     PlaySound(sndDrop);
+}
+
+void PlaySoundFootstep(void) {
+    if (!IsAudioDeviceReady()) return;
+    PlaySound(sndFootstep);
+}
+
+void PlaySoundMob(MobType type) {
+    if (!IsAudioDeviceReady()) return;
+    if (type == MOB_ZOMBIE) PlaySound(sndZombie);
+    else if (type == MOB_PIG) PlaySound(sndPig);
+}
+
+void PlaySoundSplash(void) {
+    if (!IsAudioDeviceReady()) return;
+    PlaySound(sndSplash);
 }
