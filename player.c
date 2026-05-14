@@ -77,6 +77,13 @@ void InitPlayer(void)
     player.damageFlashTimer = 0.0f;
     player.playerDead = false;
     player.fallPeakVel = 0.0f;
+    player.spawnX = -1;
+    player.spawnY = -1;
+
+    for (int i = 0; i < 4; i++) {
+        player.armor[i] = BLOCK_AIR;
+        player.armorDurability[i] = 0;
+    }
 }
 
 //----------------------------------------------------------------------------------
@@ -84,13 +91,25 @@ void InitPlayer(void)
 //----------------------------------------------------------------------------------
 bool AddToInventory(BlockType item)
 {
-    // Tools don't stack, always use new slot
+    // Tools and armor don't stack, always use new slot
     if (IsTool(item)) {
         for (int i = 0; i < INVENTORY_SLOTS; i++) {
             if (player.inventory[i] == BLOCK_AIR) {
                 player.inventory[i] = item;
                 player.inventoryCount[i] = 1;
                 player.toolDurability[i] = GetToolMaxDurability(item);
+                return true;
+            }
+        }
+        ShowMessage("Inventory full!", (Color){240, 80, 80, 255});
+        return false;
+    }
+    if (IsArmor(item)) {
+        for (int i = 0; i < INVENTORY_SLOTS; i++) {
+            if (player.inventory[i] == BLOCK_AIR) {
+                player.inventory[i] = item;
+                player.inventoryCount[i] = 1;
+                player.toolDurability[i] = GetArmorMaxDurability(item);
                 return true;
             }
         }
@@ -151,6 +170,75 @@ int GetFoodValue(BlockType item)
     }
 }
 
+//----------------------------------------------------------------------------------
+// Armor System
+//----------------------------------------------------------------------------------
+bool IsArmor(BlockType item)
+{
+    return item >= ARMOR_WOOD_HELMET && item <= ARMOR_IRON_BOOTS;
+}
+
+int GetArmorValue(BlockType item)
+{
+    switch (item) {
+    case ARMOR_WOOD_HELMET:     return 1;
+    case ARMOR_WOOD_CHESTPLATE: return 3;
+    case ARMOR_WOOD_LEGGINGS:   return 2;
+    case ARMOR_WOOD_BOOTS:      return 1;
+    case ARMOR_STONE_HELMET:    return 2;
+    case ARMOR_STONE_CHESTPLATE:return 5;
+    case ARMOR_STONE_LEGGINGS:  return 3;
+    case ARMOR_STONE_BOOTS:     return 2;
+    case ARMOR_IRON_HELMET:     return 3;
+    case ARMOR_IRON_CHESTPLATE: return 8;
+    case ARMOR_IRON_LEGGINGS:   return 6;
+    case ARMOR_IRON_BOOTS:      return 3;
+    default: return 0;
+    }
+}
+
+int GetArmorMaxDurability(BlockType item)
+{
+    if (item >= ARMOR_WOOD_HELMET && item <= ARMOR_WOOD_BOOTS) return ARMOR_DURABILITY_WOOD;
+    if (item >= ARMOR_STONE_HELMET && item <= ARMOR_STONE_BOOTS) return ARMOR_DURABILITY_STONE;
+    if (item >= ARMOR_IRON_HELMET && item <= ARMOR_IRON_BOOTS) return ARMOR_DURABILITY_IRON;
+    return 0;
+}
+
+int GetTotalArmorPoints(void)
+{
+    int total = 0;
+    for (int i = 0; i < 4; i++) {
+        if (player.armor[i] != BLOCK_AIR) {
+            total += GetArmorValue((BlockType)player.armor[i]);
+        }
+    }
+    return total;
+}
+
+float GetArmorDamageReduction(void)
+{
+    int points = GetTotalArmorPoints();
+    float reduction = points * 0.04f;
+    if (reduction > 0.80f) reduction = 0.80f;
+    return reduction;
+}
+
+void DamageArmor(void)
+{
+    for (int i = 0; i < 4; i++) {
+        if (player.armor[i] != BLOCK_AIR) {
+            player.armorDurability[i]--;
+            if (player.armorDurability[i] <= 0) {
+                ShowMessage(TextFormat("%s broke!", blockInfo[player.armor[i]].name),
+                           (Color){240, 80, 80, 255});
+                player.armor[i] = BLOCK_AIR;
+                player.armorDurability[i] = 0;
+            }
+        }
+    }
+}
+
 float GetToolMiningSpeed(BlockType tool, BlockType block)
 {
     if (!IsTool(tool)) return 1.0f; // bare hands
@@ -167,7 +255,7 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
     if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) tier = 4.0f;
 
     // Correct tool bonus
-    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE)) {
+    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE)) {
         return tier * 1.5f;
     }
     if (isAxe && (block == BLOCK_WOOD || block == BLOCK_PLANKS)) {
@@ -193,12 +281,12 @@ void PlayerPhysics(float dt)
         player.knockbackTimer -= dt;
     } else {
         player.velocity.x = 0;
-        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) player.velocity.x = -MOVE_SPEED;
-        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) player.velocity.x = MOVE_SPEED;
+        if (Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT)) player.velocity.x = -MOVE_SPEED;
+        if (Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT)) player.velocity.x = MOVE_SPEED;
     }
 
     // Sprint
-    bool wantsSprint = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    bool wantsSprint = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
     player.sprinting = wantsSprint && player.onGround && player.hunger > 0 && player.velocity.x != 0;
     if (player.sprinting) player.velocity.x *= SPRINT_SPEED_MULT;
 
@@ -228,15 +316,22 @@ void PlayerPhysics(float dt)
                              player.position.y + PLAYER_HEIGHT / 2,
                              (Color){100, 160, 220, 200});
     }
+    // Water splash on exit
+    if (!inWater && player.wasInWater) {
+        PlaySoundSplash();
+        SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                             player.position.y + PLAYER_HEIGHT,
+                             (Color){120, 180, 230, 200});
+    }
     player.wasInWater = inWater;
     if (inWater) {
         player.velocity.x *= WATER_SPEED_MULT;
-        if (IsKeyDown(KEY_SPACE)) {
+        if (Win32IsKeyDown(KEY_SPACE)) {
             player.velocity.y = WATER_SWIM_VEL;
         }
     } else {
         // Normal jump
-        if ((IsKeyPressed(KEY_W) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_SPACE)) && player.onGround) {
+        if ((Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE)) && player.onGround) {
             player.velocity.y = JUMP_VELOCITY;
             player.onGround = false;
             PlaySoundJump();
@@ -360,7 +455,7 @@ void PlayerBlockInteraction(void)
 {
     if (inventoryOpen || gamePaused) return;
 
-    Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
+    Vector2 mouseWorld = GetScreenToWorld2D(Win32GetMousePosition(), camera);
     int blockX = (int)(mouseWorld.x / BLOCK_SIZE);
     int blockY = (int)(mouseWorld.y / BLOCK_SIZE);
 
@@ -473,6 +568,9 @@ void PlayerBlockInteraction(void)
                         world[blockX][landY] = above;
                         InvalidateChunkAt(blockX, fy);
                         InvalidateChunkAt(blockX, landY);
+                        // Landing feedback
+                        SpawnBlockParticles(blockX, landY, (BlockType)above);
+                        PlaySoundLand();
                     } else {
                         break; // Non-gravity block stops the chain
                     }
@@ -507,7 +605,36 @@ void PlayerBlockInteraction(void)
     }
 
     // Place block or eat food (right click, instant)
-    if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+    if (Win32IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+        // Interact with bed (set spawn point)
+        if (blockX >= 0 && blockX < WORLD_WIDTH && blockY >= 0 && blockY < WORLD_HEIGHT) {
+            if (world[blockX][blockY] == BLOCK_BED) {
+                player.spawnX = blockX;
+                player.spawnY = blockY - 1;
+                ShowMessage("Spawn point set!", (Color){100, 220, 100, 255});
+                PlaySoundCraft();
+                return;
+            }
+            // Interact with crafting table
+            if (world[blockX][blockY] == BLOCK_CRAFTING_TABLE) {
+                inventoryOpen = true;
+                craftingTableOpen = true;
+                gamePaused = false;
+                PlaySoundCraft();
+                return;
+            }
+            // Interact with furnace
+            if (world[blockX][blockY] == BLOCK_FURNACE) {
+                furnaceOpen = true;
+                furnaceBlockX = blockX;
+                furnaceBlockY = blockY;
+                inventoryOpen = true;
+                gamePaused = false;
+                PlaySoundCraft();
+                return;
+            }
+        }
+
         // Eat food
         if (IsFood(selectedTool) && player.hunger < MAX_HUNGER) {
             int foodVal = GetFoodValue(selectedTool);
@@ -523,7 +650,7 @@ void PlayerBlockInteraction(void)
             return;
         }
 
-        if (IsTool(selectedTool) || IsFood(selectedTool)) return; // Can't place tools or food
+        if (IsTool(selectedTool) || IsFood(selectedTool) || IsArmor(selectedTool)) return; // Can't place tools, food, or armor
         if (selectedTool != BLOCK_AIR && player.inventoryCount[player.selectedSlot] > 0) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 float bLeft = blockX * BLOCK_SIZE;
@@ -537,12 +664,19 @@ void PlayerBlockInteraction(void)
                 float pBottom = pTop + PLAYER_HEIGHT;
 
                 if (!(pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom)) {
+                    bool wasWater = (world[blockX][blockY] == BLOCK_WATER);
                     world[blockX][blockY] = selectedTool;
                     player.inventoryCount[player.selectedSlot]--;
                     if (player.inventoryCount[player.selectedSlot] <= 0) {
                         player.inventory[player.selectedSlot] = BLOCK_AIR;
                     }
                     PlaySoundPlace(selectedTool);
+                    if (wasWater) {
+                        SpawnDamageParticles(blockX * BLOCK_SIZE + BLOCK_SIZE / 2,
+                                             blockY * BLOCK_SIZE + BLOCK_SIZE / 2,
+                                             (Color){100, 160, 220, 200});
+                        PlaySoundSplash();
+                    }
                     UpdateLightAt(blockX, blockY);
                     InvalidateChunkAt(blockX, blockY);
                     if (blockX % CHUNK_SIZE == 0) InvalidateChunkAt(blockX - 1, blockY);
@@ -632,7 +766,15 @@ void UpdatePlayerStatus(float dt)
     player.hungerTimer += dt;
     if (player.hungerTimer >= 1.0f / hungerRate) {
         player.hungerTimer -= 1.0f / hungerRate;
-        if (player.hunger > 0) player.hunger--;
+        if (player.hunger > 0) {
+            player.hunger--;
+            // Warn when hunger gets low
+            if (player.hunger == 6) {
+                ShowMessage("Hungry!", (Color){220, 180, 60, 255});
+            } else if (player.hunger == 2) {
+                ShowMessage("Starving!", (Color){240, 100, 60, 255});
+            }
+        }
     }
 
     // Hunger damage at 0 hunger
@@ -655,6 +797,9 @@ void UpdatePlayerStatus(float dt)
         if (player.regenTimer >= 1.0f / HEALTH_REGEN_RATE) {
             player.regenTimer -= 1.0f / HEALTH_REGEN_RATE;
             player.health++;
+            SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                                 player.position.y + PLAYER_HEIGHT / 2,
+                                 (Color){80, 220, 80, 200});
         }
     } else {
         player.regenTimer = 0.0f;
@@ -676,8 +821,18 @@ void RespawnPlayer(void)
         player.inventoryCount[i] = 0;
         player.toolDurability[i] = 0;
     }
+    // Lose all armor on death
+    for (int i = 0; i < 4; i++) {
+        player.armor[i] = BLOCK_AIR;
+        player.armorDurability[i] = 0;
+    }
     int spawnX, spawnY;
-    FindSpawnPoint(&spawnX, &spawnY);
+    if (player.spawnX >= 0 && player.spawnY >= 0) {
+        spawnX = player.spawnX;
+        spawnY = player.spawnY;
+    } else {
+        FindSpawnPoint(&spawnX, &spawnY);
+    }
     player.position = (Vector2){ spawnX * BLOCK_SIZE, spawnY * BLOCK_SIZE };
     player.velocity = (Vector2){ 0, 0 };
     player.onGround = false;
@@ -732,7 +887,7 @@ void UpdateHotbar(void)
     int oldSlot = player.selectedSlot;
 
     for (int i = 0; i < HOTBAR_SLOTS; i++) {
-        if (IsKeyPressed(KEY_ONE + i)) player.selectedSlot = i;
+        if (Win32IsKeyPressed(KEY_ONE + i)) player.selectedSlot = i;
     }
 
     float wheel = GetMouseWheelMove();

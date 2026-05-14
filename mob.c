@@ -5,11 +5,11 @@
 // Mob globals defined in main.c
 
 // Mob properties per type
-static const int mobMaxHealth[] = { 0, 10, 20 };       // NONE, PIG, ZOMBIE
-static const float mobSpeed[] = { 0, 40.0f, 60.0f };
-static const int mobWidth[] = { 0, 16, 12 };
-static const int mobHeight[] = { 0, 12, 28 };
-static const int mobDamage[] = { 0, 0, 4 };            // contact damage
+static const int mobMaxHealth[] = { 0, 10, 20, 15 };       // NONE, PIG, ZOMBIE, SKELETON
+static const float mobSpeed[] = { 0, 40.0f, 60.0f, 50.0f };
+static const int mobWidth[] = { 0, 16, 12, 12 };
+static const int mobHeight[] = { 0, 12, 28, 28 };
+static const int mobDamage[] = { 0, 0, 4, 2 };            // contact damage
 
 void InitMobs(void)
 {
@@ -18,6 +18,92 @@ void InitMobs(void)
         mobs[i].type = MOB_NONE;
     }
     mobSpawnTimer = 0.0f;
+}
+
+//----------------------------------------------------------------------------------
+// Projectile System
+//----------------------------------------------------------------------------------
+void InitProjectiles(void)
+{
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        projectiles[i].active = false;
+    }
+}
+
+void SpawnProjectile(float x, float y, float vx, float vy)
+{
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (!projectiles[i].active) {
+            projectiles[i].position = (Vector2){ x, y };
+            projectiles[i].velocity = (Vector2){ vx, vy };
+            projectiles[i].lifetime = PROJECTILE_LIFETIME;
+            projectiles[i].active = true;
+            return;
+        }
+    }
+}
+
+void UpdateProjectiles(float dt)
+{
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (!projectiles[i].active) continue;
+        Projectile *p = &projectiles[i];
+
+        // Apply gravity (arrows arc)
+        p->velocity.y += ARROW_GRAVITY * dt;
+
+        p->position.x += p->velocity.x * dt;
+        p->position.y += p->velocity.y * dt;
+        p->lifetime -= dt;
+
+        if (p->lifetime <= 0) {
+            p->active = false;
+            continue;
+        }
+
+        // Check collision with world
+        int bx = (int)(p->position.x) / BLOCK_SIZE;
+        int by = (int)(p->position.y) / BLOCK_SIZE;
+        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+            if (IsBlockSolid(bx, by)) {
+                p->active = false;
+                continue;
+            }
+        }
+
+        // Check collision with player
+        float px = player.position.x;
+        float py = player.position.y;
+        if (p->position.x >= px && p->position.x <= px + PLAYER_WIDTH &&
+            p->position.y >= py && p->position.y <= py + PLAYER_HEIGHT) {
+            float reduction = GetArmorDamageReduction();
+            int finalDamage = (int)(PROJECTILE_DAMAGE * (1.0f - reduction));
+            if (finalDamage < 1) finalDamage = 1;
+            player.health -= finalDamage;
+            if (player.health < 0) player.health = 0;
+            DamageArmor();
+            player.damageFlashTimer = 0.3f;
+            SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
+            PlaySoundHurt();
+            p->active = false;
+        }
+    }
+}
+
+void DrawProjectiles(void)
+{
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        if (!projectiles[i].active) continue;
+        Projectile *p = &projectiles[i];
+        // Draw arrow as a small line
+        float angle = atan2f(p->velocity.y, p->velocity.x);
+        float len = 6.0f;
+        float ex = p->position.x - cosf(angle) * len;
+        float ey = p->position.y - sinf(angle) * len;
+        DrawLine((int)p->position.x, (int)p->position.y, (int)ex, (int)ey, (Color){180, 160, 120, 255});
+        // Arrowhead
+        DrawRectangle((int)p->position.x - 1, (int)p->position.y - 1, 3, 3, (Color){200, 200, 200, 255});
+    }
 }
 
 Mob* SpawnMob(MobType type, float x, float y)
@@ -35,6 +121,7 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].aiState = 0;
             mobs[i].contactCooldown = 0.0f;
             mobs[i].deathTimer = 0.0f;
+            mobs[i].attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
             mobs[i].active = true;
             return &mobs[i];
         }
@@ -169,6 +256,68 @@ static void UpdatePigAI(Mob *mob, float dt)
     }
 }
 
+static void UpdateSkeletonAI(Mob *mob, float dt)
+{
+    float dx = player.position.x - mob->position.x;
+    float dist = fabsf(dx);
+
+    if (CanMobSeePlayer(mob) && dist < 350.0f) {
+        // Face player
+        mob->facingRight = dx > 0;
+
+        // Maintain distance (~150-200 pixels)
+        if (dist < 150.0f) {
+            // Too close, back away
+            mob->velocity.x = (dx > 0 ? -1 : 1) * mobSpeed[MOB_SKELETON];
+        } else if (dist > 220.0f) {
+            // Too far, approach
+            mob->velocity.x = (dx > 0 ? 1 : -1) * mobSpeed[MOB_SKELETON] * 0.6f;
+        } else {
+            // Good range, strafe
+            mob->aiTimer -= dt;
+            if (mob->aiTimer <= 0) {
+                mob->aiTimer = 1.0f + (float)(rand() % 100) / 100.0f;
+                mob->aiState = (rand() % 2) ? 1 : -1;
+            }
+            mob->velocity.x = mob->aiState * mobSpeed[MOB_SKELETON] * 0.4f;
+        }
+
+        // Shoot arrows
+        mob->attackTimer -= dt;
+        if (mob->attackTimer <= 0) {
+            mob->attackTimer = 1.5f + (float)(rand() % 100) / 100.0f;
+            float arrowX = mob->position.x + mobWidth[MOB_SKELETON] / 2;
+            float arrowY = mob->position.y + mobHeight[MOB_SKELETON] / 3;
+            float targetX = player.position.x + PLAYER_WIDTH / 2;
+            float targetY = player.position.y + PLAYER_HEIGHT / 3;
+            float adx = targetX - arrowX;
+            float ady = targetY - arrowY;
+            float adist = sqrtf(adx * adx + ady * ady);
+            if (adist > 0) {
+                float speed = PROJECTILE_SPEED;
+                // Aim with slight arc compensation
+                float flightTime = adist / speed;
+                float arcComp = 0.5f * ARROW_GRAVITY * flightTime * flightTime;
+                float vx = (adx / adist) * speed;
+                float vy = (ady / adist) * speed - arcComp / flightTime;
+                SpawnProjectile(arrowX, arrowY, vx, vy);
+            }
+        }
+    } else {
+        // Wander
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = MOB_AI_INTERVAL + (float)(rand() % 100) / 100.0f;
+            mob->aiState = rand() % 3;
+        }
+        switch (mob->aiState) {
+            case 0: mob->velocity.x = 0; break;
+            case 1: mob->velocity.x = -mobSpeed[MOB_SKELETON] * 0.5f; mob->facingRight = false; break;
+            case 2: mob->velocity.x = mobSpeed[MOB_SKELETON] * 0.5f; mob->facingRight = true; break;
+        }
+    }
+}
+
 static void UpdateMobContactDamage(Mob *mob, float dt)
 {
     if (mob->contactCooldown > 0) {
@@ -191,8 +340,13 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
     float mBottom = mTop + h;
 
     if (pRight > mLeft && pLeft < mRight && pBottom > mTop && pTop < mBottom) {
-        player.health -= mobDamage[mob->type];
+        int rawDamage = mobDamage[mob->type];
+        float reduction = GetArmorDamageReduction();
+        int finalDamage = (int)(rawDamage * (1.0f - reduction));
+        if (finalDamage < 1) finalDamage = 1;
+        player.health -= finalDamage;
         if (player.health < 0) player.health = 0;
+        DamageArmor();
         mob->contactCooldown = MOB_CONTACT_COOLDOWN;
 
         // Knockback
@@ -219,6 +373,18 @@ void DamageMob(Mob *mob, int damage)
         mob->deathTimer = MOB_DEATH_TIME;
         mob->velocity.x = 0;
 
+        // Death particles
+        Color deathColor;
+        switch (mob->type) {
+            case MOB_PIG: deathColor = (Color){230, 160, 150, 255}; break;
+            case MOB_ZOMBIE: deathColor = (Color){80, 140, 60, 255}; break;
+            case MOB_SKELETON: deathColor = (Color){220, 210, 190, 255}; break;
+            default: deathColor = (Color){180, 30, 30, 255}; break;
+        }
+        SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
+                             mob->position.y + mobHeight[mob->type] / 2.0f,
+                             deathColor);
+
         // Drop items
         float dropX = mob->position.x + mobWidth[mob->type] / 2;
         float dropY = mob->position.y;
@@ -227,9 +393,12 @@ void DamageMob(Mob *mob, int damage)
         } else if (mob->type == MOB_ZOMBIE) {
             if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
             if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
+        } else if (mob->type == MOB_SKELETON) {
+            SpawnItemEntity(ITEM_STICK, 1 + rand() % 3, dropX, dropY); // bones
+            if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, dropX, dropY);
         }
         PlaySoundDeath();
-        player.xp += (mob->type == MOB_ZOMBIE) ? 5 : 3;
+        player.xp += (mob->type == MOB_PIG) ? 3 : 5;
         if (player.xp > MAX_XP) player.xp = MAX_XP;
     }
 }
@@ -272,6 +441,24 @@ static void TrySpawnMobs(float dt)
             for (int y = by; y < WORLD_HEIGHT - 2; y++) {
                 if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     SpawnMob(MOB_ZOMBIE, spawnX, (y - 2) * BLOCK_SIZE);
+                    break;
+                }
+            }
+        }
+    }
+
+    // Skeleton spawning: at night, less frequent
+    if (dayNight.lightLevel < 0.2f && count < 6 && (rand() % 3 == 0)) {
+        float angle = (float)(rand() % 628) / 100.0f;
+        float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
+        float spawnX = playerCX + cosf(angle) * dist;
+        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
+
+        int bx = (int)(spawnX / BLOCK_SIZE);
+        if (bx >= 0 && bx < WORLD_WIDTH) {
+            for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+                if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                    SpawnMob(MOB_SKELETON, spawnX, (y - 2) * BLOCK_SIZE);
                     break;
                 }
             }
@@ -333,8 +520,8 @@ void UpdateMobs(float dt)
             continue;
         }
 
-        // Zombie burns in sunlight
-        if (mob->type == MOB_ZOMBIE && dayNight.lightLevel > 0.8f) {
+        // Undead mobs burn in sunlight
+        if ((mob->type == MOB_ZOMBIE || mob->type == MOB_SKELETON) && dayNight.lightLevel > 0.8f) {
             // Check if exposed to sky
             int bx = (int)(mob->position.x + mobWidth[mob->type] / 2) / BLOCK_SIZE;
             int by = (int)(mob->position.y) / BLOCK_SIZE;
@@ -351,6 +538,9 @@ void UpdateMobs(float dt)
                 if (mob->health <= 0) {
                     mob->deathTimer = MOB_DEATH_TIME;
                     mob->velocity.x = 0;
+                    SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
+                                         mob->position.y + mobHeight[mob->type] / 2.0f,
+                                         (Color){200, 160, 60, 255});
                     // Drop items like normal death
                     float dropX = mob->position.x + mobWidth[mob->type] / 2;
                     float dropY = mob->position.y;
@@ -370,6 +560,7 @@ void UpdateMobs(float dt)
         // AI
         if (mob->type == MOB_ZOMBIE) UpdateZombieAI(mob, dt);
         else if (mob->type == MOB_PIG) UpdatePigAI(mob, dt);
+        else if (mob->type == MOB_SKELETON) UpdateSkeletonAI(mob, dt);
 
         // Physics
         UpdateMobPhysics(mob, dt);
@@ -441,6 +632,41 @@ static void DrawPigSprite(Mob *mob)
     DrawRectangle((int)(x + 10), (int)(y + 10 + legSwing), 3, 4, (Color){200, 130, 120, alpha});
 }
 
+static void DrawSkeletonSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float armSwing = moving ? sinf(time * 8.0f) * 3.0f : 0;
+    float legSwing = moving ? sinf(time * 8.0f) * 3.0f : 0;
+
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+    }
+
+    // Head (bone white)
+    DrawRectangle((int)(x + 1), (int)y, 10, 10, (Color){230, 220, 200, alpha});
+    // Eyes (dark hollow)
+    DrawRectangle((int)(x + 3), (int)(y + 4), 2, 2, (Color){40, 30, 30, alpha});
+    DrawRectangle((int)(x + 7), (int)(y + 4), 2, 2, (Color){40, 30, 30, alpha});
+    // Ribs (bone white with gaps)
+    DrawRectangle((int)(x + 2), (int)(y + 10), 8, 2, (Color){220, 210, 190, alpha});
+    DrawRectangle((int)(x + 2), (int)(y + 13), 8, 2, (Color){220, 210, 190, alpha});
+    DrawRectangle((int)(x + 2), (int)(y + 16), 8, 2, (Color){220, 210, 190, alpha});
+    // Arms (thin bone)
+    DrawRectangle((int)(x - 1), (int)(y + 10 + armSwing), 2, 10, (Color){220, 210, 190, alpha});
+    DrawRectangle((int)(x + 11), (int)(y + 10 - armSwing), 2, 10, (Color){220, 210, 190, alpha});
+    // Bow in right hand (when not attacking)
+    if (mob->attackTimer > 0.5f) {
+        DrawRectangle((int)(x + 13), (int)(y + 8 - armSwing), 2, 8, (Color){140, 100, 50, alpha});
+    }
+    // Legs (thin bone)
+    DrawRectangle((int)(x + 2), (int)(y + 20 + legSwing), 3, 8, (Color){220, 210, 190, alpha});
+    DrawRectangle((int)(x + 7), (int)(y + 20 - legSwing), 3, 8, (Color){220, 210, 190, alpha});
+}
+
 void DrawMobs(void)
 {
     for (int i = 0; i < MAX_MOBS; i++) {
@@ -450,6 +676,7 @@ void DrawMobs(void)
         switch (mob->type) {
             case MOB_ZOMBIE: DrawZombieSprite(mob); break;
             case MOB_PIG: DrawPigSprite(mob); break;
+            case MOB_SKELETON: DrawSkeletonSprite(mob); break;
             default: break;
         }
 

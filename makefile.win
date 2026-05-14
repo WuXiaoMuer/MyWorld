@@ -9,14 +9,14 @@ CD       = cd /d
 LIBS     = "-LE:/github/MyWorld/lib" "-Wl,--stack,12582912" "-s" "-lraylib" "-lopengl32" "-lgdi32" "-lwinmm" "-static"
 INCS     = "-IE:/github/MyWorld/include"
 CXXINCS  = "-IE:/github/MyWorld/include"
-CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-mwindows"
-CFLAGS   = $(INCS) "-O2" "-pipe" "-mwindows"
+CXXFLAGS = $(CXXINCS) "-O2" "-pipe"
+CFLAGS   = $(INCS) "-O2" "-pipe"
 WINDRESFLAGS = 
 RES      = MyWorld_private.res
-OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o $(RES)
+OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o $(RES)
 BIN      = MyWorld.exe
-LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "MyWorld_private.res"
-CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "MyWorld_private.res" "MyWorld.exe"
+LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "MyWorld_private.res"
+CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "MyWorld_private.res" "MyWorld.exe"
 
 .PHONY: all all-before all-after clean clean-custom
 
@@ -54,8 +54,23 @@ daynight.o: daynight.c types.h
 	$(CC) -c "daynight.c" -o "daynight.o" $(CFLAGS) 
 
 rendering.o: rendering.c types.h
-	$(CC) -c "rendering.c" -o "rendering.o" $(CFLAGS) 
+	$(CC) -c "rendering.c" -o "rendering.o" $(CFLAGS)
 
-MyWorld_private.res: MyWorld_private.rc 
-	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS) 
+sound.o: sound.c types.h
+	$(CC) -c "sound.c" -o "sound.o" $(CFLAGS)
+
+mob.o: mob.c types.h
+	$(CC) -c "mob.c" -o "mob.o" $(CFLAGS)
+
+particles.o: particles.c types.h
+	$(CC) -c "particles.c" -o "particles.o" $(CFLAGS)
+
+entities.o: entities.c types.h
+	$(CC) -c "entities.c" -o "entities.o" $(CFLAGS)
+
+light.o: light.c types.h
+	$(CC) -c "light.c" -o "light.o" $(CFLAGS)
+
+MyWorld_private.res: MyWorld_private.rc
+	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS)
 

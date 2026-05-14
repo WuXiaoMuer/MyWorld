@@ -9,6 +9,7 @@
 
 static unsigned int soundSeed = 12345;
 static float bgmVolume = 0.3f;
+static float sfxVolume = 0.7f;
 
 static float fast_sine(float t) {
     t = t - (int)t;
@@ -431,74 +432,95 @@ static bool IsStoneBlock(BlockType bt) {
            bt == BLOCK_GLASS || bt == BLOCK_FURNACE;
 }
 
+void SetSFXVolume(float volume) {
+    sfxVolume = volume;
+    if (sfxVolume < 0.0f) sfxVolume = 0.0f;
+    if (sfxVolume > 1.0f) sfxVolume = 1.0f;
+}
+
 void PlaySoundBreak(BlockType block) {
     if (!IsAudioDeviceReady()) return;
-    PlaySound(IsStoneBlock(block) ? sndBreakStone : sndBreak);
+    Sound s = IsStoneBlock(block) ? sndBreakStone : sndBreak;
+    SetSoundVolume(s, sfxVolume);
+    PlaySound(s);
 }
 
 void PlaySoundPlace(BlockType block) {
     (void)block;
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndPlace, sfxVolume);
     PlaySound(sndPlace);
 }
 
 void PlaySoundJump(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndJump, sfxVolume);
     PlaySound(sndJump);
 }
 
 void PlaySoundLand(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndLand, sfxVolume);
     PlaySound(sndLand);
 }
 
 void PlaySoundHurt(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndHurt, sfxVolume);
     PlaySound(sndHurt);
 }
 
 void PlaySoundDeath(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndDeath, sfxVolume);
     PlaySound(sndDeath);
 }
 
 void PlaySoundEat(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndEat, sfxVolume);
     PlaySound(sndEat);
 }
 
 void PlaySoundUIClick(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndClick, sfxVolume);
     PlaySound(sndClick);
 }
 
 void PlaySoundCraft(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndCraft, sfxVolume);
     PlaySound(sndCraft);
 }
 
 void PlaySoundXP(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndXP, sfxVolume);
     PlaySound(sndXP);
 }
 
 void PlaySoundDrop(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndDrop, sfxVolume);
     PlaySound(sndDrop);
 }
 
 void PlaySoundFootstep(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndFootstep, sfxVolume);
     PlaySound(sndFootstep);
 }
 
 void PlaySoundMob(MobType type) {
     if (!IsAudioDeviceReady()) return;
-    if (type == MOB_ZOMBIE) PlaySound(sndZombie);
-    else if (type == MOB_PIG) PlaySound(sndPig);
+    if (type == MOB_ZOMBIE) { SetSoundVolume(sndZombie, sfxVolume); PlaySound(sndZombie); }
+    else if (type == MOB_PIG) { SetSoundVolume(sndPig, sfxVolume); PlaySound(sndPig); }
+    else if (type == MOB_SKELETON) { SetSoundVolume(sndZombie, sfxVolume); PlaySound(sndZombie); }
 }
 
 void PlaySoundSplash(void) {
     if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndSplash, sfxVolume);
     PlaySound(sndSplash);
 }

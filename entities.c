@@ -121,12 +121,15 @@ void DrawEntities(void)
 
 void PickupNearbyItems(float px, float py)
 {
+    float pcx = px + PLAYER_WIDTH / 2;
+    float pcy = py + PLAYER_HEIGHT / 2;
+
     for (int i = 0; i < MAX_ENTITIES; i++) {
         ItemEntity *e = &entities[i];
         if (!e->active || e->pickupDelay > 0.0f) continue;
 
-        float dx = (e->position.x + 5) - (px + PLAYER_WIDTH / 2);
-        float dy = (e->position.y + 5) - (py + PLAYER_HEIGHT / 2);
+        float dx = pcx - (e->position.x + 5);
+        float dy = pcy - (e->position.y + 5);
         float dist = sqrtf(dx * dx + dy * dy);
 
         if (dist < ENTITY_PICKUP_DIST) {
@@ -135,11 +138,14 @@ void PickupNearbyItems(float px, float py)
                 e->active = false;
                 PlaySoundXP();
             }
-        } else if (dist < ENTITY_PICKUP_DIST * 4) {
-            // Magnetic attraction when close
-            float pull = 200.0f / (dist + 1.0f);
-            e->velocity.x += dx * pull * 0.016f;
-            e->velocity.y += dy * pull * 0.016f;
+        } else if (dist < ENTITY_PICKUP_DIST * 4 && dist > 1.0f) {
+            // Magnetic pull: set velocity toward player, damped by distance
+            float speed = 150.0f;
+            float nx = dx / dist;
+            float ny = dy / dist;
+            // Blend toward pull direction rather than accumulating
+            e->velocity.x = e->velocity.x * 0.8f + nx * speed * 0.2f;
+            e->velocity.y = e->velocity.y * 0.8f + ny * speed * 0.2f - 30.0f; // slight upward bias
         }
     }
 }

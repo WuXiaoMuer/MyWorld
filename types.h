@@ -8,6 +8,61 @@
 #include <limits.h>
 
 //----------------------------------------------------------------------------------
+// Win32 Input Override (bypasses broken GLFW input on some systems)
+//----------------------------------------------------------------------------------
+#ifdef _WIN32
+typedef unsigned long DWORD;
+typedef int BOOL;
+typedef long LONG;
+__declspec(dllimport) BOOL __stdcall GetCursorPos(LONG*);
+__declspec(dllimport) BOOL __stdcall ScreenToClient(void*, LONG*);
+__declspec(dllimport) short __stdcall GetAsyncKeyState(int);
+__declspec(dllimport) void* __stdcall GetForegroundWindow(void);
+__declspec(dllimport) void* __stdcall GetFocus(void);
+#ifndef VK_LBUTTON
+#define VK_LBUTTON  0x01
+#define VK_RBUTTON  0x02
+#define VK_MBUTTON  0x04
+#define VK_BACK     0x08
+#define VK_TAB      0x09
+#define VK_RETURN   0x0D
+#define VK_SHIFT    0x10
+#define VK_CONTROL  0x11
+#define VK_MENU     0x12
+#define VK_ESCAPE   0x1B
+#define VK_SPACE    0x20
+#define VK_DELETE   0x2E
+#define VK_LEFT     0x25
+#define VK_UP       0x26
+#define VK_RIGHT    0x27
+#define VK_DOWN     0x28
+#define VK_F3       0x72
+#define VK_F11      0x7A
+#endif
+// VK_0..VK_9 = 0x30..0x39, VK_A..VK_Z = 0x41..0x5A (already defined in WinUser.h)
+#endif
+
+// Win32 input state (updated each frame by UpdateWin32Input)
+extern int win32MouseX;
+extern int win32MouseY;
+extern int win32MousePrevX;
+extern int win32MousePrevY;
+extern bool win32LMB;
+extern bool win32LMBPrev;
+extern bool win32RMB;
+extern bool win32RMBPrev;
+
+// Win32 input functions
+void UpdateWin32Input(void);
+Vector2 Win32GetMousePosition(void);
+Vector2 Win32GetMouseDelta(void);
+bool Win32IsMouseButtonPressed(int button);
+bool Win32IsMouseButtonReleased(int button);
+bool Win32IsKeyPressed(int key);
+bool Win32IsKeyDown(int key);
+int Win32GetCharPressed(void);
+
+//----------------------------------------------------------------------------------
 // Constants
 //----------------------------------------------------------------------------------
 #define SCREEN_WIDTH        1280
@@ -23,11 +78,11 @@
 #define CHUNKS_LOADED       12
 #define CHUNK_EMPTY         INT_MAX
 
-#define SEA_LEVEL           128
-#define TERRAIN_BASE        120
+#define SEA_LEVEL           112
+#define TERRAIN_BASE        100
 #define TERRAIN_AMPLITUDE   35
-#define CAVE_START          150
-#define CAVE_END            245
+#define CAVE_START          140
+#define CAVE_END            240
 
 #define PLAYER_WIDTH        12
 #define PLAYER_HEIGHT       28
@@ -50,11 +105,14 @@
 #define BREAK_RANGE         6
 #define PLACE_RANGE         6
 
-#define MAX_CRAFT_RECIPES   32
+#define MAX_CRAFT_RECIPES   64
+#define MAX_SMELT_RECIPES   8
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        3
-#define SAVE_PATH           "saves/world.mwsav"
+#define SAVE_VERSION        4
+#define MAX_SAVE_SLOTS      8
+#define SLOT_VISIBLE        4
+#define SAVE_DIR            "saves"
 
 #define DEATH_Y             (WORLD_HEIGHT * BLOCK_SIZE + 500)
 #define MESSAGE_DURATION    2.0f
@@ -79,9 +137,19 @@
 #define DURABILITY_STONE    132
 #define DURABILITY_IRON     251
 
+// Armor durability
+#define ARMOR_DURABILITY_WOOD    55
+#define ARMOR_DURABILITY_STONE   160
+#define ARMOR_DURABILITY_IRON    300
+
 // Food restoration values (hunger points)
 #define FOOD_RAW_PORK_VALUE    3
 #define FOOD_COOKED_PORK_VALUE 8
+
+// Minimap
+#define MINIMAP_SIZE        100
+#define MINIMAP_SCALE       2    // pixels per block
+#define MINIMAP_RANGE       50   // blocks visible around player
 #define FOOD_APPLE_VALUE       4
 #define FOOD_BREAD_VALUE       5
 
@@ -103,6 +171,11 @@
 #define MOB_CONTACT_COOLDOWN 1.0f
 #define MOB_DEATH_TIME      0.3f
 #define MOB_GRAVITY         980.0f
+#define MAX_PROJECTILES     32
+#define PROJECTILE_SPEED    200.0f
+#define PROJECTILE_DAMAGE   3
+#define PROJECTILE_LIFETIME 3.0f
+#define ARROW_GRAVITY       400.0f
 
 // Light system
 #define MAX_LIGHT_LEVEL     15
@@ -137,6 +210,7 @@ typedef enum {
     BLOCK_FLOWER,
     BLOCK_TALL_GRASS,
     BLOCK_FURNACE,
+    BLOCK_BED,
     // Items (not placeable)
     ITEM_STICK,
     ITEM_COAL,
@@ -159,6 +233,21 @@ typedef enum {
     FOOD_COOKED_PORK,
     FOOD_APPLE,
     FOOD_BREAD,
+    // Interactive blocks
+    BLOCK_CRAFTING_TABLE,
+    // Armor (not placeable)
+    ARMOR_WOOD_HELMET,
+    ARMOR_WOOD_CHESTPLATE,
+    ARMOR_WOOD_LEGGINGS,
+    ARMOR_WOOD_BOOTS,
+    ARMOR_STONE_HELMET,
+    ARMOR_STONE_CHESTPLATE,
+    ARMOR_STONE_LEGGINGS,
+    ARMOR_STONE_BOOTS,
+    ARMOR_IRON_HELMET,
+    ARMOR_IRON_CHESTPLATE,
+    ARMOR_IRON_LEGGINGS,
+    ARMOR_IRON_BOOTS,
     BLOCK_COUNT
 } BlockType;
 
@@ -180,7 +269,14 @@ typedef struct {
     BlockType output;
     int outputCount;
     const char *name;
+    bool advanced;          // true = requires crafting table
 } CraftingRecipe;
+
+typedef struct {
+    BlockType input;
+    BlockType output;
+    const char *name;
+} SmeltRecipe;
 
 //----------------------------------------------------------------------------------
 // Mob System
@@ -189,6 +285,7 @@ typedef enum {
     MOB_NONE = 0,
     MOB_PIG,
     MOB_ZOMBIE,
+    MOB_SKELETON,
     MOB_TYPE_COUNT
 } MobType;
 
@@ -205,8 +302,16 @@ typedef struct {
     float contactCooldown;
     float deathTimer;   // >0 = dying
     float burnTimer;    // sunlight damage accumulator
+    float attackTimer;  // cooldown for ranged attacks
     bool active;
 } Mob;
+
+typedef struct {
+    Vector2 position;
+    Vector2 velocity;
+    float lifetime;
+    bool active;
+} Projectile;
 
 //----------------------------------------------------------------------------------
 // Data Structures
@@ -237,6 +342,10 @@ typedef struct {
     bool wasInWater;         // for water splash detection
     float footstepTimer;     // for footstep sound intervals
     float fallPeakVel;       // peak downward velocity during current fall
+    int spawnX, spawnY;      // bed spawn point (-1 = use default)
+    // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
+    uint8_t armor[4];
+    int armorDurability[4];
 } Player;
 
 //----------------------------------------------------------------------------------
@@ -273,8 +382,16 @@ typedef struct {
 //----------------------------------------------------------------------------------
 typedef enum {
     STATE_MENU = 0,
-    STATE_PLAYING
+    STATE_PLAYING,
+    STATE_SETTINGS,
+    STATE_SLOT_SELECT
 } GameState;
+
+typedef struct {
+    bool exists;
+    unsigned int seed;
+    int worldW, worldH;
+} SaveSlotInfo;
 
 typedef struct {
     int chunkX;
@@ -302,6 +419,7 @@ extern DayNightCycle dayNight;
 
 extern Texture2D blockAtlas;
 extern bool showDebug;
+extern bool showLargeMap;
 extern bool inventoryOpen;
 extern bool gamePaused;
 extern bool audioReady;
@@ -312,12 +430,31 @@ extern float messageTimer;
 extern Color messageColor;
 
 extern Mob mobs[MAX_MOBS];
+extern Projectile projectiles[MAX_PROJECTILES];
 extern float mobSpawnTimer;
 
 extern Particle particles[MAX_PARTICLES];
 extern ItemEntity entities[MAX_ENTITIES];
 extern GameState gameState;
+
+// Crafting search
+extern char craftSearchBuf[32];
+extern int craftSearchLen;
+extern float bgmVolumeSlider;
+extern float sfxVolumeSlider;
 extern int menuSelection;
+extern int selectedSaveSlot;
+extern int slotSelectMode; // 0=new game, 1=load game
+extern char currentSavePath[256];
+extern int slotScrollOffset;
+extern int windowMode; // 0=windowed, 1=fullscreen, 2=borderless
+extern char seedInputBuf[32];
+extern int seedInputLen;
+
+// Confirmation dialog
+extern bool confirmDialogActive;
+extern int confirmDialogSlot;
+extern int confirmDialogMode; // 0=overwrite, 1=delete
 
 extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 extern Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
@@ -327,6 +464,30 @@ extern Music bgm;
 extern const BlockInfo blockInfo[BLOCK_COUNT];
 extern CraftingRecipe craftRecipes[MAX_CRAFT_RECIPES];
 extern int craftRecipeCount;
+
+// Furnace UI state
+extern bool furnaceOpen;
+extern int furnaceBlockX, furnaceBlockY;
+extern uint8_t furnaceFuel;
+extern int furnaceFuelCount;
+extern uint8_t furnaceInput;
+extern int furnaceInputCount;
+extern uint8_t furnaceOutput;
+extern int furnaceOutputCount;
+extern float furnaceProgress;
+extern float furnaceFuelBurn;
+
+// Drag-and-drop held item (shared between rendering.c and crafting.c)
+extern uint8_t heldItem;
+extern int heldCount;
+extern int heldDurability;
+
+// Crafting table state
+extern bool craftingTableOpen;
+
+// Smelting recipes
+extern SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
+extern int smeltRecipeCount;
 
 //----------------------------------------------------------------------------------
 // Function Declarations
@@ -366,6 +527,12 @@ bool IsTool(BlockType item);
 int GetToolMaxDurability(BlockType tool);
 bool IsFood(BlockType item);
 int GetFoodValue(BlockType item);
+bool IsArmor(BlockType item);
+int GetArmorValue(BlockType item);
+int GetArmorMaxDurability(BlockType item);
+int GetTotalArmorPoints(void);
+float GetArmorDamageReduction(void);
+void DamageArmor(void);
 void PlayerPhysics(float dt);
 void PlayerBlockInteraction(void);
 void UpdatePlayer(float dt);
@@ -393,12 +560,18 @@ void DrawPlayerStatus(void);
 void DrawCrosshair(void);
 void DrawDebugInfo(void);
 void DrawInventoryScreen(void);
+void SortInventory(void);
 void DrawMessage(void);
 void DrawPauseMenu(void);
 void DrawDeathScreen(float dt);
 float GetDeathFadeTimer(void);
 void DrawMainMenu(void);
+void DrawSlotSelectScreen(void);
+void DrawConfirmDialog(void);
 void DrawBackground(void);
+void DrawMinimap(void);
+void DrawLargeMap(void);
+void DrawSettingsScreen(void);
 void ReturnHeldItem(void);
 void ShowMessage(const char *msg, Color color);
 
@@ -406,18 +579,28 @@ void ShowMessage(const char *msg, Color color);
 bool SaveExists(const char *path);
 bool SaveWorld(const char *path);
 bool LoadWorld(const char *path);
+void GetSavePath(int slot, char *buf, int bufSize);
+bool GetSlotInfo(int slot, SaveSlotInfo *info);
+void DeleteSaveSlot(int slot);
 
 // crafting.c
 void InitCraftingRecipes(void);
 bool CanCraft(int recipeIndex);
 void Craft(int recipeIndex);
-void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad);
+void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad, bool showAdvanced);
+void InitSmeltingRecipes(void);
+int FindSmeltRecipe(BlockType input);
+void DrawFurnaceUI(void);
 
 // mob.c
 void InitMobs(void);
 void UpdateMobs(float dt);
 void DrawMobs(void);
 Mob* SpawnMob(MobType type, float x, float y);
+void InitProjectiles(void);
+void SpawnProjectile(float x, float y, float vx, float vy);
+void UpdateProjectiles(float dt);
+void DrawProjectiles(void);
 void DamageMob(Mob *mob, int damage);
 bool IsPlayerNearMob(Mob *mob, float range);
 
@@ -438,9 +621,9 @@ void PlaySoundDrop(void);
 void PlaySoundFootstep(void);
 void PlaySoundMob(MobType type);
 void PlaySoundSplash(void);
+void SetSFXVolume(float volume);
 void UpdateBGM(void);
 void SetBGMVolume(float volume);
-void LoadSoundsDeferred(void);
 
 // particles.c
 void InitParticles(void);
@@ -462,5 +645,6 @@ void UpdateGame(float dt);
 void DrawGame(void);
 void UnloadGame(void);
 void UpdateDrawFrame(void);
+void ApplyWindowMode(int mode);
 
 #endif // TYPES_H

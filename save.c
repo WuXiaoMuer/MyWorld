@@ -20,6 +20,48 @@ bool SaveExists(const char *path)
     return false;
 }
 
+void GetSavePath(int slot, char *buf, int bufSize)
+{
+    snprintf(buf, bufSize, "%s/world%d.mwsav", SAVE_DIR, slot);
+}
+
+bool GetSlotInfo(int slot, SaveSlotInfo *info)
+{
+    info->exists = false;
+    info->seed = 0;
+    info->worldW = 0;
+    info->worldH = 0;
+
+    char path[256];
+    GetSavePath(slot, path, sizeof(path));
+    FILE *f = fopen(path, "rb");
+    if (!f) return false;
+
+    char magic[4];
+    if (fread(magic, 1, 4, f) != 4) { fclose(f); return false; }
+    if (memcmp(magic, SAVE_MAGIC, 4) != 0) { fclose(f); return false; }
+
+    uint32_t version, seed, ww, wh;
+    if (fread(&version, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&seed, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&ww, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+    if (fread(&wh, sizeof(uint32_t), 1, f) != 1) { fclose(f); return false; }
+
+    fclose(f);
+    info->exists = true;
+    info->seed = seed;
+    info->worldW = (int)ww;
+    info->worldH = (int)wh;
+    return true;
+}
+
+void DeleteSaveSlot(int slot)
+{
+    char path[256];
+    GetSavePath(slot, path, sizeof(path));
+    remove(path);
+}
+
 bool SaveWorld(const char *path)
 {
     if (player.playerDead) return false;
@@ -61,6 +103,10 @@ bool SaveWorld(const char *path)
     fwrite(&player.hunger, sizeof(int), 1, f);
     fwrite(&player.oxygen, sizeof(int), 1, f);
     fwrite(&player.xp, sizeof(int), 1, f);
+    fwrite(&player.spawnX, sizeof(int), 1, f);
+    fwrite(&player.spawnY, sizeof(int), 1, f);
+    fwrite(player.armor, sizeof(uint8_t), 4, f);
+    fwrite(player.armorDurability, sizeof(int), 4, f);
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {
@@ -145,6 +191,16 @@ bool LoadWorld(const char *path)
         if (fread(&player.hunger, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         if (fread(&player.oxygen, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         if (fread(&player.xp, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+        // v3+: bed spawn point (optional - may not exist in older v2 saves)
+        if (fread(&player.spawnX, sizeof(int), 1, f) != 1) { player.spawnX = -1; player.spawnY = -1; }
+        else if (fread(&player.spawnY, sizeof(int), 1, f) != 1) { player.spawnY = -1; }
+        // v4+: armor slots (optional - may not exist in older saves)
+        if (version >= 4) {
+            if (fread(player.armor, sizeof(uint8_t), 4, f) != 4) { for (int i = 0; i < 4; i++) player.armor[i] = BLOCK_AIR; }
+            if (fread(player.armorDurability, sizeof(int), 4, f) != 4) { for (int i = 0; i < 4; i++) player.armorDurability[i] = 0; }
+        } else {
+            for (int i = 0; i < 4; i++) { player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; }
+        }
     } else {
         // v2 compat: default values
         for (int i = 0; i < INVENTORY_SLOTS; i++) {
@@ -158,6 +214,7 @@ bool LoadWorld(const char *path)
         player.hunger = MAX_HUNGER;
         player.oxygen = MAX_OXYGEN;
         player.xp = 0;
+        for (int i = 0; i < 4; i++) { player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; }
     }
     player.oxygenTimer = 0.0f;
     player.hungerTimer = 0.0f;
