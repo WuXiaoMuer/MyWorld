@@ -114,7 +114,7 @@ void DrawEntities(void)
 
         // Stack count
         if (e->count > 1) {
-            DrawText(TextFormat("%d", e->count), drawX + 8, drawY + 6, 8, (Color){255, 255, 255, alpha});
+            DrawGameText(TextFormat("%d", e->count), drawX + 8, drawY + 6, 8, (Color){255, 255, 255, alpha});
         }
     }
 }

@@ -101,7 +101,7 @@ bool AddToInventory(BlockType item)
                 return true;
             }
         }
-        ShowMessage("Inventory full!", (Color){240, 80, 80, 255});
+        ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
         return false;
     }
     if (IsArmor(item)) {
@@ -113,7 +113,7 @@ bool AddToInventory(BlockType item)
                 return true;
             }
         }
-        ShowMessage("Inventory full!", (Color){240, 80, 80, 255});
+        ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
         return false;
     }
 
@@ -133,8 +133,7 @@ bool AddToInventory(BlockType item)
         }
     }
     // Inventory full
-    snprintf(messageText, sizeof(messageText), "Inventory full!");
-    messageTimer = MESSAGE_DURATION;
+    ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
     return false;
 }
 
@@ -230,7 +229,7 @@ void DamageArmor(void)
         if (player.armor[i] != BLOCK_AIR) {
             player.armorDurability[i]--;
             if (player.armorDurability[i] <= 0) {
-                ShowMessage(TextFormat("%s broke!", blockInfo[player.armor[i]].name),
+                ShowMessage(Sf(STR_MSG_BROKE, GetBlockName(player.armor[i])),
                            (Color){240, 80, 80, 255});
                 player.armor[i] = BLOCK_AIR;
                 player.armorDurability[i] = 0;
@@ -422,7 +421,7 @@ void PlayerPhysics(float dt)
                                          player.position.y + PLAYER_HEIGHT,
                                          (Color){200, 50, 50, 255});
                     PlaySoundHurt();
-                    ShowMessage("Ouch! Fall damage!", (Color){240, 100, 100, 255});
+                    ShowMessage(S(STR_MSG_FALL_DAMAGE), (Color){240, 100, 100, 255});
                 }
             }
             player.fallPeakVel = 0.0f;
@@ -515,11 +514,11 @@ void PlayerBlockInteraction(void)
                                 player.inventory[slot] = BLOCK_AIR;
                                 player.inventoryCount[slot] = 0;
                                 player.toolDurability[slot] = 0;
-                                ShowMessage("Tool broke!", (Color){240, 80, 80, 255});
+                                ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
                             } else {
                                 int maxDur = GetToolMaxDurability(selectedTool);
                                 if (maxDur > 0 && player.toolDurability[slot] == maxDur / 5) {
-                                    ShowMessage("Tool is wearing out!", (Color){240, 200, 80, 255});
+                                    ShowMessage(S(STR_MSG_TOOL_WEARING), (Color){240, 200, 80, 255});
                                 }
                             }
                         }
@@ -542,6 +541,10 @@ void PlayerBlockInteraction(void)
             miningProgress += (dt * toolSpeed) / baseMineTime;
 
             if (miningProgress >= 1.0f) {
+                // Return furnace items before destroying
+                if (bt == BLOCK_FURNACE) {
+                    ReturnFurnaceItems();
+                }
                 world[blockX][blockY] = BLOCK_AIR;
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Coal ore drops coal item instead of the ore block
@@ -590,11 +593,11 @@ void PlayerBlockInteraction(void)
                         player.inventory[slot] = BLOCK_AIR;
                         player.inventoryCount[slot] = 0;
                         player.toolDurability[slot] = 0;
-                        ShowMessage("Tool broke!", (Color){240, 80, 80, 255});
+                        ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
                     } else {
                         int maxDur = GetToolMaxDurability(selectedTool);
                         if (maxDur > 0 && player.toolDurability[slot] == maxDur / 5) {
-                            ShowMessage("Tool is wearing out!", (Color){240, 200, 80, 255});
+                            ShowMessage(S(STR_MSG_TOOL_WEARING), (Color){240, 200, 80, 255});
                         }
                     }
                 }
@@ -611,7 +614,7 @@ void PlayerBlockInteraction(void)
             if (world[blockX][blockY] == BLOCK_BED) {
                 player.spawnX = blockX;
                 player.spawnY = blockY - 1;
-                ShowMessage("Spawn point set!", (Color){100, 220, 100, 255});
+                ShowMessage(S(STR_MSG_SPAWN_SET), (Color){100, 220, 100, 255});
                 PlaySoundCraft();
                 return;
             }
@@ -645,12 +648,12 @@ void PlayerBlockInteraction(void)
                 player.inventory[player.selectedSlot] = BLOCK_AIR;
             }
             PlaySoundEat();
-            snprintf(messageText, sizeof(messageText), "Ate %s (+%d hunger)", blockInfo[selectedTool].name, foodVal);
-            ShowMessage(messageText, (Color){80, 220, 80, 255});
+            ShowMessage(Sf(STR_MSG_ATE, GetBlockName(selectedTool), foodVal), (Color){80, 220, 80, 255});
             return;
         }
 
         if (IsTool(selectedTool) || IsFood(selectedTool) || IsArmor(selectedTool)) return; // Can't place tools, food, or armor
+        if (selectedTool >= ITEM_STICK && selectedTool <= ITEM_IRON_INGOT) return; // Can't place items
         if (selectedTool != BLOCK_AIR && player.inventoryCount[player.selectedSlot] > 0) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 float bLeft = blockX * BLOCK_SIZE;
@@ -770,9 +773,9 @@ void UpdatePlayerStatus(float dt)
             player.hunger--;
             // Warn when hunger gets low
             if (player.hunger == 6) {
-                ShowMessage("Hungry!", (Color){220, 180, 60, 255});
+                ShowMessage(S(STR_MSG_HUNGRY), (Color){220, 180, 60, 255});
             } else if (player.hunger == 2) {
-                ShowMessage("Starving!", (Color){240, 100, 60, 255});
+                ShowMessage(S(STR_MSG_STARVING), (Color){240, 100, 60, 255});
             }
         }
     }
@@ -890,7 +893,7 @@ void UpdateHotbar(void)
         if (Win32IsKeyPressed(KEY_ONE + i)) player.selectedSlot = i;
     }
 
-    float wheel = GetMouseWheelMove();
+    float wheel = Win32GetMouseWheelMove();
     if (wheel < 0) player.selectedSlot = (player.selectedSlot + 1) % HOTBAR_SLOTS;
     if (wheel > 0) player.selectedSlot = (player.selectedSlot - 1 + HOTBAR_SLOTS) % HOTBAR_SLOTS;
 
@@ -898,7 +901,7 @@ void UpdateHotbar(void)
     if (player.selectedSlot != oldSlot) {
         BlockType item = (BlockType)player.inventory[player.selectedSlot];
         if (item != BLOCK_AIR) {
-            ShowMessage(blockInfo[item].name, (Color){220, 220, 220, 255});
+            ShowMessage(GetBlockName(item), (Color){220, 220, 220, 255});
             messageTimer = 0.8f;
         }
     }

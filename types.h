@@ -12,6 +12,7 @@
 //----------------------------------------------------------------------------------
 #ifdef _WIN32
 typedef unsigned long DWORD;
+typedef unsigned int UINT;
 typedef int BOOL;
 typedef long LONG;
 __declspec(dllimport) BOOL __stdcall GetCursorPos(LONG*);
@@ -39,7 +40,6 @@ __declspec(dllimport) void* __stdcall GetFocus(void);
 #define VK_F3       0x72
 #define VK_F11      0x7A
 #endif
-// VK_0..VK_9 = 0x30..0x39, VK_A..VK_Z = 0x41..0x5A (already defined in WinUser.h)
 #endif
 
 // Win32 input state (updated each frame by UpdateWin32Input)
@@ -61,6 +61,8 @@ bool Win32IsMouseButtonReleased(int button);
 bool Win32IsKeyPressed(int key);
 bool Win32IsKeyDown(int key);
 int Win32GetCharPressed(void);
+float Win32GetMouseWheelMove(void);
+void InitWin32WheelHook(void);
 
 //----------------------------------------------------------------------------------
 // Constants
@@ -261,6 +263,286 @@ typedef struct {
 } BlockInfo;
 
 //----------------------------------------------------------------------------------
+// Language & i18n
+//----------------------------------------------------------------------------------
+typedef enum {
+    LANG_EN = 0,
+    LANG_ZH_CN,
+    LANG_JA,
+    LANG_COUNT
+} Language;
+
+typedef enum {
+    STR_NONE = 0,
+
+    // Main Menu
+    STR_TITLE,
+    STR_SUBTITLE,
+    STR_BTN_NEW_GAME,
+    STR_BTN_LOAD_GAME,
+    STR_BTN_SETTINGS,
+    STR_BTN_QUIT,
+    STR_HINT_NAVIGATE,
+    STR_HINT_CONTROLS,
+
+    // Slot Select
+    STR_NEW_GAME_TITLE,
+    STR_LOAD_GAME_TITLE,
+    STR_NEW_GAME_SUB,
+    STR_LOAD_GAME_SUB,
+    STR_SEED,
+    STR_RANDOM,
+    STR_SLOT,
+    STR_SEED_DISPLAY,
+    STR_OCCUPIED,
+    STR_EMPTY_NEW,
+    STR_EMPTY_LOAD,
+    STR_BACK,
+    STR_HINT_SLOT,
+
+    // Confirm Dialog
+    STR_DELETE_SAVE,
+    STR_OVERWRITE_SAVE,
+    STR_SLOT_HAS_DATA,
+    STR_CANNOT_UNDO,
+    STR_YES_DELETE,
+    STR_YES_OVERWRITE,
+    STR_CANCEL,
+    STR_CONFIRM_KEYS,
+
+    // Pause Menu
+    STR_PAUSED,
+    STR_MUSIC_VOLUME,
+    STR_SFX_VOLUME,
+    STR_CONTROLS_TITLE,
+    STR_CONTINUE,
+    STR_MAIN_MENU,
+
+    // Control Keys
+    STR_KEY_WASD,
+    STR_KEY_SPACE,
+    STR_KEY_SHIFT,
+    STR_KEY_LCLICK,
+    STR_KEY_RCLICK,
+    STR_KEY_E,
+    STR_KEY_H,
+    STR_KEY_F3,
+    STR_KEY_ESC,
+    STR_KEY_19,
+
+    // Control Actions
+    STR_ACT_MOVE,
+    STR_ACT_JUMP,
+    STR_ACT_SPRINT,
+    STR_ACT_BREAK,
+    STR_ACT_PLACE,
+    STR_ACT_INVENTORY,
+    STR_ACT_HEAL,
+    STR_ACT_DEBUG,
+    STR_ACT_PAUSE,
+    STR_ACT_HOTBAR,
+
+    // Death Screen
+    STR_YOU_DIED,
+    STR_PRESS_SPACE_RESPAWN,
+    STR_PRESS_ESC_MENU,
+
+    // Inventory
+    STR_INVENTORY,
+    STR_SORT,
+
+    // Map
+    STR_WORLD_MAP,
+    STR_PRESS_M_CLOSE,
+    STR_PLAYER_COORD,
+
+    // Crafting
+    STR_CRAFTING,
+    STR_CRAFTING_TABLE,
+    STR_SEARCH,
+    STR_NO_MATCHES,
+    STR_NO_RECIPES,
+
+    // Furnace
+    STR_FURNACE,
+    STR_FUEL,
+    STR_INPUT,
+    STR_OUTPUT,
+    STR_PRESS_E_ESC_CLOSE,
+
+    // Settings
+    STR_SETTINGS,
+    STR_SECTION_AUDIO,
+    STR_SOUND_EFFECTS,
+    STR_SECTION_DISPLAY,
+    STR_WINDOW_MODE,
+    STR_WINDOWED,
+    STR_FULLSCREEN,
+    STR_BORDERLESS,
+    STR_SECTION_LANGUAGE,
+    STR_LANGUAGE,
+    STR_SECTION_FONT,
+    STR_FONT,
+    STR_FONT_BUILTIN,
+    STR_FONT_CUSTOM,
+
+    // Language names (for selector buttons)
+    STR_LANG_NAME_EN,
+    STR_LANG_NAME_ZH,
+    STR_LANG_NAME_JA,
+
+    // Font names
+    STR_FONT_NAME_BUILTIN,
+    STR_FONT_NAME_LXGW,
+
+    // Status Messages
+    STR_MSG_GAME_SAVED,
+    STR_MSG_HEALED_XP,
+    STR_MSG_NOT_ENOUGH_XP,
+    STR_MSG_INVENTORY_FULL,
+    STR_MSG_TOOL_BROKE,
+    STR_MSG_TOOL_WEARING,
+    STR_MSG_FALL_DAMAGE,
+    STR_MSG_SPAWN_SET,
+    STR_MSG_HUNGRY,
+    STR_MSG_STARVING,
+    STR_MSG_ATE,
+    STR_MSG_BROKE,
+
+    // Tooltips
+    STR_TOOLTIP_ARMOR,
+    STR_TOOLTIP_HUNGER,
+    STR_TOOLTIP_DURABILITY,
+    STR_TOOLTIP_DUR_SHORT,
+
+    // Debug
+    STR_DBG_FPS,
+    STR_DBG_POS,
+    STR_DBG_BLOCK,
+    STR_DBG_CHUNKS,
+    STR_DBG_TIME,
+    STR_DBG_LIGHT,
+    STR_DBG_GROUND,
+    STR_DBG_HP,
+    STR_DBG_OXYGEN,
+    STR_DBG_UNDERWATER,
+    STR_DBG_SEED,
+    STR_YES,
+    STR_NO,
+
+    // Block/Item Names (order matches BlockType enum exactly)
+    STR_BLOCK_AIR,
+    STR_BLOCK_GRASS,
+    STR_BLOCK_DIRT,
+    STR_BLOCK_STONE,
+    STR_BLOCK_COBBLESTONE,
+    STR_BLOCK_WOOD,
+    STR_BLOCK_LEAVES,
+    STR_BLOCK_SAND,
+    STR_BLOCK_WATER,
+    STR_BLOCK_COAL_ORE,
+    STR_BLOCK_IRON_ORE,
+    STR_BLOCK_PLANKS,
+    STR_BLOCK_BRICK,
+    STR_BLOCK_GLASS,
+    STR_BLOCK_BEDROCK,
+    STR_BLOCK_GRAVEL,
+    STR_BLOCK_CLAY,
+    STR_BLOCK_SANDSTONE,
+    STR_BLOCK_TORCH,
+    STR_BLOCK_FLOWER,
+    STR_BLOCK_TALL_GRASS,
+    STR_BLOCK_FURNACE,
+    STR_BLOCK_BED,
+    STR_ITEM_STICK,
+    STR_ITEM_COAL,
+    STR_ITEM_IRON_INGOT,
+    STR_TOOL_WOOD_PICKAXE,
+    STR_TOOL_WOOD_AXE,
+    STR_TOOL_WOOD_SWORD,
+    STR_TOOL_WOOD_SHOVEL,
+    STR_TOOL_STONE_PICKAXE,
+    STR_TOOL_STONE_AXE,
+    STR_TOOL_STONE_SWORD,
+    STR_TOOL_STONE_SHOVEL,
+    STR_TOOL_IRON_PICKAXE,
+    STR_TOOL_IRON_AXE,
+    STR_TOOL_IRON_SWORD,
+    STR_TOOL_IRON_SHOVEL,
+    STR_FOOD_RAW_PORK,
+    STR_FOOD_COOKED_PORK,
+    STR_FOOD_APPLE,
+    STR_FOOD_BREAD,
+    STR_BLOCK_CRAFTING_TABLE,
+    STR_ARMOR_WOOD_HELMET,
+    STR_ARMOR_WOOD_CHESTPLATE,
+    STR_ARMOR_WOOD_LEGGINGS,
+    STR_ARMOR_WOOD_BOOTS,
+    STR_ARMOR_STONE_HELMET,
+    STR_ARMOR_STONE_CHESTPLATE,
+    STR_ARMOR_STONE_LEGGINGS,
+    STR_ARMOR_STONE_BOOTS,
+    STR_ARMOR_IRON_HELMET,
+    STR_ARMOR_IRON_CHESTPLATE,
+    STR_ARMOR_IRON_LEGGINGS,
+    STR_ARMOR_IRON_BOOTS,
+
+    // Recipe Names
+    STR_RECIPE_WOOD_PLANKS,
+    STR_RECIPE_PLANKS_STICKS,
+    STR_RECIPE_WOOD_PICK,
+    STR_RECIPE_WOOD_AXE,
+    STR_RECIPE_WOOD_SWORD,
+    STR_RECIPE_WOOD_SHOVEL,
+    STR_RECIPE_STONE_PICK,
+    STR_RECIPE_STONE_AXE,
+    STR_RECIPE_STONE_SWORD,
+    STR_RECIPE_STONE_SHOVEL,
+    STR_RECIPE_IRON_PICK,
+    STR_RECIPE_IRON_AXE,
+    STR_RECIPE_IRON_SWORD,
+    STR_RECIPE_IRON_SHOVEL,
+    STR_RECIPE_BRICK,
+    STR_RECIPE_FURNACE,
+    STR_RECIPE_TORCHES,
+    STR_RECIPE_SANDSTONE,
+    STR_RECIPE_COBBLE,
+    STR_RECIPE_BED,
+    STR_RECIPE_CRAFTING_TABLE,
+    STR_RECIPE_BREAD,
+    STR_RECIPE_APPLE,
+    // Advanced armor
+    STR_RECIPE_WOOD_HELMET,
+    STR_RECIPE_WOOD_CHEST,
+    STR_RECIPE_WOOD_LEGS,
+    STR_RECIPE_WOOD_BOOTS,
+    STR_RECIPE_STONE_HELMET,
+    STR_RECIPE_STONE_CHEST,
+    STR_RECIPE_STONE_LEGS,
+    STR_RECIPE_STONE_BOOTS,
+    STR_RECIPE_IRON_HELMET,
+    STR_RECIPE_IRON_CHEST,
+    STR_RECIPE_IRON_LEGS,
+    STR_RECIPE_IRON_BOOTS,
+    // Smelt
+    STR_SMELT_IRON,
+    STR_SMELT_PORK,
+    STR_SMELT_COBBLE,
+    STR_SMELT_SAND,
+
+    // Furnace messages
+    STR_MSG_NO_FUEL,
+    STR_MSG_SMELTING,
+    STR_MSG_CANNOT_SMELT,
+
+    // Additional controls
+    STR_KEY_F11,
+    STR_ACT_FULLSCREEN,
+
+    STR_COUNT
+} StringId;
+
+//----------------------------------------------------------------------------------
 // Crafting
 //----------------------------------------------------------------------------------
 typedef struct {
@@ -268,14 +550,14 @@ typedef struct {
     int inputCount;
     BlockType output;
     int outputCount;
-    const char *name;
+    StringId nameId;
     bool advanced;          // true = requires crafting table
 } CraftingRecipe;
 
 typedef struct {
     BlockType input;
     BlockType output;
-    const char *name;
+    StringId nameId;
 } SmeltRecipe;
 
 //----------------------------------------------------------------------------------
@@ -489,6 +771,12 @@ extern bool craftingTableOpen;
 extern SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
 extern int smeltRecipeCount;
 
+// i18n / Font
+extern Language language;
+extern Font gameFont;
+extern bool useCustomFont;
+extern char customFontPath[256];
+
 //----------------------------------------------------------------------------------
 // Function Declarations
 //----------------------------------------------------------------------------------
@@ -591,6 +879,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 void InitSmeltingRecipes(void);
 int FindSmeltRecipe(BlockType input);
 void DrawFurnaceUI(void);
+void ReturnFurnaceItems(void);
 
 // mob.c
 void InitMobs(void);
@@ -646,5 +935,36 @@ void DrawGame(void);
 void UnloadGame(void);
 void UpdateDrawFrame(void);
 void ApplyWindowMode(int mode);
+void LoadSettings(void);
+
+// Smooth hover animation
+float GetHoverAlpha(int slotId, bool hovered, float dt);
+
+// Screen transitions
+typedef enum {
+    TRANSITION_NONE = 0,
+    TRANSITION_FADE_OUT,
+    TRANSITION_FADE_IN
+} TransitionState;
+
+extern TransitionState transitionState;
+extern float transitionAlpha;
+extern GameState transitionTarget;
+
+void StartTransition(GameState target);
+void UpdateTransition(float dt);
+void DrawTransition(void);
+bool IsTransitioning(void);
+
+// i18n.c
+const char *S(StringId id);
+const char *Sf(StringId id, ...);
+const char *GetBlockName(BlockType bt);
+void LoadGameFont(void);
+void UnloadGameFont(void);
+bool ReloadGameFont(const char *path);
+void DrawGameText(const char *text, int posX, int posY, int fsize, Color color);
+Vector2 MeasureGameText(const char *text, int fsize);
+int MeasureGameTextWidth(const char *text, int fsize);
 
 #endif // TYPES_H

@@ -79,3 +79,6 @@ lib/
 
 # Save files
 saves/
+
+# User settings
+settings.cfg

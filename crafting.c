@@ -7,62 +7,62 @@ void InitCraftingRecipes(void)
 {
     craftRecipeCount = 0;
 
-    #define ADD_RECIPE(in, inC, out, outC, n, adv) do { \
+    #define ADD_RECIPE(in, inC, out, outC, nid, adv) do { \
         if (craftRecipeCount < MAX_CRAFT_RECIPES) \
-            craftRecipes[craftRecipeCount++] = (CraftingRecipe){in, inC, out, outC, n, adv}; \
+            craftRecipes[craftRecipeCount++] = (CraftingRecipe){in, inC, out, outC, nid, adv}; \
     } while(0)
 
     // --- Basic materials ---
-    ADD_RECIPE(BLOCK_WOOD, 1, BLOCK_PLANKS, 4, "Wood -> 4 Planks", false);
-    ADD_RECIPE(BLOCK_PLANKS, 2, ITEM_STICK, 4, "2 Planks -> 4 Sticks", false);
+    ADD_RECIPE(BLOCK_WOOD, 1, BLOCK_PLANKS, 4, STR_RECIPE_WOOD_PLANKS, false);
+    ADD_RECIPE(BLOCK_PLANKS, 2, ITEM_STICK, 4, STR_RECIPE_PLANKS_STICKS, false);
 
     // --- Wood tools ---
-    ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_PICKAXE, 1, "3 Planks -> Wood Pick", false);
-    ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_AXE, 1, "3 Planks -> Wood Axe", false);
-    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SWORD, 1, "2 Planks -> Wood Sword", false);
-    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SHOVEL, 1, "2 Planks -> Wood Shovel", false);
+    ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_PICKAXE, 1, STR_RECIPE_WOOD_PICK, false);
+    ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_AXE, 1, STR_RECIPE_WOOD_AXE, false);
+    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SWORD, 1, STR_RECIPE_WOOD_SWORD, false);
+    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SHOVEL, 1, STR_RECIPE_WOOD_SHOVEL, false);
 
     // --- Stone tools ---
-    ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_PICKAXE, 1, "3 Cobble -> Stone Pick", false);
-    ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_AXE, 1, "3 Cobble -> Stone Axe", false);
-    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SWORD, 1, "2 Cobble -> Stone Sword", false);
-    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SHOVEL, 1, "2 Cobble -> Stone Shovel", false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_PICKAXE, 1, STR_RECIPE_STONE_PICK, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_AXE, 1, STR_RECIPE_STONE_AXE, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SWORD, 1, STR_RECIPE_STONE_SWORD, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SHOVEL, 1, STR_RECIPE_STONE_SHOVEL, false);
 
     // --- Iron tools ---
-    ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_PICKAXE, 1, "3 Iron -> Iron Pick", false);
-    ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_AXE, 1, "3 Iron -> Iron Axe", false);
-    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SWORD, 1, "2 Iron -> Iron Sword", false);
-    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SHOVEL, 1, "2 Iron -> Iron Shovel", false);
+    ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_PICKAXE, 1, STR_RECIPE_IRON_PICK, false);
+    ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_AXE, 1, STR_RECIPE_IRON_AXE, false);
+    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SWORD, 1, STR_RECIPE_IRON_SWORD, false);
+    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SHOVEL, 1, STR_RECIPE_IRON_SHOVEL, false);
 
     // --- Block crafting ---
-    ADD_RECIPE(BLOCK_STONE, 4, BLOCK_BRICK, 4, "4 Stone -> 4 Brick", false);
-    ADD_RECIPE(BLOCK_STONE, 8, BLOCK_FURNACE, 1, "8 Stone -> Furnace", false);
-    ADD_RECIPE(ITEM_STICK, 2, BLOCK_TORCH, 4, "2 Sticks -> 4 Torches", false);
-    ADD_RECIPE(BLOCK_SAND, 4, BLOCK_SANDSTONE, 4, "4 Sand -> 4 Sandstone", false);
-    ADD_RECIPE(BLOCK_GRAVEL, 4, BLOCK_COBBLESTONE, 4, "4 Gravel -> 4 Cobble", false);
-    ADD_RECIPE(BLOCK_PLANKS, 6, BLOCK_BED, 1, "6 Planks -> Bed", false);
-    ADD_RECIPE(BLOCK_PLANKS, 8, BLOCK_CRAFTING_TABLE, 1, "8 Planks -> Crafting Table", false);
+    ADD_RECIPE(BLOCK_STONE, 4, BLOCK_BRICK, 4, STR_RECIPE_BRICK, false);
+    ADD_RECIPE(BLOCK_STONE, 8, BLOCK_FURNACE, 1, STR_RECIPE_FURNACE, false);
+    ADD_RECIPE(ITEM_STICK, 2, BLOCK_TORCH, 4, STR_RECIPE_TORCHES, false);
+    ADD_RECIPE(BLOCK_SAND, 4, BLOCK_SANDSTONE, 4, STR_RECIPE_SANDSTONE, false);
+    ADD_RECIPE(BLOCK_GRAVEL, 4, BLOCK_COBBLESTONE, 4, STR_RECIPE_COBBLE, false);
+    ADD_RECIPE(BLOCK_PLANKS, 6, BLOCK_BED, 1, STR_RECIPE_BED, false);
+    ADD_RECIPE(BLOCK_PLANKS, 8, BLOCK_CRAFTING_TABLE, 1, STR_RECIPE_CRAFTING_TABLE, false);
 
     // --- Food ---
-    ADD_RECIPE(BLOCK_PLANKS, 8, FOOD_BREAD, 1, "8 Planks -> Bread", false);
-    ADD_RECIPE(BLOCK_LEAVES, 8, FOOD_APPLE, 1, "8 Leaves -> Apple", false);
+    ADD_RECIPE(BLOCK_PLANKS, 8, FOOD_BREAD, 1, STR_RECIPE_BREAD, false);
+    ADD_RECIPE(BLOCK_LEAVES, 8, FOOD_APPLE, 1, STR_RECIPE_APPLE, false);
 
     // --- Advanced recipes (require crafting table) ---
     // Wood armor
-    ADD_RECIPE(BLOCK_PLANKS, 5, ARMOR_WOOD_HELMET, 1, "5 Planks -> Wood Helmet", true);
-    ADD_RECIPE(BLOCK_PLANKS, 8, ARMOR_WOOD_CHESTPLATE, 1, "8 Planks -> Wood Chest", true);
-    ADD_RECIPE(BLOCK_PLANKS, 7, ARMOR_WOOD_LEGGINGS, 1, "7 Planks -> Wood Legs", true);
-    ADD_RECIPE(BLOCK_PLANKS, 4, ARMOR_WOOD_BOOTS, 1, "4 Planks -> Wood Boots", true);
+    ADD_RECIPE(BLOCK_PLANKS, 5, ARMOR_WOOD_HELMET, 1, STR_RECIPE_WOOD_HELMET, true);
+    ADD_RECIPE(BLOCK_PLANKS, 8, ARMOR_WOOD_CHESTPLATE, 1, STR_RECIPE_WOOD_CHEST, true);
+    ADD_RECIPE(BLOCK_PLANKS, 7, ARMOR_WOOD_LEGGINGS, 1, STR_RECIPE_WOOD_LEGS, true);
+    ADD_RECIPE(BLOCK_PLANKS, 4, ARMOR_WOOD_BOOTS, 1, STR_RECIPE_WOOD_BOOTS, true);
     // Stone armor
-    ADD_RECIPE(BLOCK_COBBLESTONE, 5, ARMOR_STONE_HELMET, 1, "5 Cobble -> Stone Helmet", true);
-    ADD_RECIPE(BLOCK_COBBLESTONE, 8, ARMOR_STONE_CHESTPLATE, 1, "8 Cobble -> Stone Chest", true);
-    ADD_RECIPE(BLOCK_COBBLESTONE, 7, ARMOR_STONE_LEGGINGS, 1, "7 Cobble -> Stone Legs", true);
-    ADD_RECIPE(BLOCK_COBBLESTONE, 4, ARMOR_STONE_BOOTS, 1, "4 Cobble -> Stone Boots", true);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 5, ARMOR_STONE_HELMET, 1, STR_RECIPE_STONE_HELMET, true);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 8, ARMOR_STONE_CHESTPLATE, 1, STR_RECIPE_STONE_CHEST, true);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 7, ARMOR_STONE_LEGGINGS, 1, STR_RECIPE_STONE_LEGS, true);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 4, ARMOR_STONE_BOOTS, 1, STR_RECIPE_STONE_BOOTS, true);
     // Iron armor
-    ADD_RECIPE(ITEM_IRON_INGOT, 5, ARMOR_IRON_HELMET, 1, "5 Iron -> Iron Helmet", true);
-    ADD_RECIPE(ITEM_IRON_INGOT, 8, ARMOR_IRON_CHESTPLATE, 1, "8 Iron -> Iron Chest", true);
-    ADD_RECIPE(ITEM_IRON_INGOT, 7, ARMOR_IRON_LEGGINGS, 1, "7 Iron -> Iron Legs", true);
-    ADD_RECIPE(ITEM_IRON_INGOT, 4, ARMOR_IRON_BOOTS, 1, "4 Iron -> Iron Boots", true);
+    ADD_RECIPE(ITEM_IRON_INGOT, 5, ARMOR_IRON_HELMET, 1, STR_RECIPE_IRON_HELMET, true);
+    ADD_RECIPE(ITEM_IRON_INGOT, 8, ARMOR_IRON_CHESTPLATE, 1, STR_RECIPE_IRON_CHEST, true);
+    ADD_RECIPE(ITEM_IRON_INGOT, 7, ARMOR_IRON_LEGGINGS, 1, STR_RECIPE_IRON_LEGS, true);
+    ADD_RECIPE(ITEM_IRON_INGOT, 4, ARMOR_IRON_BOOTS, 1, STR_RECIPE_IRON_BOOTS, true);
 
     #undef ADD_RECIPE
 }
@@ -70,10 +70,10 @@ void InitCraftingRecipes(void)
 void InitSmeltingRecipes(void)
 {
     smeltRecipeCount = 0;
-    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_IRON_ORE, ITEM_IRON_INGOT, "Iron Ore -> Ingot"};
-    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){FOOD_RAW_PORK, FOOD_COOKED_PORK, "Raw Pork -> Cooked"};
-    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_COBBLESTONE, BLOCK_STONE, "Cobble -> Stone"};
-    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_SAND, BLOCK_GLASS, "Sand -> Glass"};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_IRON_ORE, ITEM_IRON_INGOT, STR_SMELT_IRON};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){FOOD_RAW_PORK, FOOD_COOKED_PORK, STR_SMELT_PORK};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_COBBLESTONE, BLOCK_STONE, STR_SMELT_COBBLE};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_SAND, BLOCK_GLASS, STR_SMELT_SAND};
 }
 
 int FindSmeltRecipe(BlockType input)
@@ -157,8 +157,8 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     Vector2 mouse = Win32GetMousePosition();
 
     // Title
-    const char *title = showAdvanced ? "Crafting Table" : "Crafting";
-    DrawText(title, panelX, panelY, 16, (Color){220, 210, 230, 255});
+    const char *title = showAdvanced ? S(STR_CRAFTING_TABLE) : S(STR_CRAFTING);
+    DrawGameText(title, panelX, panelY, 16, (Color){220, 210, 230, 255});
     panelY += 22;
 
     // Search box
@@ -190,13 +190,13 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     }
 
     if (craftSearchLen > 0) {
-        DrawText(craftSearchBuf, panelX + 4, panelY + 3, 11, (Color){200, 200, 220, 255});
+        DrawGameText(craftSearchBuf, panelX + 4, panelY + 3, 11, (Color){200, 200, 220, 255});
         if (searchFocused && ((int)(GetTime() * 2.0f) % 2 == 0)) {
-            int cursorX = panelX + 4 + MeasureText(craftSearchBuf, 11);
+            int cursorX = panelX + 4 + MeasureGameTextWidth(craftSearchBuf, 11);
             DrawRectangle(cursorX, panelY + 3, 1, 11, (Color){200, 200, 220, 200});
         }
         int clearX = panelX + searchBoxW - 14;
-        DrawText("x", clearX, panelY + 3, 11, (Color){180, 100, 100, 200});
+        DrawGameText("x", clearX, panelY + 3, 11, (Color){180, 100, 100, 200});
         if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse.x >= clearX && mouse.x <= clearX + 12
             && mouse.y >= panelY && mouse.y <= panelY + searchBoxH) {
             craftSearchLen = 0;
@@ -204,7 +204,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             craftScrollOffset = 0;
         }
     } else {
-        DrawText("Search...", panelX + 4, panelY + 3, 11, (Color){100, 95, 115, 150});
+        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){100, 95, 115, 150});
         if (searchFocused && ((int)(GetTime() * 2.0f) % 2 == 0)) {
             DrawRectangle(panelX + 4, panelY + 3, 1, 11, (Color){150, 145, 165, 150});
         }
@@ -221,7 +221,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         if (craftSearchLen == 0) {
             filteredIndices[filteredCount++] = i;
         } else {
-            const char *name = craftRecipes[i].name;
+            const char *name = S(craftRecipes[i].nameId);
             bool match = false;
             for (const char *h = name; *h; h++) {
                 const char *n = craftSearchBuf;
@@ -242,7 +242,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     // Scroll with mouse wheel
     Rectangle panelArea = { (float)panelX, (float)panelY, (float)panelW, (float)(visibleCount * (slotH + pad)) };
     if (CheckCollisionPointRec(mouse, panelArea)) {
-        int wheel = (int)GetMouseWheelMove();
+        int wheel = (int)Win32GetMouseWheelMove();
         if (wheel != 0) {
             craftScrollOffset -= wheel * 2;
             if (craftScrollOffset < 0) craftScrollOffset = 0;
@@ -263,12 +263,27 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         int slotY = panelY + (i - startIdx) * (slotH + pad);
 
         bool canCraft = CanCraft(ri);
-        Color bgColor = canCraft ? (Color){55, 75, 55, 200} : (Color){55, 45, 45, 180};
 
         Rectangle btnRect = { (float)x, (float)slotY, (float)panelW, (float)slotH };
         bool hover = CheckCollisionPointRec(mouse, btnRect);
+        float hA = GetHoverAlpha(200 + i, hover, GetFrameTime());
+        Color bgColor;
+        if (canCraft) {
+            bgColor = (Color){
+                (unsigned char)(55 + (int)(15 * hA)),
+                (unsigned char)(75 + (int)(25 * hA)),
+                (unsigned char)(55 + (int)(15 * hA)),
+                (unsigned char)(200 + (int)(20 * hA))
+            };
+        } else {
+            bgColor = (Color){
+                (unsigned char)(55 + (int)(15 * hA)),
+                (unsigned char)(45 + (int)(5 * hA)),
+                (unsigned char)(45 + (int)(5 * hA)),
+                (unsigned char)(180 + (int)(20 * hA))
+            };
+        }
         if (hover) {
-            bgColor = canCraft ? (Color){70, 100, 70, 220} : (Color){70, 50, 50, 200};
             if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && canCraft) {
                 if (Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT)) {
                     int count = 0;
@@ -300,10 +315,10 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
                 if (player.inventory[s] == r->input) have += player.inventoryCount[s];
             }
             Color countColor = have >= r->inputCount ? (Color){120, 220, 120, 255} : (Color){200, 160, 160, 255};
-            DrawText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
+            DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
         }
 
-        DrawText(">", x + iconSize + 35, textY, 11, (Color){180, 180, 180, 200});
+        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){180, 180, 180, 200});
 
         // Output icon
         if (r->output < BLOCK_COUNT && blockAtlas.id > 0) {
@@ -311,10 +326,10 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             Rectangle dstOut = { (float)(x + iconSize + 50), (float)(slotY + 3), (float)iconSize, (float)iconSize };
             DrawTexturePro(blockAtlas, srcOut, dstOut, (Vector2){0, 0}, 0, WHITE);
         }
-        DrawText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){200, 200, 200, 255});
+        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){200, 200, 200, 255});
 
         // Recipe name
-        DrawText(r->name, x + iconSize * 2 + 85, textY, 10, (Color){150, 145, 160, 220});
+        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){150, 145, 160, 220});
     }
 
     // Scrollbar
@@ -336,16 +351,16 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     int listH = visibleCount * (slotH + pad);
     if (craftScrollOffset > 0) {
         DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){45, 42, 50, 180});
-        DrawText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){180, 175, 190, 150});
+        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){180, 175, 190, 150});
     }
     if (endIdx < filteredCount) {
         DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){45, 42, 50, 180});
-        DrawText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){180, 175, 190, 150});
+        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){180, 175, 190, 150});
     }
 
     if (filteredCount == 0) {
-        const char *msg = craftSearchLen > 0 ? "No matches" : "No recipes";
-        DrawText(msg, panelX + 8, panelY + 20, 14, (Color){120, 115, 130, 180});
+        const char *msg = craftSearchLen > 0 ? S(STR_NO_MATCHES) : S(STR_NO_RECIPES);
+        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){120, 115, 130, 180});
     }
 }
 
@@ -358,37 +373,56 @@ void DrawFurnaceUI(void)
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 160});
 
     int panelW = 300;
-    int panelH = 220;
+    int panelH = 240;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
     int panelY = (SCREEN_HEIGHT - panelH) / 2;
+    Vector2 mouse = Win32GetMousePosition();
 
-    // Background
+    // Background with shadow
+    DrawRectangle(panelX + 3, panelY + 3, panelW, panelH, (Color){0, 0, 0, 60});
     DrawRectangle(panelX, panelY, panelW, panelH, (Color){45, 42, 50, 240});
+    DrawRectangle(panelX, panelY, panelW, 30, (Color){50, 47, 56, 240});
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){90, 85, 100, 255});
+    DrawRectangleLines(panelX + 1, panelY + 1, panelW - 2, panelH - 2, (Color){65, 60, 75, 200});
 
     // Title
-    DrawText("Furnace", panelX + panelW / 2 - MeasureText("Furnace", 16) / 2, panelY + 8, 16, (Color){220, 210, 230, 255});
+    DrawGameText(S(STR_FURNACE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_FURNACE), 16) / 2, panelY + 8, 16, (Color){220, 210, 230, 255});
 
     int slotSize = 40;
-    int slotY = panelY + 40;
+    int slotY = panelY + 44;
 
     // Fuel slot (left)
     int fuelX = panelX + 30;
-    DrawRectangle(fuelX, slotY, slotSize, slotSize, (Color){30, 28, 38, 220});
-    DrawRectangleLines(fuelX, slotY, slotSize, slotSize, (Color){80, 75, 95, 180});
-    DrawText("Fuel", fuelX, slotY - 14, 10, (Color){180, 175, 190, 200});
+    Rectangle fuelRect = { (float)fuelX, (float)slotY, (float)slotSize, (float)slotSize };
+    bool fuelHover = CheckCollisionPointRec(mouse, fuelRect);
+    Color fuelBg = fuelHover ? (Color){45, 42, 52, 230} : (Color){30, 28, 38, 220};
+    Color fuelBorder = fuelHover ? (Color){120, 110, 140, 220} : (Color){80, 75, 95, 180};
+    if (fuelHover) DrawRectangle(fuelX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
+    DrawRectangle(fuelX, slotY, slotSize, slotSize, fuelBg);
+    DrawRectangleLines(fuelX, slotY, slotSize, slotSize, fuelBorder);
+    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 10, (Color){180, 175, 190, 200});
 
     // Input slot (center)
     int inputX = panelX + panelW / 2 - slotSize / 2;
-    DrawRectangle(inputX, slotY, slotSize, slotSize, (Color){30, 28, 38, 220});
-    DrawRectangleLines(inputX, slotY, slotSize, slotSize, (Color){80, 75, 95, 180});
-    DrawText("Input", inputX, slotY - 14, 10, (Color){180, 175, 190, 200});
+    Rectangle inputRect = { (float)inputX, (float)slotY, (float)slotSize, (float)slotSize };
+    bool inputHover = CheckCollisionPointRec(mouse, inputRect);
+    Color inputBg = inputHover ? (Color){45, 42, 52, 230} : (Color){30, 28, 38, 220};
+    Color inputBorder = inputHover ? (Color){120, 110, 140, 220} : (Color){80, 75, 95, 180};
+    if (inputHover) DrawRectangle(inputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
+    DrawRectangle(inputX, slotY, slotSize, slotSize, inputBg);
+    DrawRectangleLines(inputX, slotY, slotSize, slotSize, inputBorder);
+    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 10, (Color){180, 175, 190, 200});
 
     // Output slot (right)
     int outputX = panelX + panelW - 30 - slotSize;
-    DrawRectangle(outputX, slotY, slotSize, slotSize, (Color){30, 28, 38, 220});
-    DrawRectangleLines(outputX, slotY, slotSize, slotSize, (Color){80, 75, 95, 180});
-    DrawText("Output", outputX, slotY - 14, 10, (Color){180, 175, 190, 200});
+    Rectangle outputRect = { (float)outputX, (float)slotY, (float)slotSize, (float)slotSize };
+    bool outputHover = CheckCollisionPointRec(mouse, outputRect);
+    Color outputBg = outputHover ? (Color){45, 42, 52, 230} : (Color){30, 28, 38, 220};
+    Color outputBorder = outputHover ? (Color){120, 110, 140, 220} : (Color){80, 75, 95, 180};
+    if (outputHover) DrawRectangle(outputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
+    DrawRectangle(outputX, slotY, slotSize, slotSize, outputBg);
+    DrawRectangleLines(outputX, slotY, slotSize, slotSize, outputBorder);
+    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 10, (Color){180, 175, 190, 200});
 
     // Draw items in slots
     if (furnaceFuel != BLOCK_AIR && blockAtlas.id > 0) {
@@ -396,21 +430,21 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(fuelX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceFuelCount > 1)
-            DrawText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
+            DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
     if (furnaceInput != BLOCK_AIR && blockAtlas.id > 0) {
         Rectangle src = { (float)(furnaceInput * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)(inputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceInputCount > 1)
-            DrawText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
+            DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
     if (furnaceOutput != BLOCK_AIR && blockAtlas.id > 0) {
         Rectangle src = { (float)(furnaceOutput * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)(outputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceOutputCount > 1)
-            DrawText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
+            DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
 
     // Progress arrow between input and output
@@ -432,7 +466,7 @@ void DrawFurnaceUI(void)
 
     // Fuel flame indicator
     int flameY = slotY + slotSize + 10;
-    DrawText("Fuel:", fuelX, flameY, 10, (Color){180, 175, 190, 200});
+    DrawGameText(TextFormat("%s:", S(STR_FUEL)), fuelX, flameY, 10, (Color){180, 175, 190, 200});
     if (furnaceFuelBurn > 0.0f) {
         int flameW = 60;
         int flameH = 8;
@@ -440,30 +474,28 @@ void DrawFurnaceUI(void)
         DrawRectangle(fuelX, flameY + 14, flameW, flameH, (Color){40, 38, 48, 200});
         DrawRectangle(fuelX, flameY + 14, (int)(flameW * fuelPct), flameH, (Color){220, 120, 40, 255});
     } else {
-        DrawText("No fuel", fuelX, flameY + 14, 10, (Color){150, 80, 80, 200});
+        DrawGameText(S(STR_MSG_NO_FUEL), fuelX, flameY + 14, 10, (Color){150, 80, 80, 200});
     }
 
     // Smelting recipe info
     if (furnaceInput != BLOCK_AIR) {
         int ri = FindSmeltRecipe((BlockType)furnaceInput);
         if (ri >= 0) {
-            DrawText(TextFormat("Smelting: %s", smeltRecipes[ri].name),
+            DrawGameText(Sf(STR_MSG_SMELTING, S(smeltRecipes[ri].nameId)),
                      panelX + 10, panelY + panelH - 40, 10, (Color){150, 145, 160, 200});
         } else {
-            DrawText("Cannot smelt this item",
+            DrawGameText(S(STR_MSG_CANNOT_SMELT),
                      panelX + 10, panelY + panelH - 40, 10, (Color){200, 100, 100, 200});
         }
     }
 
     // Close hint
-    DrawText("Press E or ESC to close", panelX + panelW / 2 - MeasureText("Press E or ESC to close", 10) / 2,
+    DrawGameText(S(STR_PRESS_E_ESC_CLOSE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_PRESS_E_ESC_CLOSE), 10) / 2,
              panelY + panelH - 18, 10, (Color){120, 115, 130, 180});
 
     // --- Click handling for furnace slots ---
-    Vector2 mouse = Win32GetMousePosition();
 
     // Fuel slot click
-    Rectangle fuelRect = { (float)fuelX, (float)slotY, (float)slotSize, (float)slotSize };
     if (CheckCollisionPointRec(mouse, fuelRect) && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (heldItem == BLOCK_AIR && furnaceFuel != BLOCK_AIR) {
             // Pick up fuel
@@ -492,7 +524,6 @@ void DrawFurnaceUI(void)
     }
 
     // Input slot click
-    Rectangle inputRect = { (float)inputX, (float)slotY, (float)slotSize, (float)slotSize };
     if (CheckCollisionPointRec(mouse, inputRect) && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (heldItem == BLOCK_AIR && furnaceInput != BLOCK_AIR) {
             // Pick up input
@@ -523,7 +554,6 @@ void DrawFurnaceUI(void)
     }
 
     // Output slot click (take only)
-    Rectangle outputRect = { (float)outputX, (float)slotY, (float)slotSize, (float)slotSize };
     if (CheckCollisionPointRec(mouse, outputRect) && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         if (heldItem == BLOCK_AIR && furnaceOutput != BLOCK_AIR) {
             heldItem = furnaceOutput;

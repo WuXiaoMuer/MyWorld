@@ -9,14 +9,14 @@ CD       = cd /d
 LIBS     = "-LE:/github/MyWorld/lib" "-Wl,--stack,12582912" "-s" "-lraylib" "-lopengl32" "-lgdi32" "-lwinmm" "-static"
 INCS     = "-IE:/github/MyWorld/include"
 CXXINCS  = "-IE:/github/MyWorld/include"
-CXXFLAGS = $(CXXINCS) "-O2" "-pipe"
-CFLAGS   = $(INCS) "-O2" "-pipe"
+CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-finput-charset=UTF-8" "-fexec-charset=UTF-8"
+CFLAGS   = $(INCS) "-O2" "-pipe" "-finput-charset=UTF-8" "-fexec-charset=UTF-8"
 WINDRESFLAGS = 
 RES      = MyWorld_private.res
-OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o $(RES)
+OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o i18n.o $(RES)
 BIN      = MyWorld.exe
-LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "MyWorld_private.res"
-CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "MyWorld_private.res" "MyWorld.exe"
+LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "MyWorld_private.res"
+CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "MyWorld_private.res" "MyWorld.exe"
 
 .PHONY: all all-before all-after clean clean-custom
 
@@ -70,6 +70,9 @@ entities.o: entities.c types.h
 
 light.o: light.c types.h
 	$(CC) -c "light.c" -o "light.o" $(CFLAGS)
+
+i18n.o: i18n.c types.h
+	$(CC) -c "i18n.c" -o "i18n.o" $(CFLAGS)
 
 MyWorld_private.res: MyWorld_private.rc
 	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS)

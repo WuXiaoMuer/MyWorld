@@ -192,6 +192,57 @@ int Win32GetCharPressed(void)
     return 0;
 }
 
+// Mouse wheel via thread-specific WH_GETMESSAGE hook on GLFW's thread
+static volatile float wheelAccum = 0.0f;
+static void *wheelHookHandle = NULL;
+
+__declspec(dllimport) void __stdcall Sleep(unsigned long);
+__declspec(dllimport) unsigned long __stdcall GetWindowThreadProcessId(void*, unsigned long*);
+__declspec(dllimport) void* __stdcall SetWindowsHookExA(int, void*, void*, unsigned long);
+__declspec(dllimport) int __stdcall UnhookWindowsHookEx(void*);
+__declspec(dllimport) long long __stdcall CallNextHookEx(void*, int, long long, long long);
+#define WH_GETMESSAGE 3
+#define WM_MOUSEWHEEL 0x020A
+#define HC_ACTION 0
+
+// Thread-specific hook: intercepts WM_MOUSEWHEEL from GLFW's message loop.
+// lParam points to MSG struct when nCode >= 0 and wParam == PM_REMOVE (1).
+// MSG layout (64-bit): hwnd(8) + message(4) + pad(4) + wP(8) + lP(8) + time(4) + pad(4) + ptX(4) + ptY(4)
+// message at byte 8, wParam at byte 16
+static long long __stdcall WheelGetMsgProc(int nCode, long long wParam, long long lParam)
+{
+    if (nCode >= 0 && wParam == 1) { // HC_ACTION, PM_REMOVE
+        unsigned int *raw = (unsigned int *)lParam;
+        unsigned int msgType = raw[2]; // byte 8 / sizeof(UINT)=4 → index 2 (on both 32/64 with padding)
+        if (msgType == WM_MOUSEWHEEL) {
+            // On 64-bit: wParam field at byte 16 → size_t index = 16/8 = 2
+            // On 32-bit: wParam field at byte 8 → size_t index = 8/4 = 2
+            size_t *fields = (size_t *)lParam;
+            size_t wp = fields[2];
+            short delta = (short)(wp >> 16);
+            wheelAccum += (float)delta / 120.0f;
+        }
+    }
+    return CallNextHookEx(wheelHookHandle, nCode, wParam, lParam);
+}
+
+void InitWin32WheelHook(void)
+{
+    // Get GLFW window's thread ID and install hook on that thread
+    void *hwnd = GetWindowHandle();
+    if (hwnd) {
+        unsigned long glfwTid = GetWindowThreadProcessId(hwnd, NULL);
+        wheelHookHandle = SetWindowsHookExA(WH_GETMESSAGE, (void*)WheelGetMsgProc, NULL, glfwTid);
+    }
+}
+
+float Win32GetMouseWheelMove(void)
+{
+    float v = wheelAccum;
+    wheelAccum = 0.0f;
+    return v;
+}
+
 //----------------------------------------------------------------------------------
 // Global Definitions
 //----------------------------------------------------------------------------------
@@ -290,11 +341,15 @@ int main(void)
     SetTargetFPS(60);
     SetExitKey(0);
     SetWindowState(FLAG_WINDOW_ALWAYS_RUN);
+    InitWin32WheelHook();
 
     // Start audio loading in background thread
     _beginthread(AudioLoadThread, 0, NULL);
 
     // Pre-init: load systems needed for menu rendering
+    LoadSettings();
+    if (windowMode != 0) ApplyWindowMode(windowMode);
+    LoadGameFont();
     GenerateBlockAtlas();
     InitCraftingRecipes();
     InitCameraSystem();
