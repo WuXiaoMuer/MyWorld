@@ -108,10 +108,12 @@ void InitWin32WheelHook(void);
 #define PLACE_RANGE         6
 
 #define MAX_CRAFT_RECIPES   64
-#define MAX_SMELT_RECIPES   8
+#define MAX_SMELT_RECIPES   10
+#define MAX_CHESTS          64
+#define CHEST_SLOTS         27
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        4
+#define SAVE_VERSION        6
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -138,11 +140,15 @@ void InitWin32WheelHook(void);
 #define DURABILITY_WOOD     60
 #define DURABILITY_STONE    132
 #define DURABILITY_IRON     251
+#define DURABILITY_GOLD     48
+#define DURABILITY_DIAMOND  800
 
 // Armor durability
 #define ARMOR_DURABILITY_WOOD    55
 #define ARMOR_DURABILITY_STONE   160
 #define ARMOR_DURABILITY_IRON    300
+#define ARMOR_DURABILITY_GOLD    175
+#define ARMOR_DURABILITY_DIAMOND 500
 
 // Food restoration values (hunger points)
 #define FOOD_RAW_PORK_VALUE    3
@@ -250,6 +256,34 @@ typedef enum {
     ARMOR_IRON_CHESTPLATE,
     ARMOR_IRON_LEGGINGS,
     ARMOR_IRON_BOOTS,
+    // New ores
+    BLOCK_GOLD_ORE,
+    BLOCK_DIAMOND_ORE,
+    // New items
+    ITEM_GOLD_INGOT,
+    ITEM_DIAMOND,
+    // New interactive blocks
+    BLOCK_CHEST,
+    // Gold tools
+    TOOL_GOLD_PICKAXE,
+    TOOL_GOLD_AXE,
+    TOOL_GOLD_SWORD,
+    TOOL_GOLD_SHOVEL,
+    // Diamond tools
+    TOOL_DIAMOND_PICKAXE,
+    TOOL_DIAMOND_AXE,
+    TOOL_DIAMOND_SWORD,
+    TOOL_DIAMOND_SHOVEL,
+    // Gold armor
+    ARMOR_GOLD_HELMET,
+    ARMOR_GOLD_CHESTPLATE,
+    ARMOR_GOLD_LEGGINGS,
+    ARMOR_GOLD_BOOTS,
+    // Diamond armor
+    ARMOR_DIAMOND_HELMET,
+    ARMOR_DIAMOND_CHESTPLATE,
+    ARMOR_DIAMOND_LEGGINGS,
+    ARMOR_DIAMOND_BOOTS,
     BLOCK_COUNT
 } BlockType;
 
@@ -261,6 +295,12 @@ typedef struct {
     bool transparent;
     bool breakable;
 } BlockInfo;
+
+typedef struct {
+    int x, y;
+    uint8_t items[CHEST_SLOTS];
+    int counts[CHEST_SLOTS];
+} ChestData;
 
 //----------------------------------------------------------------------------------
 // Language & i18n
@@ -346,6 +386,13 @@ typedef enum {
     STR_YOU_DIED,
     STR_PRESS_SPACE_RESPAWN,
     STR_PRESS_ESC_MENU,
+    STR_DEATH_FALL,
+    STR_DEATH_DROWN,
+    STR_DEATH_STARVE,
+    STR_DEATH_MOB_ZOMBIE,
+    STR_DEATH_MOB_SKELETON,
+    STR_DEATH_VOID,
+    STR_DEATH_SCORE,
 
     // Inventory
     STR_INVENTORY,
@@ -486,6 +533,32 @@ typedef enum {
     STR_ARMOR_IRON_CHESTPLATE,
     STR_ARMOR_IRON_LEGGINGS,
     STR_ARMOR_IRON_BOOTS,
+    // New blocks/items
+    STR_BLOCK_GOLD_ORE,
+    STR_BLOCK_DIAMOND_ORE,
+    STR_ITEM_GOLD_INGOT,
+    STR_ITEM_DIAMOND,
+    STR_BLOCK_CHEST,
+    // Gold tools
+    STR_TOOL_GOLD_PICKAXE,
+    STR_TOOL_GOLD_AXE,
+    STR_TOOL_GOLD_SWORD,
+    STR_TOOL_GOLD_SHOVEL,
+    // Diamond tools
+    STR_TOOL_DIAMOND_PICKAXE,
+    STR_TOOL_DIAMOND_AXE,
+    STR_TOOL_DIAMOND_SWORD,
+    STR_TOOL_DIAMOND_SHOVEL,
+    // Gold armor
+    STR_ARMOR_GOLD_HELMET,
+    STR_ARMOR_GOLD_CHESTPLATE,
+    STR_ARMOR_GOLD_LEGGINGS,
+    STR_ARMOR_GOLD_BOOTS,
+    // Diamond armor
+    STR_ARMOR_DIAMOND_HELMET,
+    STR_ARMOR_DIAMOND_CHESTPLATE,
+    STR_ARMOR_DIAMOND_LEGGINGS,
+    STR_ARMOR_DIAMOND_BOOTS,
 
     // Recipe Names
     STR_RECIPE_WOOD_PLANKS,
@@ -524,11 +597,32 @@ typedef enum {
     STR_RECIPE_IRON_CHEST,
     STR_RECIPE_IRON_LEGS,
     STR_RECIPE_IRON_BOOTS,
+    // Gold recipes
+    STR_RECIPE_GOLD_PICK,
+    STR_RECIPE_GOLD_AXE,
+    STR_RECIPE_GOLD_SWORD,
+    STR_RECIPE_GOLD_SHOVEL,
+    STR_RECIPE_GOLD_HELMET,
+    STR_RECIPE_GOLD_CHEST,
+    STR_RECIPE_GOLD_LEGS,
+    STR_RECIPE_GOLD_BOOTS,
+    // Diamond recipes
+    STR_RECIPE_DIAMOND_PICK,
+    STR_RECIPE_DIAMOND_AXE,
+    STR_RECIPE_DIAMOND_SWORD,
+    STR_RECIPE_DIAMOND_SHOVEL,
+    STR_RECIPE_DIAMOND_HELMET,
+    STR_RECIPE_DIAMOND_CHEST,
+    STR_RECIPE_DIAMOND_LEGS,
+    STR_RECIPE_DIAMOND_BOOTS,
+    // Chest recipe
+    STR_RECIPE_CHEST,
     // Smelt
     STR_SMELT_IRON,
     STR_SMELT_PORK,
     STR_SMELT_COBBLE,
     STR_SMELT_SAND,
+    STR_SMELT_GOLD,
 
     // Furnace messages
     STR_MSG_NO_FUEL,
@@ -767,6 +861,12 @@ extern int heldDurability;
 // Crafting table state
 extern bool craftingTableOpen;
 
+// Chest state
+extern bool chestOpen;
+extern int chestBlockX, chestBlockY;
+extern ChestData chestData[MAX_CHESTS];
+extern int chestCount;
+
 // Smelting recipes
 extern SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
 extern int smeltRecipeCount;
@@ -810,6 +910,7 @@ Color ApplyLighting(Color base, int bx, int by);
 // player.c
 void InitPlayer(void);
 bool AddToInventory(BlockType item);
+int AddToInventoryCount(BlockType item, int count);
 float GetToolMiningSpeed(BlockType tool, BlockType block);
 bool IsTool(BlockType item);
 int GetToolMaxDurability(BlockType tool);
@@ -853,6 +954,7 @@ void DrawMessage(void);
 void DrawPauseMenu(void);
 void DrawDeathScreen(float dt);
 float GetDeathFadeTimer(void);
+void SetDeathCause(StringId cause);
 void DrawMainMenu(void);
 void DrawSlotSelectScreen(void);
 void DrawConfirmDialog(void);

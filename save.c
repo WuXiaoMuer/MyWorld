@@ -108,6 +108,27 @@ bool SaveWorld(const char *path)
     fwrite(player.armor, sizeof(uint8_t), 4, f);
     fwrite(player.armorDurability, sizeof(int), 4, f);
 
+    // Furnace state (v5+)
+    fwrite(&furnaceBlockX, sizeof(int), 1, f);
+    fwrite(&furnaceBlockY, sizeof(int), 1, f);
+    fwrite(&furnaceFuel, sizeof(uint8_t), 1, f);
+    fwrite(&furnaceFuelCount, sizeof(int), 1, f);
+    fwrite(&furnaceInput, sizeof(uint8_t), 1, f);
+    fwrite(&furnaceInputCount, sizeof(int), 1, f);
+    fwrite(&furnaceOutput, sizeof(uint8_t), 1, f);
+    fwrite(&furnaceOutputCount, sizeof(int), 1, f);
+    fwrite(&furnaceProgress, sizeof(float), 1, f);
+    fwrite(&furnaceFuelBurn, sizeof(float), 1, f);
+
+    // Chest data (v6+)
+    fwrite(&chestCount, sizeof(int), 1, f);
+    for (int i = 0; i < chestCount; i++) {
+        fwrite(&chestData[i].x, sizeof(int), 1, f);
+        fwrite(&chestData[i].y, sizeof(int), 1, f);
+        fwrite(chestData[i].items, sizeof(uint8_t), CHEST_SLOTS, f);
+        fwrite(chestData[i].counts, sizeof(int), CHEST_SLOTS, f);
+    }
+
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {
         int y = 0;
@@ -200,6 +221,37 @@ bool LoadWorld(const char *path)
             if (fread(player.armorDurability, sizeof(int), 4, f) != 4) { for (int i = 0; i < 4; i++) player.armorDurability[i] = 0; }
         } else {
             for (int i = 0; i < 4; i++) { player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; }
+        }
+        // v5+: furnace state
+        if (version >= 5) {
+            if (fread(&furnaceBlockX, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceBlockY, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceFuel, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceFuelCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceInput, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceInputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceOutput, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceOutputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceProgress, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&furnaceFuelBurn, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+        } else {
+            furnaceFuel = BLOCK_AIR; furnaceFuelCount = 0;
+            furnaceInput = BLOCK_AIR; furnaceInputCount = 0;
+            furnaceOutput = BLOCK_AIR; furnaceOutputCount = 0;
+            furnaceProgress = 0.0f; furnaceFuelBurn = 0.0f;
+            furnaceBlockX = -1; furnaceBlockY = -1;
+        }
+        // v6+: chest data
+        if (version >= 6) {
+            if (fread(&chestCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            for (int i = 0; i < chestCount; i++) {
+                if (fread(&chestData[i].x, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                if (fread(&chestData[i].y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                if (fread(chestData[i].items, sizeof(uint8_t), CHEST_SLOTS, f) != CHEST_SLOTS) { fclose(f); return false; }
+                if (fread(chestData[i].counts, sizeof(int), CHEST_SLOTS, f) != CHEST_SLOTS) { fclose(f); return false; }
+            }
+        } else {
+            chestCount = 0;
         }
     } else {
         // v2 compat: default values

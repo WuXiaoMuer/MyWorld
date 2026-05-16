@@ -68,6 +68,34 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Iron Chest",     {200,180,160,255}, {170,150,130,255}, false, false, false},
     {"Iron Leggings",  {200,180,160,255}, {170,150,130,255}, false, false, false},
     {"Iron Boots",     {200,180,160,255}, {170,150,130,255}, false, false, false},
+    // New ores
+    {"Gold Ore",    {130,110,100,255}, {220,180,50,255},  true,  false, true},
+    {"Diamond Ore", {130,110,100,255}, {80,220,230,255},  true,  false, true},
+    // New items
+    {"Gold Ingot",  {220,180,50,255},  {180,140,30,255},  false, false, false},
+    {"Diamond",     {80,220,230,255},  {50,180,200,255},  false, false, false},
+    // Interactive blocks
+    {"Chest",       {140,100,50,255},  {100,70,30,255},   true,  false, true},
+    // Gold tools
+    {"Gold Pick",   {220,180,50,255},  {180,140,30,255},  false, false, false},
+    {"Gold Axe",    {220,180,50,255},  {180,140,30,255},  false, false, false},
+    {"Gold Sword",  {220,180,50,255},  {180,140,30,255},  false, false, false},
+    {"Gold Shovel", {220,180,50,255},  {180,140,30,255},  false, false, false},
+    // Diamond tools
+    {"Diamond Pick",   {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Axe",    {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Sword",  {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Shovel", {80,220,230,255}, {50,180,200,255}, false, false, false},
+    // Gold armor
+    {"Gold Helmet",    {220,180,50,255},  {180,140,30,255}, false, false, false},
+    {"Gold Chest",     {220,180,50,255},  {180,140,30,255}, false, false, false},
+    {"Gold Leggings",  {220,180,50,255},  {180,140,30,255}, false, false, false},
+    {"Gold Boots",     {220,180,50,255},  {180,140,30,255}, false, false, false},
+    // Diamond armor
+    {"Diamond Helmet",    {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Chest",     {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Leggings",  {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Boots",     {80,220,230,255}, {50,180,200,255}, false, false, false},
 };
 
 //----------------------------------------------------------------------------------
@@ -81,22 +109,35 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
 
     switch (bt) {
     case BLOCK_GRASS:
-        for (int y = 3; y < 16; y++)
+        // Dirt base with pebble details
+        for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 1);
                 Color c = detail;
-                if ((hash2D(x + worldX * 16, y + worldY * 16, 1) % 5) == 0) c = (Color){100, 70, 45, 255};
+                if (h % 7 == 0) c = (Color){100, 70, 45, 255};
+                else if (h % 11 == 0) c = (Color){150, 110, 80, 255};
+                else if (h % 19 == 0) c = (Color){90, 60, 35, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
-        for (int y = 0; y < 4; y++)
+        // Grass top with multiple green shades and blade details
+        for (int y = 0; y < 5; y++)
             for (int x = 0; x < 16; x++) {
-                int wave = (int)(sinf(x * 0.8f + varSeed * 0.1f) * 1.5f);
-                if (y + wave < 3) {
+                int wave = (int)(sinf(x * 0.7f + varSeed * 0.1f) * 2.0f);
+                int grassEdge = 3 + wave;
+                if (y < grassEdge) {
+                    unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 2);
                     Color c = base;
-                    if ((hash2D(x + worldX * 16, y + worldY * 16, 2) % 4) == 0)
-                        c = (Color){60, 130, 0, 255};
+                    if (h % 5 == 0) c = (Color){60, 140, 0, 255};
+                    else if (h % 8 == 0) c = (Color){85, 165, 10, 255};
+                    else if (h % 13 == 0) c = (Color){50, 120, 0, 255};
+                    // Grass blade tips
+                    if (y == grassEdge - 1 && h % 4 == 0) c = (Color){90, 170, 20, 255};
                     ImageDrawPixel(img, px + x, py + y, c);
-                } else {
-                    ImageDrawPixel(img, px + x, py + y, detail);
+                } else if (y == grassEdge) {
+                    // Transition: mix green and brown
+                    unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 3);
+                    Color c = (h % 2 == 0) ? (Color){80, 110, 30, 255} : detail;
+                    ImageDrawPixel(img, px + x, py + y, c);
                 }
             }
         break;
@@ -104,10 +145,16 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     case BLOCK_DIRT:
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
-                Color c = base;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 3);
+                Color c = base;
                 if (h % 7 == 0) c = detail;
                 else if (h % 11 == 0) c = (Color){150, 110, 80, 255};
+                else if (h % 19 == 0) c = (Color){100, 65, 40, 255};
+                // Small pebble/rock details
+                if ((x == 4 && y == 5) || (x == 11 && y == 10) || (x == 7 && y == 13))
+                    c = (Color){120, 90, 60, 255};
+                // Shadow at bottom
+                if (y > 13) c = (Color){(unsigned char)(base.r - 12), (unsigned char)(base.g - 10), (unsigned char)(base.b - 8), 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -115,11 +162,18 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     case BLOCK_STONE:
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
-                Color c = base;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
-                if (h % 8 == 0) c = detail;
-                else if (h % 13 == 0) c = (Color){140, 140, 140, 255};
-                if (y == 4 || y == 11) c = detail;
+                Color c = base;
+                // Natural color variation
+                if (h % 13 == 0) c = (Color){140, 140, 140, 255};
+                else if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Crack lines (horizontal and diagonal)
+                if (y == 4 || y == 11) { c = detail; }
+                if ((x + y) % 9 == 0 && h % 3 == 0) c = detail;
+                // Shadow at bottom for depth
+                if (y > 13) c = (Color){(unsigned char)(base.r - 15), (unsigned char)(base.g - 15), (unsigned char)(base.b - 15), 255};
+                // Highlight at top
+                if (y < 2 && h % 4 == 0) c = (Color){145, 145, 145, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -127,10 +181,20 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     case BLOCK_COBBLESTONE:
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
-                Color c = base;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 5);
-                if ((x % 8 < 1) || (y % 8 < 1)) c = detail;
-                else if (h % 6 == 0) c = (Color){115, 115, 115, 255};
+                Color c = base;
+                // Mortar lines between stones
+                if ((x % 8 < 1) || (y % 8 < 1)) { c = detail; }
+                else {
+                    if (h % 6 == 0) c = (Color){115, 115, 115, 255};
+                    // Stone surface variation
+                    else if (h % 11 == 0) c = (Color){90, 90, 90, 255};
+                    // Highlight on top-left of each stone
+                    int lx = x % 8, ly = y % 8;
+                    if (lx == 1 && ly > 0 && ly < 4) c = (Color){120, 120, 120, 255};
+                    // Shadow on bottom-right
+                    if (lx == 7 && ly > 4) c = (Color){80, 80, 80, 255};
+                }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -138,10 +202,20 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     case BLOCK_WOOD:
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 6);
                 Color c = base;
+                // Bark vertical lines
                 if (x == 4 || x == 12) c = detail;
+                // Horizontal grain lines
                 if (y % 5 == 0) c = detail;
-                if ((hash2D(x + worldX * 16, y + worldY * 16, 6) % 9) == 0) c = (Color){88, 58, 28, 255};
+                // Bark texture variation
+                if (h % 9 == 0) c = (Color){88, 58, 28, 255};
+                else if (h % 14 == 0) c = (Color){115, 80, 40, 255};
+                // Bark knot detail
+                if ((x == 8 && y == 8) || (x == 9 && y == 8) || (x == 8 && y == 9))
+                    c = (Color){80, 50, 22, 255};
+                // Shadow between bark grooves
+                if (x == 5 || x == 13) c = (Color){(unsigned char)(base.r - 15), (unsigned char)(base.g - 12), (unsigned char)(base.b - 8), 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -149,11 +223,18 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     case BLOCK_LEAVES:
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
-                Color c = base;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 7);
+                Color c = base;
+                // Multiple green shades for depth
                 if (h % 5 == 0) c = detail;
                 else if (h % 11 == 0) c = (Color){45, 140, 20, 255};
+                else if (h % 13 == 0) c = (Color){30, 100, 10, 255};
+                // Light spots (sun hitting leaves)
+                if (h % 23 == 0) c = (Color){60, 150, 30, 255};
+                // Small gaps/holes
                 if (h % 17 == 0) c = (Color){0, 0, 0, 0};
+                // Shadow at bottom for depth
+                if (y > 12 && h % 3 == 0) c = (Color){(unsigned char)(base.r - 12), (unsigned char)(base.g - 10), (unsigned char)(base.b - 5), 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -161,10 +242,13 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     case BLOCK_SAND:
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
-                Color c = base;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 8);
+                Color c = base;
                 if (h % 6 == 0) c = detail;
                 else if (h % 14 == 0) c = (Color){220, 200, 130, 255};
+                else if (h % 19 == 0) c = (Color){200, 180, 110, 255};
+                // Grain pattern: subtle ripple effect
+                if ((x + y * 3) % 7 == 0) c = (Color){(unsigned char)(base.r - 8), (unsigned char)(base.g - 6), (unsigned char)(base.b - 4), 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -184,10 +268,18 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 Color c = blockInfo[BLOCK_STONE].baseColor;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
                 if (h % 8 == 0) c = blockInfo[BLOCK_STONE].detailColor;
+                if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Coal deposits with depth
                 if ((x >= 3 && x <= 5 && y >= 3 && y <= 5) ||
                     (x >= 10 && x <= 12 && y >= 9 && y <= 11) ||
                     (x >= 6 && x <= 7 && y >= 10 && y <= 11)) {
                     c = base;
+                    // Highlight on top-left of deposit
+                    if ((x == 3 && y == 3) || (x == 10 && y == 9))
+                        c = (Color){90, 90, 90, 255};
+                    // Shadow on bottom-right
+                    if ((x == 5 && y == 5) || (x == 12 && y == 11))
+                        c = (Color){30, 30, 30, 255};
                 }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
@@ -199,10 +291,18 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 Color c = blockInfo[BLOCK_STONE].baseColor;
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
                 if (h % 8 == 0) c = blockInfo[BLOCK_STONE].detailColor;
+                if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Iron ore deposits with metallic sheen
                 if ((x >= 2 && x <= 4 && y >= 6 && y <= 8) ||
                     (x >= 11 && x <= 13 && y >= 3 && y <= 4) ||
                     (x >= 7 && x <= 8 && y >= 12 && y <= 14)) {
                     c = detail;
+                    // Metallic highlight
+                    if ((x == 2 && y == 6) || (x == 11 && y == 3) || (x == 7 && y == 12))
+                        c = (Color){230, 210, 190, 255};
+                    // Shadow
+                    if ((x == 4 && y == 8) || (x == 13 && y == 4) || (x == 8 && y == 14))
+                        c = (Color){100, 85, 75, 255};
                 }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
@@ -212,9 +312,18 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = base;
+                // Plank dividers
                 if (y % 4 == 0) c = detail;
                 if (x == 8) c = detail;
-                if ((hash2D(x + worldX * 16, y + worldY * 16, 9) % 10) == 0) c = (Color){170, 130, 70, 255};
+                // Wood grain
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 9);
+                if (h % 10 == 0) c = (Color){170, 130, 70, 255};
+                // Knots
+                if ((x == 4 && y == 2) || (x == 12 && y == 10)) c = (Color){130, 95, 45, 255};
+                // Highlights on top edge of each plank
+                if (y % 4 == 1 && h % 3 == 0) c = (Color){195, 155, 90, 255};
+                // Shadow on bottom edge of each plank
+                if (y % 4 == 3 && h % 4 == 0) c = (Color){(unsigned char)(base.r*0.85f), (unsigned char)(base.g*0.85f), (unsigned char)(base.b*0.85f), 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -240,11 +349,21 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 if (x == 0 || x == 15 || y == 0 || y == 15) {
-                    ImageDrawPixel(img, px + x, py + y, (Color){200, 220, 255, 150});
-                } else if ((x == 3 && y == 3) || (x == 4 && y == 3)) {
-                    ImageDrawPixel(img, px + x, py + y, (Color){255, 255, 255, 180});
+                    // Frame with slight bevel
+                    Color frame = {190, 210, 245, 150};
+                    if (x == 0 || y == 0) frame = (Color){210, 230, 255, 160}; // light edge
+                    if (x == 15 || y == 15) frame = (Color){170, 190, 225, 140}; // dark edge
+                    ImageDrawPixel(img, px + x, py + y, frame);
                 } else {
-                    ImageDrawPixel(img, px + x, py + y, base);
+                    // Glass surface with subtle reflections
+                    Color c = base;
+                    // Diagonal reflection streak
+                    if (x == y && x >= 2 && x <= 6) c = (Color){220, 235, 255, 120};
+                    // Corner shine
+                    if ((x == 2 && y == 2) || (x == 3 && y == 2)) c = (Color){255, 255, 255, 160};
+                    // Bottom-right subtle shadow
+                    if (x >= 12 && y >= 12) c = (Color){180, 200, 235, 90};
+                    ImageDrawPixel(img, px + x, py + y, c);
                 }
             }
         break;
@@ -295,34 +414,59 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
         break;
 
     case BLOCK_TORCH:
-        // Stick
-        for (int y = 4; y < 16; y++) ImageDrawPixel(img, px + 7, py + y, (Color){120, 80, 30, 255});
-        for (int y = 4; y < 16; y++) ImageDrawPixel(img, px + 8, py + y, (Color){100, 65, 20, 255});
-        // Flame
-        for (int y = 0; y < 5; y++)
+        // Stick with wood grain
+        for (int y = 5; y < 16; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){130, 85, 30, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){110, 70, 22, 255});
+            if (y % 3 == 0) ImageDrawPixel(img, px + 7, py + y, (Color){100, 65, 20, 255});
+        }
+        // Flame - layered with glow
+        for (int y = 0; y < 6; y++)
             for (int x = 6; x < 10; x++) {
-                Color flame = (y < 2) ? (Color){255, 220, 50, 255} : (Color){255, 150, 20, 255};
-                if (x == 6 && y > 2) continue;
-                if (x == 9 && y > 2) continue;
+                Color flame;
+                if (y == 0) flame = (Color){255, 255, 200, 255}; // bright tip
+                else if (y <= 2) flame = (Color){255, 220, 50, 255}; // yellow core
+                else if (y <= 4) flame = (Color){255, 150, 20, 255}; // orange
+                else flame = (Color){200, 80, 10, 255}; // red base
+                // Flame shape (tapers at top)
+                if (y == 0 && (x < 7 || x > 8)) continue;
+                if (y >= 4 && (x < 7 || x > 8)) continue;
                 ImageDrawPixel(img, px + x, py + y, flame);
             }
         break;
 
     case BLOCK_FLOWER:
-        // Stem
-        for (int y = 8; y < 16; y++) ImageDrawPixel(img, px + 7, py + y, (Color){40, 120, 20, 255});
-        for (int y = 8; y < 16; y++) ImageDrawPixel(img, px + 8, py + y, (Color){30, 100, 15, 255});
-        // Petals
-        for (int y = 3; y < 8; y++)
-            for (int x = 5; x < 11; x++) {
-                if ((x == 5 || x == 10) && y < 5) continue;
-                if ((x == 6 || x == 9) && y < 4) continue;
-                Color petal = ((x + y) % 2 == 0) ? base : detail;
-                ImageDrawPixel(img, px + x, py + y, petal);
+        // Stem with leaf
+        for (int y = 8; y < 16; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){45, 130, 22, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){35, 110, 18, 255});
+        }
+        // Small leaf on stem
+        ImageDrawPixel(img, px + 9, py + 11, (Color){50, 140, 25, 255});
+        ImageDrawPixel(img, px + 10, py + 10, (Color){60, 150, 30, 255});
+        // Petals with shading
+        for (int y = 2; y < 8; y++)
+            for (int x = 4; x < 12; x++) {
+                // Flower shape: 5 petals in cross pattern
+                int cx = 8, cy = 5;
+                int dx = abs(x - cx), dy = abs(y - cy);
+                bool inPetal = false;
+                if (dx <= 1 && dy <= 3) inPetal = true; // vertical petals
+                if (dy <= 1 && dx <= 3) inPetal = true; // horizontal petals
+                if (dx <= 2 && dy <= 2 && dx + dy <= 3) inPetal = true; // center
+                if (inPetal) {
+                    Color c = base;
+                    // Gradient: lighter toward tips
+                    if (dy == 3 || dx == 3) c = detail;
+                    // Highlight
+                    if (y == 3 && x >= 7 && x <= 9) c = (Color){(unsigned char)(base.r+30>255?255:base.r+30), (unsigned char)(base.g+30>255?255:base.g+30), (unsigned char)(base.b+30>255?255:base.b+30), 255};
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
             }
-        // Center
+        // Center pistil
         ImageDrawPixel(img, px + 7, py + 5, (Color){255, 220, 50, 255});
-        ImageDrawPixel(img, px + 8, py + 5, (Color){255, 220, 50, 255});
+        ImageDrawPixel(img, px + 8, py + 5, (Color){255, 230, 60, 255});
+        ImageDrawPixel(img, px + 7, py + 4, (Color){255, 210, 40, 255});
         break;
 
     case BLOCK_TALL_GRASS:
@@ -344,31 +488,56 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = base;
+                // Stone border
                 if (x == 0 || x == 15 || y == 0 || y == 15) c = detail;
-                if (x >= 5 && x <= 10 && y >= 5 && y <= 10) c = (Color){40, 40, 40, 255};
-                if (x >= 6 && x <= 9 && y >= 7 && y <= 9) c = (Color){80, 40, 10, 255};
+                // Corner bricks
+                if ((x <= 1 || x >= 14) && (y <= 1 || y >= 14)) c = (Color){90, 90, 90, 255};
+                // Opening (dark)
+                if (x >= 5 && x <= 10 && y >= 5 && y <= 10) c = (Color){30, 30, 30, 255};
+                // Opening border
+                if ((x == 5 || x == 10) && y >= 5 && y <= 10) c = (Color){70, 70, 70, 255};
+                if ((y == 5 || y == 10) && x >= 5 && x <= 10) c = (Color){70, 70, 70, 255};
+                // Fire glow inside
+                if (x >= 6 && x <= 9 && y >= 7 && y <= 9) c = (Color){120, 50, 10, 255};
+                if (x >= 7 && x <= 8 && y >= 8 && y <= 9) c = (Color){200, 100, 20, 255};
+                // Surface variation
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 55);
+                if (h % 12 == 0 && x > 1 && x < 14 && y > 1 && y < 14) c = (Color){110, 110, 110, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
 
     case BLOCK_BED:
-        // Bed: red blanket on top, white pillow, wooden frame
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = base;
                 // Blanket (top 2/3)
                 if (y >= 0 && y <= 10) {
                     c = base;
-                    if (y == 0 || y == 10) c = detail; // blanket edge
+                    // Blanket folds/creases
+                    if (y == 0 || y == 10) c = detail;
+                    if (y == 5 && x >= 6) c = detail;
+                    // Highlight on upper blanket
+                    if (y >= 1 && y <= 3 && x >= 6 && x <= 13) c = (Color){220, 70, 70, 255};
+                    // Shadow on lower blanket
+                    if (y >= 8 && y <= 9 && x >= 6 && x <= 13) c = (Color){140, 35, 35, 255};
                 }
-                // Pillow (left side)
+                // Pillow (left side) with puff shape
                 if (x >= 1 && x <= 5 && y >= 1 && y <= 4) {
-                    c = (Color){240, 240, 240, 255}; // white pillow
+                    c = (Color){240, 240, 240, 255};
+                    if (y == 1) c = (Color){250, 250, 250, 255}; // top highlight
+                    if (y == 4) c = (Color){220, 220, 220, 255}; // bottom shadow
+                    if (x == 1) c = (Color){225, 225, 225, 255}; // left shadow
+                    if (x == 5) c = (Color){225, 225, 225, 255}; // right shadow
                 }
                 // Wooden frame (bottom)
                 if (y >= 11 && y <= 15) {
-                    c = (Color){140, 100, 50, 255}; // wood color
+                    c = (Color){140, 100, 50, 255};
                     if (y == 11) c = (Color){120, 80, 40, 255};
+                    // Frame leg shadows
+                    if ((x == 1 || x == 14) && y >= 13) c = (Color){100, 70, 35, 255};
+                    // Frame plank detail
+                    if (y == 13 && x >= 2 && x <= 13) c = (Color){155, 115, 60, 255};
                 }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
@@ -376,59 +545,236 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
 
     // Item icons (atlas only)
     case ITEM_STICK:
-        for (int y = 3; y < 14; y++) { ImageDrawPixel(img, px + 7, py + y, base); ImageDrawPixel(img, px + 8, py + y, detail); }
+        // Stick with wood grain and knot
+        for (int y = 2; y < 15; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){130, 90, 40, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){110, 75, 30, 255});
+            if (y % 4 == 0) ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 25, 255});
+        }
+        // Knot detail
+        ImageDrawPixel(img, px + 7, py + 8, (Color){90, 60, 20, 255});
         break;
     case ITEM_COAL:
-        for (int y = 5; y < 12; y++) for (int x = 5; x < 12; x++) ImageDrawPixel(img, px + x, py + y, base);
-        for (int y = 6; y < 10; y++) for (int x = 7; x < 10; x++) ImageDrawPixel(img, px + x, py + y, detail);
+        // Coal chunk with glossy highlights
+        for (int y = 4; y < 12; y++) for (int x = 4; x < 12; x++) {
+            Color c = base;
+            if (x == 4 || x == 11 || y == 4 || y == 11) c = (Color){50, 50, 50, 255};
+            // Glossy highlight
+            if (x >= 6 && x <= 8 && y >= 5 && y <= 7) c = (Color){70, 70, 70, 255};
+            if (x == 7 && y == 6) c = (Color){90, 90, 90, 255}; // bright spot
+            // Cracks
+            if ((x == 9 && y >= 7 && y <= 9) || (x == 6 && y == 9)) c = detail;
+            ImageDrawPixel(img, px + x, py + y, c);
+        }
         break;
     case ITEM_IRON_INGOT:
-        for (int y = 6; y < 11; y++) for (int x = 4; x < 13; x++) ImageDrawPixel(img, px + x, py + y, base);
-        for (int y = 7; y < 10; y++) for (int x = 5; x < 12; x++) ImageDrawPixel(img, px + x, py + y, detail);
-        for (int x = 4; x < 13; x++) ImageDrawPixel(img, px + x, py + 6, (Color){240, 230, 220, 255});
+        // Ingot shape with 3D shading
+        for (int y = 5; y < 11; y++) for (int x = 3; x < 13; x++) {
+            Color c = base;
+            if (y == 5) c = (Color){240, 230, 220, 255}; // top highlight
+            if (y == 10) c = (Color){(unsigned char)(detail.r*0.8f), (unsigned char)(detail.g*0.8f), (unsigned char)(detail.b*0.8f), 255}; // bottom shadow
+            if (x == 3 || x == 12) c = detail; // side edges
+            if (y >= 6 && y <= 9 && x >= 4 && x <= 11) c = detail; // inner shade
+            if (y == 6 && x >= 5 && x <= 10) c = (Color){245, 235, 225, 255}; // top face shine
+            ImageDrawPixel(img, px + x, py + y, c);
+        }
+        break;
+
+    case BLOCK_GOLD_ORE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = blockInfo[BLOCK_STONE].baseColor;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
+                if (h % 8 == 0) c = blockInfo[BLOCK_STONE].detailColor;
+                if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Gold deposits with shimmer
+                if ((x >= 3 && x <= 5 && y >= 3 && y <= 5) ||
+                    (x >= 10 && x <= 12 && y >= 9 && y <= 11) ||
+                    (x >= 6 && x <= 7 && y >= 10 && y <= 11)) {
+                    c = detail;
+                    // Bright gold sparkle highlight
+                    if ((x == 3 && y == 3) || (x == 11 && y == 9))
+                        c = (Color){255, 230, 100, 255};
+                    // Deep gold shadow
+                    if ((x == 5 && y == 5) || (x == 12 && y == 11))
+                        c = (Color){160, 120, 20, 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_DIAMOND_ORE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = blockInfo[BLOCK_STONE].baseColor;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
+                if (h % 8 == 0) c = blockInfo[BLOCK_STONE].detailColor;
+                if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Diamond crystal deposits with sparkle
+                if ((x >= 4 && x <= 6 && y >= 5 && y <= 7) ||
+                    (x >= 9 && x <= 11 && y >= 2 && y <= 3) ||
+                    (x >= 2 && x <= 3 && y >= 11 && y <= 13)) {
+                    c = detail;
+                    // Bright crystal sparkle
+                    if ((x == 4 && y == 5) || (x == 10 && y == 2))
+                        c = (Color){150, 255, 255, 255};
+                    // Deep crystal shadow
+                    if ((x == 6 && y == 7) || (x == 3 && y == 13))
+                        c = (Color){30, 140, 160, 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_GOLD_INGOT:
+        // Gold ingot with rich 3D shading
+        for (int y = 5; y < 11; y++) for (int x = 3; x < 13; x++) {
+            Color c = base;
+            if (y == 5) c = (Color){255, 220, 80, 255}; // top highlight
+            if (y == 10) c = (Color){(unsigned char)(detail.r*0.8f), (unsigned char)(detail.g*0.8f), (unsigned char)(detail.b*0.8f), 255}; // bottom shadow
+            if (x == 3 || x == 12) c = detail; // side edges
+            if (y >= 6 && y <= 9 && x >= 4 && x <= 11) c = detail; // inner shade
+            if (y == 6 && x >= 5 && x <= 10) c = (Color){255, 230, 100, 255}; // top face shine
+            ImageDrawPixel(img, px + x, py + y, c);
+        }
+        break;
+
+    case ITEM_DIAMOND:
+        // Diamond gem - faceted shape with light refraction
+        for (int y = 2; y < 14; y++)
+            for (int x = 3; x < 13; x++) {
+                bool inShape = false;
+                if (y < 6 && x >= 6 - (y - 2) && x <= 9 + (y - 2)) inShape = true;
+                if (y >= 6 && y < 10 && x >= 3 && x <= 12) inShape = true;
+                if (y >= 10 && x >= 3 + (y - 10) * 2 && x <= 12 - (y - 10) * 2) inShape = true;
+                if (inShape) {
+                    Color c = base;
+                    // Light refraction facets
+                    if (y < 6 && x < 7) c = detail; // upper-left darker
+                    if (y < 6 && x >= 8) c = (Color){120, 240, 250, 255}; // upper-right lighter
+                    if (y >= 6 && y < 10 && x < 6) c = detail; // left facet
+                    if (y >= 6 && y < 10 && x >= 9) c = (Color){100, 230, 240, 255}; // right facet bright
+                    // Sparkle highlights
+                    if ((x == 6 && y == 4) || (x == 9 && y == 7)) c = (Color){200, 255, 255, 255};
+                    // Bottom facet shadow
+                    if (y >= 10) c = (Color){(unsigned char)(detail.r*0.8f), (unsigned char)(detail.g*0.8f), (unsigned char)(detail.b*0.8f), 255};
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
+            }
+        break;
+
+    case BLOCK_CHEST:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                // Border/frame
+                if (x == 0 || x == 15 || y == 0 || y == 15) c = detail;
+                // Lid line (top half)
+                if (y == 5) c = (Color){80, 55, 25, 255};
+                // Bottom edge
+                if (y == 15) c = (Color){80, 55, 25, 255};
+                // Planks vertical lines
+                if (x == 4 || x == 8 || x == 12) c = (Color){(unsigned char)(detail.r*0.9f), (unsigned char)(detail.g*0.9f), (unsigned char)(detail.b*0.9f), 255};
+                // Lock/clasp (gold)
+                if (x >= 7 && x <= 8 && y >= 4 && y <= 6) c = (Color){180, 150, 50, 255};
+                if (x == 7 && y == 5) c = (Color){220, 190, 70, 255}; // lock highlight
+                // Wood grain highlights on lid
+                if (y >= 1 && y <= 4 && (x == 2 || x == 6 || x == 10 || x == 14)) c = (Color){160, 120, 65, 255};
+                // Shadow on bottom half
+                if (y >= 10 && y <= 14) c = (Color){(unsigned char)(base.r*0.85f), (unsigned char)(base.g*0.85f), (unsigned char)(base.b*0.85f), 255};
+                // Top lid highlight
+                if (y == 1 && x >= 2 && x <= 13) c = (Color){170, 130, 70, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
         break;
 
     // Tool icons (atlas only, not used for world rendering)
     case TOOL_WOOD_PICKAXE:
     case TOOL_STONE_PICKAXE:
-    case TOOL_IRON_PICKAXE: {
+    case TOOL_IRON_PICKAXE:
+    case TOOL_GOLD_PICKAXE:
+    case TOOL_DIAMOND_PICKAXE: {
         Color tc = base; Color th = detail;
-        // Handle
-        for (int y = 8; y < 15; y++) { ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 30, 255}); ImageDrawPixel(img, px + 8, py + y, (Color){80, 55, 20, 255}); }
-        // Head
-        for (int x = 3; x < 13; x++) for (int y = 3; y < 7; y++) ImageDrawPixel(img, px + x, py + y, tc);
-        for (int x = 2; x < 14; x++) ImageDrawPixel(img, px + x, py + 3, th);
-        for (int x = 4; x < 12; x++) ImageDrawPixel(img, px + x, py + 7, th);
+        // Handle with wood grain
+        for (int y = 8; y < 15; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 30, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){80, 55, 20, 255});
+            if (y % 3 == 0) ImageDrawPixel(img, px + 7, py + y, (Color){90, 60, 25, 255});
+        }
+        // Head with metallic gradient
+        for (int x = 3; x < 13; x++) for (int y = 3; y < 7; y++) {
+            Color c = tc;
+            if (y == 3) c = th; // top edge highlight
+            if (y == 6) c = (Color){(unsigned char)(tc.r*0.7f), (unsigned char)(tc.g*0.7f), (unsigned char)(tc.b*0.7f), 255}; // bottom shadow
+            ImageDrawPixel(img, px + x, py + y, c);
+        }
+        // Head tips
+        ImageDrawPixel(img, px + 2, py + 4, th);
+        ImageDrawPixel(img, px + 13, py + 4, th);
         break;
     }
     case TOOL_WOOD_AXE:
     case TOOL_STONE_AXE:
-    case TOOL_IRON_AXE: {
+    case TOOL_IRON_AXE:
+    case TOOL_GOLD_AXE:
+    case TOOL_DIAMOND_AXE: {
         Color tc = base; Color th = detail;
-        for (int y = 6; y < 15; y++) { ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 30, 255}); ImageDrawPixel(img, px + 8, py + y, (Color){80, 55, 20, 255}); }
-        for (int x = 4; x < 9; x++) for (int y = 2; y < 8; y++) ImageDrawPixel(img, px + x, py + y, tc);
-        for (int x = 3; x < 10; x++) ImageDrawPixel(img, px + x, py + 2, th);
+        // Handle
+        for (int y = 6; y < 15; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 30, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){80, 55, 20, 255});
+        }
+        // Axe head with edge highlight
+        for (int x = 4; x < 9; x++) for (int y = 2; y < 8; y++) {
+            Color c = tc;
+            if (y == 2) c = th; // top edge
+            if (x == 4) c = (Color){(unsigned char)(tc.r*0.8f), (unsigned char)(tc.g*0.8f), (unsigned char)(tc.b*0.8f), 255};
+            ImageDrawPixel(img, px + x, py + y, c);
+        }
+        // Sharp edge
+        for (int y = 3; y < 7; y++) ImageDrawPixel(img, px + 3, py + y, th);
         break;
     }
     case TOOL_WOOD_SWORD:
     case TOOL_STONE_SWORD:
-    case TOOL_IRON_SWORD: {
+    case TOOL_IRON_SWORD:
+    case TOOL_GOLD_SWORD:
+    case TOOL_DIAMOND_SWORD: {
         Color tc = base; Color th = detail;
-        // Blade
-        for (int y = 2; y < 12; y++) { ImageDrawPixel(img, px + 7, py + y, tc); ImageDrawPixel(img, px + 8, py + y, th); }
-        ImageDrawPixel(img, px + 7, py + 1, th); ImageDrawPixel(img, px + 8, py + 1, th);
-        // Guard
+        // Blade with highlight and shadow
+        for (int y = 1; y < 12; y++) {
+            ImageDrawPixel(img, px + 7, py + y, tc);
+            ImageDrawPixel(img, px + 8, py + y, th);
+            // Edge highlight
+            if (y > 1 && y < 11) ImageDrawPixel(img, px + 6, py + y, (Color){(unsigned char)(tc.r*0.85f), (unsigned char)(tc.g*0.85f), (unsigned char)(tc.b*0.85f), 255});
+        }
+        // Blade tip
+        ImageDrawPixel(img, px + 7, py + 0, th);
+        // Guard with detail
         for (int x = 5; x < 11; x++) ImageDrawPixel(img, px + x, py + 12, (Color){150, 130, 80, 255});
-        // Handle
-        for (int y = 13; y < 16; y++) { ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 30, 255}); ImageDrawPixel(img, px + 8, py + y, (Color){80, 55, 20, 255}); }
+        ImageDrawPixel(img, px + 5, py + 12, (Color){170, 150, 90, 255});
+        ImageDrawPixel(img, px + 10, py + 12, (Color){120, 100, 60, 255});
+        // Handle with wrap
+        for (int y = 13; y < 16; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){100, 70, 30, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){80, 55, 20, 255});
+        }
+        // Pommel
+        ImageDrawPixel(img, px + 7, py + 15, (Color){130, 100, 50, 255});
+        ImageDrawPixel(img, px + 8, py + 15, (Color){110, 80, 40, 255});
         break;
     }
     case TOOL_WOOD_SHOVEL:
     case TOOL_STONE_SHOVEL:
-    case TOOL_IRON_SHOVEL: {
+    case TOOL_IRON_SHOVEL:
+    case TOOL_GOLD_SHOVEL:
+    case TOOL_DIAMOND_SHOVEL: {
         Color tc = base; Color th = detail;
-        // Handle
-        for (int y = 2; y < 14; y++) { ImageDrawPixel(img, px + 7, py + y, (Color){120, 80, 30, 255}); ImageDrawPixel(img, px + 8, py + y, (Color){100, 65, 20, 255}); }
+        // Handle with grip
+        for (int y = 2; y < 14; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){120, 80, 30, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){100, 65, 20, 255});
+        }
         // Blade (shovel head)
         for (int y = 0; y < 3; y++)
             for (int x = 5; x < 11; x++) {
@@ -441,82 +787,126 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
     }
     // Food items
     case FOOD_RAW_PORK: {
-        // Raw meat - pinkish chunk
-        for (int y = 4; y < 12; y++)
-            for (int x = 4; x < 12; x++) {
+        // Raw meat - pinkish chunk with marbling
+        for (int y = 3; y < 13; y++)
+            for (int x = 3; x < 13; x++) {
                 Color c = base;
-                if (x == 4 || x == 11 || y == 4 || y == 11) c = detail;
-                if ((hash2D(x, y, 42) % 5) == 0) c = (Color){220, 150, 150, 255};
+                // Outer edge
+                if (x == 3 || x == 12 || y == 3 || y == 12) c = detail;
+                // Meat texture
+                unsigned int h = hash2D(x, y, 42);
+                if (h % 5 == 0) c = (Color){220, 150, 150, 255};
+                else if (h % 7 == 0) c = (Color){180, 110, 110, 255};
+                // Fat marbling
+                if ((x == 5 && y >= 6 && y <= 8) || (x == 9 && y >= 7 && y <= 9)) c = (Color){240, 210, 200, 255};
+                // Top highlight
+                if (y == 4 && x >= 5 && x <= 10) c = (Color){230, 170, 170, 255};
+                // Bottom shadow
+                if (y == 11 && x >= 5 && x <= 10) c = (Color){(unsigned char)(detail.r*0.8f), (unsigned char)(detail.g*0.8f), (unsigned char)(detail.b*0.8f), 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
-        // Bone
-        ImageDrawPixel(img, px + 7, py + 3, (Color){230, 220, 200, 255});
-        ImageDrawPixel(img, px + 8, py + 3, (Color){230, 220, 200, 255});
+        // Bone sticking out
+        ImageDrawPixel(img, px + 7, py + 2, (Color){230, 220, 200, 255});
+        ImageDrawPixel(img, px + 8, py + 2, (Color){240, 230, 210, 255});
+        ImageDrawPixel(img, px + 8, py + 1, (Color){220, 210, 190, 255});
         break;
     }
     case FOOD_COOKED_PORK: {
-        // Cooked meat - brown chunk
-        for (int y = 4; y < 12; y++)
-            for (int x = 4; x < 12; x++) {
+        // Cooked meat - golden-brown with grill marks
+        for (int y = 3; y < 13; y++)
+            for (int x = 3; x < 13; x++) {
                 Color c = base;
-                if (x == 4 || x == 11 || y == 4 || y == 11) c = detail;
-                if ((hash2D(x, y, 43) % 4) == 0) c = (Color){200, 120, 70, 255};
+                if (x == 3 || x == 12 || y == 3 || y == 12) c = detail;
+                unsigned int h = hash2D(x, y, 43);
+                if (h % 4 == 0) c = (Color){200, 120, 70, 255};
+                else if (h % 6 == 0) c = (Color){160, 90, 50, 255};
+                // Grill marks (diagonal dark lines)
+                if ((x + y) % 5 == 0 && y >= 5 && y <= 10) c = (Color){120, 70, 30, 255};
+                // Top glaze highlight
+                if (y == 4 && x >= 5 && x <= 10) c = (Color){210, 140, 80, 255};
+                // Juicy shine
+                if (x == 7 && y == 7) c = (Color){220, 150, 90, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
     }
     case FOOD_APPLE: {
-        // Apple - red circle with stem
-        for (int y = 4; y < 13; y++)
+        // Apple - round with gradient shading
+        for (int y = 3; y < 14; y++)
             for (int x = 4; x < 12; x++) {
                 float dx = x - 8.0f, dy = y - 8.5f;
-                if (dx * dx + dy * dy < 16) {
+                if (dx * dx + dy * dy < 20) {
                     Color c = base;
-                    if (dx < -1) c = (Color){180, 40, 40, 255}; // shadow
+                    // Left shadow
+                    if (dx < -2) c = (Color){170, 35, 35, 255};
+                    // Right highlight
+                    if (dx > 1 && dy < 0) c = (Color){230, 70, 70, 255};
+                    // Top shine spot
+                    if (dx >= 0 && dx <= 1 && dy >= -3 && dy <= -1) c = (Color){255, 120, 120, 255};
+                    // Bottom dark
+                    if (dy > 2) c = (Color){(unsigned char)(base.r*0.7f), (unsigned char)(base.g*0.7f), (unsigned char)(base.b*0.7f), 255};
                     ImageDrawPixel(img, px + x, py + y, c);
                 }
             }
         // Stem
-        ImageDrawPixel(img, px + 8, py + 3, (Color){100, 70, 30, 255});
-        ImageDrawPixel(img, px + 9, py + 2, (Color){60, 120, 30, 255}); // leaf
+        ImageDrawPixel(img, px + 8, py + 3, (Color){90, 60, 25, 255});
+        ImageDrawPixel(img, px + 8, py + 2, (Color){80, 55, 20, 255});
+        // Leaf
+        ImageDrawPixel(img, px + 9, py + 2, (Color){50, 130, 25, 255});
+        ImageDrawPixel(img, px + 10, py + 1, (Color){60, 140, 30, 255});
         break;
     }
     case FOOD_BREAD: {
-        // Bread - golden loaf
-        for (int y = 5; y < 12; y++)
+        // Bread - golden loaf with crust texture
+        for (int y = 4; y < 12; y++)
             for (int x = 3; x < 13; x++) {
                 Color c = base;
-                if (y == 5) c = (Color){230, 200, 120, 255}; // top crust
-                if (y == 11) c = detail; // bottom
-                if (x == 3 || x == 12) c = detail; // sides
+                // Top crust (golden brown)
+                if (y == 4) c = (Color){230, 200, 120, 255};
+                if (y == 5) c = (Color){220, 190, 110, 255};
+                // Bottom crust
+                if (y == 11) c = detail;
+                // Side edges
+                if (x == 3 || x == 12) c = detail;
+                // Inner bread texture
+                unsigned int h = hash2D(x, y, 44);
+                if (h % 8 == 0 && y >= 6 && y <= 10) c = (Color){200, 170, 90, 255};
+                // Crust highlights
+                if (y == 4 && x >= 5 && x <= 10) c = (Color){240, 210, 130, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
-        // Score marks
-        ImageDrawPixel(img, px + 5, py + 5, detail);
-        ImageDrawPixel(img, px + 8, py + 5, detail);
-        ImageDrawPixel(img, px + 11, py + 5, detail);
+        // Score marks on top
+        ImageDrawPixel(img, px + 5, py + 4, detail);
+        ImageDrawPixel(img, px + 6, py + 4, detail);
+        ImageDrawPixel(img, px + 8, py + 4, detail);
+        ImageDrawPixel(img, px + 9, py + 4, detail);
+        ImageDrawPixel(img, px + 11, py + 4, detail);
         break;
     }
     case BLOCK_CRAFTING_TABLE: {
-        // Crafting table: wooden top with 3x3 grid pattern
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = base;
                 if (y <= 5) {
-                    // Table top surface
+                    // Table top surface with wood grain
                     c = base;
                     if (y == 0 || y == 5) c = detail;
-                    // 3x3 grid lines on top
+                    // 3x3 grid lines (crafting grid)
                     if (y >= 1 && y <= 4) {
-                        if (x == 3 || x == 7 || x == 11) c = (Color){200, 170, 100, 255};
-                        if (y == 2) c = (Color){200, 170, 100, 255};
+                        if (x == 3 || x == 7 || x == 11) c = (Color){170, 135, 75, 255};
+                        if (y == 2) c = (Color){170, 135, 75, 255};
                     }
+                    // Wood grain
+                    if (y >= 1 && y <= 4 && (x == 1 || x == 5 || x == 9 || x == 14)) c = (Color){155, 120, 65, 255};
+                    // Top highlight
+                    if (y == 1 && x >= 1 && x <= 14) c = (Color){165, 130, 72, 255};
                 } else if (y <= 6) {
-                    c = detail; // table edge
+                    c = detail; // table edge/lip
                 } else {
-                    // Legs
+                    // Legs with wood texture
                     if ((x >= 2 && x <= 4) || (x >= 11 && x <= 13)) {
                         c = detail;
+                        if (x == 2 || x == 11) c = (Color){(unsigned char)(detail.r*0.8f), (unsigned char)(detail.g*0.8f), (unsigned char)(detail.b*0.8f), 255};
                     } else {
                         c = (Color){0, 0, 0, 0}; // transparent between legs
                     }
@@ -525,91 +915,137 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
     }
-    case ARMOR_WOOD_HELMET: case ARMOR_STONE_HELMET: case ARMOR_IRON_HELMET: {
-        // Helmet: dome shape
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++) {
-                Color c = {0, 0, 0, 0};
-                if (y >= 3 && y <= 12) {
-                    int cx = 8, cy = 7;
-                    int dx = x - cx, dy = y - cy;
-                    if (dx * dx + dy * dy <= 25) {
-                        c = base;
-                        if (y >= 9 && y <= 10 && x >= 5 && x <= 11) c = detail; // visor
-                        if (y == 3) c = detail; // top edge
-                    }
-                }
-                ImageDrawPixel(img, px + x, py + y, c);
-            }
-        break;
-    }
-    case ARMOR_WOOD_CHESTPLATE: case ARMOR_STONE_CHESTPLATE: case ARMOR_IRON_CHESTPLATE: {
-        // Chestplate: torso with shoulder guards
+    case ARMOR_WOOD_HELMET: case ARMOR_STONE_HELMET: case ARMOR_IRON_HELMET: case ARMOR_GOLD_HELMET: case ARMOR_DIAMOND_HELMET: {
+        Color tc = base; Color th = detail;
+        // Helmet dome
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = {0, 0, 0, 0};
                 if (y >= 2 && y <= 13) {
-                    if (x >= 4 && x <= 11) {
-                        c = base;
-                        if (y == 2 || y == 13) c = detail;
-                        if (x == 4 || x == 11) c = detail;
-                        // Center line
-                        if (x == 7 || x == 8) c = detail;
-                    }
-                    // Shoulder guards
-                    if ((x >= 2 && x <= 4) || (x >= 11 && x <= 13)) {
-                        if (y >= 2 && y <= 5) c = detail;
+                    int cx = 8, cy = 7;
+                    int dx = x - cx, dy = y - cy;
+                    if (dx * dx + dy * dy <= 30) {
+                        c = tc;
+                        // Top highlight
+                        if (y <= 4) c = (Color){(unsigned char)(tc.r+30>255?255:tc.r+30), (unsigned char)(tc.g+30>255?255:tc.g+30), (unsigned char)(tc.b+30>255?255:tc.b+30), 255};
+                        // Bottom shadow
+                        if (y >= 11) c = (Color){(unsigned char)(tc.r*0.7f), (unsigned char)(tc.g*0.7f), (unsigned char)(tc.b*0.7f), 255};
+                        // Visor slit
+                        if (y >= 8 && y <= 9 && x >= 5 && x <= 11) c = (Color){20, 20, 20, 255};
+                        // Side rivets
+                        if ((x == 4 && y == 7) || (x == 12 && y == 7)) c = th;
+                        // Top ridge
+                        if (y == 3 && x >= 6 && x <= 10) c = th;
                     }
                 }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
     }
-    case ARMOR_WOOD_LEGGINGS: case ARMOR_STONE_LEGGINGS: case ARMOR_IRON_LEGGINGS: {
-        // Leggings: two leg shapes
+    case ARMOR_WOOD_CHESTPLATE: case ARMOR_STONE_CHESTPLATE: case ARMOR_IRON_CHESTPLATE: case ARMOR_GOLD_CHESTPLATE: case ARMOR_DIAMOND_CHESTPLATE: {
+        Color tc = base; Color th = detail;
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (y >= 1 && y <= 14) {
+                    // Main body
+                    if (x >= 4 && x <= 11) {
+                        c = tc;
+                        // Top/bottom edges
+                        if (y == 1 || y == 14) c = th;
+                        // Side edges
+                        if (x == 4 || x == 11) c = th;
+                        // Center seam
+                        if (x == 7 || x == 8) c = (Color){(unsigned char)(tc.r*0.85f), (unsigned char)(tc.g*0.85f), (unsigned char)(tc.b*0.85f), 255};
+                        // Upper body highlight
+                        if (y >= 3 && y <= 6 && x >= 5 && x <= 10) c = (Color){(unsigned char)(tc.r+20>255?255:tc.r+20), (unsigned char)(tc.g+20>255?255:tc.g+20), (unsigned char)(tc.b+20>255?255:tc.b+20), 255};
+                        // Belt
+                        if (y >= 10 && y <= 11) c = (Color){(unsigned char)(tc.r*0.6f), (unsigned char)(tc.g*0.6f), (unsigned char)(tc.b*0.6f), 255};
+                        // Belt buckle
+                        if (y >= 10 && y <= 11 && x >= 7 && x <= 8) c = th;
+                    }
+                    // Shoulder guards (pauldrons)
+                    if (x >= 2 && x <= 4 && y >= 2 && y <= 6) {
+                        c = th;
+                        if (y == 2) c = (Color){(unsigned char)(th.r+20>255?255:th.r+20), (unsigned char)(th.g+20>255?255:th.g+20), (unsigned char)(th.b+20>255?255:th.b+20), 255};
+                    }
+                    if (x >= 11 && x <= 13 && y >= 2 && y <= 6) {
+                        c = th;
+                        if (y == 2) c = (Color){(unsigned char)(th.r+20>255?255:th.r+20), (unsigned char)(th.g+20>255?255:th.g+20), (unsigned char)(th.b+20>255?255:th.b+20), 255};
+                    }
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+    case ARMOR_WOOD_LEGGINGS: case ARMOR_STONE_LEGGINGS: case ARMOR_IRON_LEGGINGS: case ARMOR_GOLD_LEGGINGS: case ARMOR_DIAMOND_LEGGINGS: {
+        Color tc = base; Color th = detail;
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = {0, 0, 0, 0};
                 if (y >= 1 && y <= 14) {
                     // Left leg
                     if (x >= 3 && x <= 6) {
-                        c = base;
-                        if (x == 3 || x == 6) c = detail;
-                        if (y == 1 || y == 14) c = detail;
+                        c = tc;
+                        if (x == 3 || x == 6) c = th;
+                        if (y == 1 || y == 14) c = th;
+                        // Knee highlight
+                        if (y >= 7 && y <= 8 && x >= 4 && x <= 5) c = (Color){(unsigned char)(tc.r+20>255?255:tc.r+20), (unsigned char)(tc.g+20>255?255:tc.g+20), (unsigned char)(tc.b+20>255?255:tc.b+20), 255};
+                        // Shin shadow
+                        if (y >= 12 && x == 5) c = (Color){(unsigned char)(tc.r*0.75f), (unsigned char)(tc.g*0.75f), (unsigned char)(tc.b*0.75f), 255};
                     }
                     // Right leg
                     if (x >= 9 && x <= 12) {
-                        c = base;
-                        if (x == 9 || x == 12) c = detail;
-                        if (y == 1 || y == 14) c = detail;
+                        c = tc;
+                        if (x == 9 || x == 12) c = th;
+                        if (y == 1 || y == 14) c = th;
+                        // Knee highlight
+                        if (y >= 7 && y <= 8 && x >= 10 && x <= 11) c = (Color){(unsigned char)(tc.r+20>255?255:tc.r+20), (unsigned char)(tc.g+20>255?255:tc.g+20), (unsigned char)(tc.b+20>255?255:tc.b+20), 255};
+                        // Shin shadow
+                        if (y >= 12 && x == 10) c = (Color){(unsigned char)(tc.r*0.75f), (unsigned char)(tc.g*0.75f), (unsigned char)(tc.b*0.75f), 255};
                     }
-                    // Waist band
-                    if (y >= 1 && y <= 3 && x >= 3 && x <= 12) c = detail;
+                    // Waist band with buckle
+                    if (y >= 1 && y <= 3 && x >= 3 && x <= 12) {
+                        c = th;
+                        if (y == 2 && x >= 7 && x <= 8) c = (Color){(unsigned char)(th.r+30>255?255:th.r+30), (unsigned char)(th.g+30>255?255:th.g+30), (unsigned char)(th.b+30>255?255:th.b+30), 255};
+                    }
                 }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
     }
-    case ARMOR_WOOD_BOOTS: case ARMOR_STONE_BOOTS: case ARMOR_IRON_BOOTS: {
-        // Boots: low boot shapes
+    case ARMOR_WOOD_BOOTS: case ARMOR_STONE_BOOTS: case ARMOR_IRON_BOOTS: case ARMOR_GOLD_BOOTS: case ARMOR_DIAMOND_BOOTS: {
+        Color tc = base; Color th = detail;
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = {0, 0, 0, 0};
-                if (y >= 6 && y <= 14) {
+                if (y >= 5 && y <= 14) {
                     // Left boot
                     if (x >= 2 && x <= 6) {
-                        c = base;
-                        if (y == 6 || y == 14) c = detail;
-                        if (x == 2 || x == 6) c = detail;
-                        if (y >= 13 && x <= 3) c = detail; // toe
+                        c = tc;
+                        if (y == 5 || y == 14) c = th;
+                        if (x == 2 || x == 6) c = th;
+                        // Toe cap
+                        if (y >= 13 && x <= 3) c = th;
+                        // Ankle highlight
+                        if (y >= 6 && y <= 7 && x >= 3 && x <= 5) c = (Color){(unsigned char)(tc.r+20>255?255:tc.r+20), (unsigned char)(tc.g+20>255?255:tc.g+20), (unsigned char)(tc.b+20>255?255:tc.b+20), 255};
+                        // Sole
+                        if (y == 14) c = (Color){(unsigned char)(tc.r*0.5f), (unsigned char)(tc.g*0.5f), (unsigned char)(tc.b*0.5f), 255};
                     }
                     // Right boot
                     if (x >= 9 && x <= 13) {
-                        c = base;
-                        if (y == 6 || y == 14) c = detail;
-                        if (x == 9 || x == 13) c = detail;
-                        if (y >= 13 && x >= 12) c = detail; // toe
+                        c = tc;
+                        if (y == 5 || y == 14) c = th;
+                        if (x == 9 || x == 13) c = th;
+                        // Toe cap
+                        if (y >= 13 && x >= 12) c = th;
+                        // Ankle highlight
+                        if (y >= 6 && y <= 7 && x >= 10 && x <= 12) c = (Color){(unsigned char)(tc.r+20>255?255:tc.r+20), (unsigned char)(tc.g+20>255?255:tc.g+20), (unsigned char)(tc.b+20>255?255:tc.b+20), 255};
+                        // Sole
+                        if (y == 14) c = (Color){(unsigned char)(tc.r*0.5f), (unsigned char)(tc.g*0.5f), (unsigned char)(tc.b*0.5f), 255};
                     }
+                    // Lace/buckle details
+                    if (y == 7 && ((x >= 4 && x <= 5) || (x >= 10 && x <= 11))) c = th;
                 }
                 ImageDrawPixel(img, px + x, py + y, c);
             }
@@ -784,6 +1220,18 @@ void GenerateWorld(unsigned int seed)
                 float ironThreshold = 0.76f - (y - 155) * 0.0005f;
                 float iron = fbm(x * 0.12f, y * 0.12f, 2, 0.5f, seed + 4000);
                 if (iron > ironThreshold) { world[x][y] = BLOCK_IRON_ORE; continue; }
+            }
+            // Gold: deep, rarer than iron
+            if (y > 180) {
+                float goldThreshold = 0.78f - (y - 180) * 0.0003f;
+                float gold = fbm(x * 0.14f, y * 0.14f, 2, 0.5f, seed + 5000);
+                if (gold > goldThreshold) { world[x][y] = BLOCK_GOLD_ORE; continue; }
+            }
+            // Diamond: very deep, rarest
+            if (y > 210) {
+                float diamondThreshold = 0.82f - (y - 210) * 0.0002f;
+                float diamond = fbm(x * 0.16f, y * 0.16f, 2, 0.5f, seed + 6000);
+                if (diamond > diamondThreshold) { world[x][y] = BLOCK_DIAMOND_ORE; continue; }
             }
         }
     }

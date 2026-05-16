@@ -102,6 +102,7 @@ void InitGame(void)
     inventoryOpen = false;
     furnaceOpen = false;
     craftingTableOpen = false;
+    chestOpen = false;
     srand((unsigned int)time(NULL));
     if (worldSeed == 0) worldSeed = (unsigned int)rand();
 
@@ -483,24 +484,27 @@ static void UpdateMainMenu(float dt)
 void ReturnFurnaceItems(void)
 {
     if (furnaceFuel != BLOCK_AIR) {
-        if (!AddToInventory((BlockType)furnaceFuel)) {
-            SpawnItemEntity(furnaceFuel, furnaceFuelCount,
+        int added = AddToInventoryCount((BlockType)furnaceFuel, furnaceFuelCount);
+        if (added < furnaceFuelCount) {
+            SpawnItemEntity(furnaceFuel, furnaceFuelCount - added,
                             player.position.x + PLAYER_WIDTH / 2, player.position.y);
         }
         furnaceFuel = BLOCK_AIR;
         furnaceFuelCount = 0;
     }
     if (furnaceInput != BLOCK_AIR) {
-        if (!AddToInventory((BlockType)furnaceInput)) {
-            SpawnItemEntity(furnaceInput, furnaceInputCount,
+        int added = AddToInventoryCount((BlockType)furnaceInput, furnaceInputCount);
+        if (added < furnaceInputCount) {
+            SpawnItemEntity(furnaceInput, furnaceInputCount - added,
                             player.position.x + PLAYER_WIDTH / 2, player.position.y);
         }
         furnaceInput = BLOCK_AIR;
         furnaceInputCount = 0;
     }
     if (furnaceOutput != BLOCK_AIR) {
-        if (!AddToInventory((BlockType)furnaceOutput)) {
-            SpawnItemEntity(furnaceOutput, furnaceOutputCount,
+        int added = AddToInventoryCount((BlockType)furnaceOutput, furnaceOutputCount);
+        if (added < furnaceOutputCount) {
+            SpawnItemEntity(furnaceOutput, furnaceOutputCount - added,
                             player.position.x + PLAYER_WIDTH / 2, player.position.y);
         }
         furnaceOutput = BLOCK_AIR;
@@ -607,6 +611,13 @@ void UpdateGame(float dt)
             ReturnHeldItem();
             craftSearchLen = 0;
             craftSearchBuf[0] = '\0';
+        } else if (chestOpen) {
+            // Close chest
+            chestOpen = false;
+            inventoryOpen = false;
+            ReturnHeldItem();
+            craftSearchLen = 0;
+            craftSearchBuf[0] = '\0';
         } else {
             inventoryOpen = !inventoryOpen;
             if (inventoryOpen) {
@@ -626,6 +637,12 @@ void UpdateGame(float dt)
         if (furnaceOpen) {
             ReturnFurnaceItems();
             furnaceOpen = false;
+            inventoryOpen = false;
+            ReturnHeldItem();
+            craftSearchLen = 0;
+            craftSearchBuf[0] = '\0';
+        } else if (chestOpen) {
+            chestOpen = false;
             inventoryOpen = false;
             ReturnHeldItem();
             craftSearchLen = 0;
@@ -697,7 +714,7 @@ void UpdateGame(float dt)
     UpdateHotbar();
 
     // Distance checks: auto-close crafting table/furnace if player moves away
-    if (craftingTableOpen || furnaceOpen) {
+    if (craftingTableOpen || furnaceOpen || chestOpen) {
         int bx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int by = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
         bool nearBlock = false;
@@ -707,6 +724,7 @@ void UpdateGame(float dt)
                 if (tx >= 0 && tx < WORLD_WIDTH && ty >= 0 && ty < WORLD_HEIGHT) {
                     if (craftingTableOpen && world[tx][ty] == BLOCK_CRAFTING_TABLE) nearBlock = true;
                     if (furnaceOpen && world[tx][ty] == BLOCK_FURNACE) nearBlock = true;
+                    if (chestOpen && world[tx][ty] == BLOCK_CHEST) nearBlock = true;
                 }
             }
         }
@@ -715,6 +733,7 @@ void UpdateGame(float dt)
                 ReturnFurnaceItems();
                 furnaceOpen = false;
             }
+            chestOpen = false;
             craftingTableOpen = false;
             inventoryOpen = false;
             ReturnHeldItem();

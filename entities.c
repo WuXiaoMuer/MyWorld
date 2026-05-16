@@ -134,8 +134,10 @@ void PickupNearbyItems(float px, float py)
 
         if (dist < ENTITY_PICKUP_DIST) {
             // Try to add to inventory
-            if (AddToInventory((BlockType)e->itemType)) {
-                e->active = false;
+            int added = AddToInventoryCount((BlockType)e->itemType, e->count);
+            if (added > 0) {
+                e->count -= added;
+                if (e->count <= 0) e->active = false;
                 PlaySoundXP();
             }
         } else if (dist < ENTITY_PICKUP_DIST * 4 && dist > 1.0f) {

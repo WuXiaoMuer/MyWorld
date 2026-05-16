@@ -2,6 +2,8 @@
 #include <math.h>
 #include <stdio.h>
 
+static StringId pendingDeathCause = STR_DEATH_FALL;
+
 //----------------------------------------------------------------------------------
 // Find safe spawn point on land (not in water)
 //----------------------------------------------------------------------------------
@@ -137,12 +139,44 @@ bool AddToInventory(BlockType item)
     return false;
 }
 
+int AddToInventoryCount(BlockType item, int count)
+{
+    if (count <= 0) return 0;
+    int remaining = count;
+    // Try to stack in existing slots
+    for (int i = 0; i < INVENTORY_SLOTS && remaining > 0; i++) {
+        if (player.inventory[i] == item && player.inventoryCount[i] < 64) {
+            int space = 64 - player.inventoryCount[i];
+            int toAdd = remaining > space ? space : remaining;
+            player.inventoryCount[i] += toAdd;
+            remaining -= toAdd;
+        }
+    }
+    // Find empty slots
+    for (int i = 0; i < INVENTORY_SLOTS && remaining > 0; i++) {
+        if (player.inventory[i] == BLOCK_AIR) {
+            int toAdd = remaining > 64 ? 64 : remaining;
+            player.inventory[i] = item;
+            player.inventoryCount[i] = toAdd;
+            remaining -= toAdd;
+        }
+    }
+    if (remaining > 0) {
+        ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
+    }
+    return count - remaining; // number actually added
+}
+
 //----------------------------------------------------------------------------------
 // Tool System
 //----------------------------------------------------------------------------------
 bool IsTool(BlockType item)
 {
-    return item >= TOOL_WOOD_PICKAXE && item <= TOOL_IRON_SHOVEL;
+    return (item >= TOOL_WOOD_PICKAXE && item <= TOOL_WOOD_SHOVEL) ||
+           (item >= TOOL_STONE_PICKAXE && item <= TOOL_STONE_SHOVEL) ||
+           (item >= TOOL_IRON_PICKAXE && item <= TOOL_IRON_SHOVEL) ||
+           (item >= TOOL_GOLD_PICKAXE && item <= TOOL_GOLD_SHOVEL) ||
+           (item >= TOOL_DIAMOND_PICKAXE && item <= TOOL_DIAMOND_SHOVEL);
 }
 
 int GetToolMaxDurability(BlockType tool)
@@ -150,6 +184,8 @@ int GetToolMaxDurability(BlockType tool)
     if (tool == TOOL_WOOD_PICKAXE || tool == TOOL_WOOD_AXE || tool == TOOL_WOOD_SWORD || tool == TOOL_WOOD_SHOVEL) return DURABILITY_WOOD;
     if (tool == TOOL_STONE_PICKAXE || tool == TOOL_STONE_AXE || tool == TOOL_STONE_SWORD || tool == TOOL_STONE_SHOVEL) return DURABILITY_STONE;
     if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) return DURABILITY_IRON;
+    if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL) return DURABILITY_GOLD;
+    if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) return DURABILITY_DIAMOND;
     return 0;
 }
 
@@ -174,7 +210,11 @@ int GetFoodValue(BlockType item)
 //----------------------------------------------------------------------------------
 bool IsArmor(BlockType item)
 {
-    return item >= ARMOR_WOOD_HELMET && item <= ARMOR_IRON_BOOTS;
+    return (item >= ARMOR_WOOD_HELMET && item <= ARMOR_WOOD_BOOTS) ||
+           (item >= ARMOR_STONE_HELMET && item <= ARMOR_STONE_BOOTS) ||
+           (item >= ARMOR_IRON_HELMET && item <= ARMOR_IRON_BOOTS) ||
+           (item >= ARMOR_GOLD_HELMET && item <= ARMOR_GOLD_BOOTS) ||
+           (item >= ARMOR_DIAMOND_HELMET && item <= ARMOR_DIAMOND_BOOTS);
 }
 
 int GetArmorValue(BlockType item)
@@ -192,6 +232,14 @@ int GetArmorValue(BlockType item)
     case ARMOR_IRON_CHESTPLATE: return 8;
     case ARMOR_IRON_LEGGINGS:   return 6;
     case ARMOR_IRON_BOOTS:      return 3;
+    case ARMOR_GOLD_HELMET:     return 2;
+    case ARMOR_GOLD_CHESTPLATE: return 6;
+    case ARMOR_GOLD_LEGGINGS:   return 4;
+    case ARMOR_GOLD_BOOTS:      return 2;
+    case ARMOR_DIAMOND_HELMET:     return 4;
+    case ARMOR_DIAMOND_CHESTPLATE: return 10;
+    case ARMOR_DIAMOND_LEGGINGS:   return 7;
+    case ARMOR_DIAMOND_BOOTS:      return 4;
     default: return 0;
     }
 }
@@ -201,6 +249,8 @@ int GetArmorMaxDurability(BlockType item)
     if (item >= ARMOR_WOOD_HELMET && item <= ARMOR_WOOD_BOOTS) return ARMOR_DURABILITY_WOOD;
     if (item >= ARMOR_STONE_HELMET && item <= ARMOR_STONE_BOOTS) return ARMOR_DURABILITY_STONE;
     if (item >= ARMOR_IRON_HELMET && item <= ARMOR_IRON_BOOTS) return ARMOR_DURABILITY_IRON;
+    if (item >= ARMOR_GOLD_HELMET && item <= ARMOR_GOLD_BOOTS) return ARMOR_DURABILITY_GOLD;
+    if (item >= ARMOR_DIAMOND_HELMET && item <= ARMOR_DIAMOND_BOOTS) return ARMOR_DURABILITY_DIAMOND;
     return 0;
 }
 
@@ -242,19 +292,21 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
 {
     if (!IsTool(tool)) return 1.0f; // bare hands
 
-    bool isPickaxe = (tool == TOOL_WOOD_PICKAXE || tool == TOOL_STONE_PICKAXE || tool == TOOL_IRON_PICKAXE);
-    bool isAxe = (tool == TOOL_WOOD_AXE || tool == TOOL_STONE_AXE || tool == TOOL_IRON_AXE);
-    bool isSword = (tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD);
-    bool isShovel = (tool == TOOL_WOOD_SHOVEL || tool == TOOL_STONE_SHOVEL || tool == TOOL_IRON_SHOVEL);
+    bool isPickaxe = (tool == TOOL_WOOD_PICKAXE || tool == TOOL_STONE_PICKAXE || tool == TOOL_IRON_PICKAXE || tool == TOOL_GOLD_PICKAXE || tool == TOOL_DIAMOND_PICKAXE);
+    bool isAxe = (tool == TOOL_WOOD_AXE || tool == TOOL_STONE_AXE || tool == TOOL_IRON_AXE || tool == TOOL_GOLD_AXE || tool == TOOL_DIAMOND_AXE);
+    bool isSword = (tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD || tool == TOOL_GOLD_SWORD || tool == TOOL_DIAMOND_SWORD);
+    bool isShovel = (tool == TOOL_WOOD_SHOVEL || tool == TOOL_STONE_SHOVEL || tool == TOOL_IRON_SHOVEL || tool == TOOL_GOLD_SHOVEL || tool == TOOL_DIAMOND_SHOVEL);
 
-    // Tier multiplier: wood=1.5, stone=2.5, iron=4.0
+    // Tier multiplier: wood=1.5, stone=2.5, iron=4.0, gold=6.0, diamond=5.0
     float tier = 1.0f;
     if (tool == TOOL_WOOD_PICKAXE || tool == TOOL_WOOD_AXE || tool == TOOL_WOOD_SWORD || tool == TOOL_WOOD_SHOVEL) tier = 1.5f;
     if (tool == TOOL_STONE_PICKAXE || tool == TOOL_STONE_AXE || tool == TOOL_STONE_SWORD || tool == TOOL_STONE_SHOVEL) tier = 2.5f;
     if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) tier = 4.0f;
+    if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL) tier = 6.0f;
+    if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) tier = 5.0f;
 
     // Correct tool bonus
-    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE)) {
+    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_GOLD_ORE || block == BLOCK_DIAMOND_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE || block == BLOCK_CHEST)) {
         return tier * 1.5f;
     }
     if (isAxe && (block == BLOCK_WOOD || block == BLOCK_PLANKS)) {
@@ -416,6 +468,7 @@ void PlayerPhysics(float dt)
                 if (damage > 0) {
                     player.health -= damage;
                     if (player.health < 0) player.health = 0;
+                    pendingDeathCause = STR_DEATH_FALL;
                     player.damageFlashTimer = 0.3f;
                     SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
                                          player.position.y + PLAYER_HEIGHT,
@@ -441,6 +494,7 @@ void PlayerPhysics(float dt)
     // Death from falling out of world
     if (player.position.y > DEATH_Y) {
         player.health = 0;
+        pendingDeathCause = STR_DEATH_VOID;
     }
 }
 
@@ -499,6 +553,8 @@ void PlayerBlockInteraction(void)
                         if (selectedTool == TOOL_WOOD_SWORD) damage = 3;
                         else if (selectedTool == TOOL_STONE_SWORD) damage = 4;
                         else if (selectedTool == TOOL_IRON_SWORD) damage = 6;
+                        else if (selectedTool == TOOL_GOLD_SWORD) damage = 4;
+                        else if (selectedTool == TOOL_DIAMOND_SWORD) damage = 8;
                         else damage = 2; // Other tools
                     }
                     static float attackCooldown = 0.0f;
@@ -545,10 +601,28 @@ void PlayerBlockInteraction(void)
                 if (bt == BLOCK_FURNACE) {
                     ReturnFurnaceItems();
                 }
+                // Drop chest items before destroying
+                if (bt == BLOCK_CHEST) {
+                    for (int ci = 0; ci < chestCount; ci++) {
+                        if (chestData[ci].x == blockX && chestData[ci].y == blockY) {
+                            for (int si = 0; si < CHEST_SLOTS; si++) {
+                                if (chestData[ci].items[si] != BLOCK_AIR && chestData[ci].counts[si] > 0) {
+                                    SpawnItemEntity(chestData[ci].items[si], chestData[ci].counts[si],
+                                        blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
+                                }
+                            }
+                            chestData[ci] = chestData[--chestCount];
+                            break;
+                        }
+                    }
+                }
                 world[blockX][blockY] = BLOCK_AIR;
                 SpawnBlockParticles(blockX, blockY, bt);
-                // Coal ore drops coal item instead of the ore block
-                uint8_t dropItem = (bt == BLOCK_COAL_ORE) ? ITEM_COAL : bt;
+                // Ore drop special cases
+                uint8_t dropItem = bt;
+                if (bt == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
+                else if (bt == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
+                else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
                 SpawnItemEntity(dropItem, 1, blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
                 PlaySoundBreak(bt);
                 UpdateLightAt(blockX, blockY);
@@ -631,6 +705,16 @@ void PlayerBlockInteraction(void)
                 furnaceOpen = true;
                 furnaceBlockX = blockX;
                 furnaceBlockY = blockY;
+                inventoryOpen = true;
+                gamePaused = false;
+                PlaySoundCraft();
+                return;
+            }
+            // Interact with chest
+            if (world[blockX][blockY] == BLOCK_CHEST) {
+                chestOpen = true;
+                chestBlockX = blockX;
+                chestBlockY = blockY;
                 inventoryOpen = true;
                 gamePaused = false;
                 PlaySoundCraft();
@@ -746,6 +830,7 @@ void UpdatePlayerStatus(float dt)
                 player.drownTimer -= 1.0f / DROWN_DAMAGE_RATE;
                 player.health -= 2;
                 if (player.health < 0) player.health = 0;
+                pendingDeathCause = STR_DEATH_DROWN;
                 player.damageFlashTimer = 0.3f;
                 PlaySoundHurt();
             }
@@ -787,6 +872,7 @@ void UpdatePlayerStatus(float dt)
             player.hungerDamageTimer -= 1.0f / HUNGER_DAMAGE_RATE;
             player.health--;
             if (player.health < 0) player.health = 0;
+            pendingDeathCause = STR_DEATH_STARVE;
             player.damageFlashTimer = 0.3f;
             PlaySoundHurt();
         }
@@ -812,6 +898,7 @@ void UpdatePlayerStatus(float dt)
     if (player.health <= 0 && !player.playerDead) {
         player.playerDead = true;
         player.health = 0;
+        SetDeathCause(pendingDeathCause);
         PlaySoundDeath();
     }
 }

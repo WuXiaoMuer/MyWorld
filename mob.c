@@ -6,7 +6,7 @@
 
 // Mob properties per type
 static const int mobMaxHealth[] = { 0, 10, 20, 15 };       // NONE, PIG, ZOMBIE, SKELETON
-static const float mobSpeed[] = { 0, 40.0f, 60.0f, 50.0f };
+static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f };
 static const int mobWidth[] = { 0, 16, 12, 12 };
 static const int mobHeight[] = { 0, 12, 28, 28 };
 static const int mobDamage[] = { 0, 0, 4, 2 };            // contact damage
@@ -81,6 +81,7 @@ void UpdateProjectiles(float dt)
             if (finalDamage < 1) finalDamage = 1;
             player.health -= finalDamage;
             if (player.health < 0) player.health = 0;
+            if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_SKELETON);
             DamageArmor();
             player.damageFlashTimer = 0.3f;
             SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
@@ -346,6 +347,7 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
         if (finalDamage < 1) finalDamage = 1;
         player.health -= finalDamage;
         if (player.health < 0) player.health = 0;
+        if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_ZOMBIE);
         DamageArmor();
         mob->contactCooldown = MOB_CONTACT_COOLDOWN;
 
@@ -410,6 +412,8 @@ bool IsPlayerNearMob(Mob *mob, float range)
     return (dx * dx + dy * dy) < (range * range);
 }
 
+#define MOB_HOSTILE_LIGHT_MAX 6
+
 static void TrySpawnMobs(float dt)
 {
     mobSpawnTimer -= dt;
@@ -426,8 +430,8 @@ static void TrySpawnMobs(float dt)
     float playerCX = player.position.x + PLAYER_WIDTH / 2;
     float playerCY = player.position.y + PLAYER_HEIGHT / 2;
 
-    // Zombie spawning: at night
-    if (dayNight.lightLevel < 0.3f && count < 8) {
+    // Zombie spawning: dark areas (night surface or underground)
+    if (count < 8) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -436,19 +440,21 @@ static void TrySpawnMobs(float dt)
         int bx = (int)(spawnX / BLOCK_SIZE);
         int by = (int)(spawnY / BLOCK_SIZE);
 
-        // Find ground below spawn point
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = by; y < WORLD_HEIGHT - 2; y++) {
                 if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
-                    SpawnMob(MOB_ZOMBIE, spawnX, (y - 2) * BLOCK_SIZE);
+                    uint8_t light = GetLightLevel(bx, y - 1);
+                    if (light <= MOB_HOSTILE_LIGHT_MAX) {
+                        SpawnMob(MOB_ZOMBIE, spawnX, (y - 2) * BLOCK_SIZE);
+                    }
                     break;
                 }
             }
         }
     }
 
-    // Skeleton spawning: at night, less frequent
-    if (dayNight.lightLevel < 0.2f && count < 6 && (rand() % 3 == 0)) {
+    // Skeleton spawning: dark areas, less frequent
+    if (count < 6 && (rand() % 3 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -458,14 +464,17 @@ static void TrySpawnMobs(float dt)
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
                 if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
-                    SpawnMob(MOB_SKELETON, spawnX, (y - 2) * BLOCK_SIZE);
+                    uint8_t light = GetLightLevel(bx, y - 1);
+                    if (light <= MOB_HOSTILE_LIGHT_MAX) {
+                        SpawnMob(MOB_SKELETON, spawnX, (y - 2) * BLOCK_SIZE);
+                    }
                     break;
                 }
             }
         }
     }
 
-    // Pig spawning: during day on grass
+    // Pig spawning: during day on grass, bright areas
     if (dayNight.lightLevel > 0.5f && count < 6) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
@@ -475,7 +484,10 @@ static void TrySpawnMobs(float dt)
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
                 if (world[bx][y] == BLOCK_GRASS && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
-                    SpawnMob(MOB_PIG, spawnX, (y - 2) * BLOCK_SIZE);
+                    uint8_t light = GetLightLevel(bx, y - 1);
+                    if (light >= 8) {
+                        SpawnMob(MOB_PIG, spawnX, (y - 2) * BLOCK_SIZE);
+                    }
                     break;
                 }
             }
@@ -498,6 +510,19 @@ void UpdateMobs(float dt)
         if (dx > MOB_DESPAWN_DIST || dx < -MOB_DESPAWN_DIST) {
             mob->active = false;
             continue;
+        }
+
+        // Hostile mobs burn and despawn in sunlight
+        if (mob->type == MOB_ZOMBIE || mob->type == MOB_SKELETON) {
+            int mbx = (int)(mob->position.x / BLOCK_SIZE);
+            int mby = (int)(mob->position.y / BLOCK_SIZE);
+            uint8_t light = GetLightLevel(mbx, mby);
+            if (light >= 12 && dayNight.lightLevel > 0.6f) {
+                mob->health -= (int)(20.0f * dt);
+                if (mob->health <= 0) {
+                    mob->deathTimer = MOB_DEATH_TIME;
+                }
+            }
         }
 
         // Ambient mob sounds (closer = more likely)

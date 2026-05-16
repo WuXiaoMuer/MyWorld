@@ -50,6 +50,9 @@ int craftScrollOffset = 0;
 
 // Death state
 static float deathFadeTimer = 0.0f;
+static StringId lastDeathCause = STR_YOU_DIED;
+
+void SetDeathCause(StringId cause) { lastDeathCause = cause; }
 
 //----------------------------------------------------------------------------------
 // Inventory Sort
@@ -306,7 +309,7 @@ void DrawInventoryScreen(void)
             int cy = prevY + (prevH - charH) / 2;
             Color skin = {220,180,140,255}, hair = {80,50,30,255}, shirt = {0,100,200,255}, pants_ = {60,40,20,255};
             Color hc={0,0,0,0},cc={0,0,0,0},lc={0,0,0,0},bc={0,0,0,0};
-            for (int i = 0; i < 4; i++) { if (player.armor[i] != BLOCK_AIR) { BlockType a=(BlockType)player.armor[i]; Color ac; if(a>=ARMOR_IRON_HELMET) ac=(Color){200,210,220,255}; else if(a>=ARMOR_STONE_HELMET) ac=(Color){140,140,140,255}; else ac=(Color){160,120,60,255}; if(i==0)hc=ac;else if(i==1)cc=ac;else if(i==2)lc=ac;else bc=ac; } }
+            for (int i = 0; i < 4; i++) { if (player.armor[i] != BLOCK_AIR) { BlockType a=(BlockType)player.armor[i]; Color ac; if(a>=ARMOR_DIAMOND_HELMET) ac=(Color){80,220,230,255}; else if(a>=ARMOR_GOLD_HELMET) ac=(Color){220,180,50,255}; else if(a>=ARMOR_IRON_HELMET) ac=(Color){200,210,220,255}; else if(a>=ARMOR_STONE_HELMET) ac=(Color){140,140,140,255}; else ac=(Color){160,120,60,255}; if(i==0)hc=ac;else if(i==1)cc=ac;else if(i==2)lc=ac;else bc=ac; } }
             DrawRectangle(cx+2*sc,cy,8*sc,8*sc,skin); DrawRectangle(cx+2*sc,cy,8*sc,3*sc,hair);
             if(hc.a>0){DrawRectangle(cx+1*sc,cy-1*sc,10*sc,5*sc,hc);DrawRectangle(cx+2*sc,cy+4*sc,8*sc,2*sc,hc);}
             DrawRectangle(cx+3*sc,cy+4*sc,2*sc,2*sc,(Color){40,40,40,255}); DrawRectangle(cx+7*sc,cy+4*sc,2*sc,2*sc,(Color){40,40,40,255});
@@ -316,6 +319,7 @@ void DrawInventoryScreen(void)
             DrawRectangle(cx+1*sc,cy+18*sc,4*sc,10*sc,pants_); DrawRectangle(cx+7*sc,cy+18*sc,4*sc,10*sc,pants_);
             if(lc.a>0){DrawRectangle(cx,cy+18*sc,5*sc,10*sc,lc);DrawRectangle(cx+6*sc,cy+18*sc,5*sc,10*sc,lc);}
             if(bc.a>0){DrawRectangle(cx,cy+25*sc,5*sc,3*sc,bc);DrawRectangle(cx+6*sc,cy+25*sc,5*sc,3*sc,bc);}
+            if(dayNight.lightLevel<1.0f){unsigned char a=(unsigned char)(120*(1.0f-dayNight.lightLevel));DrawRectangle(cx-2*sc,cy-1*sc,16*sc,29*sc,(Color){5,5,25,a});}
         }
 
         // Armor slots (compact)
@@ -552,6 +556,266 @@ void DrawInventoryScreen(void)
         return;
     }
 
+    // --- Minecraft-style combined chest + inventory screen ---
+    if (chestOpen) {
+        int padding = 3;
+        int gridW = INVENTORY_COLS * slotSize + (INVENTORY_COLS - 1) * padding;
+
+        // Find chest data index
+        int chestIdx = -1;
+        for (int i = 0; i < chestCount; i++) {
+            if (chestData[i].x == chestBlockX && chestData[i].y == chestBlockY) {
+                chestIdx = i;
+                break;
+            }
+        }
+        // Create chest entry if not found
+        if (chestIdx == -1 && chestCount < MAX_CHESTS) {
+            chestIdx = chestCount++;
+            chestData[chestIdx].x = chestBlockX;
+            chestData[chestIdx].y = chestBlockY;
+            for (int i = 0; i < CHEST_SLOTS; i++) {
+                chestData[chestIdx].items[i] = BLOCK_AIR;
+                chestData[chestIdx].counts[i] = 0;
+            }
+        }
+
+        int chestRows = 3;
+        int chestGridH = chestRows * slotSize + (chestRows - 1) * padding;
+        int chestTitleH = 24;
+        int dividerH = 2;
+        int invTitleH = 20;
+        int invGridH = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
+
+        int contW = gridW + 28;
+        int contH = chestTitleH + chestGridH + dividerH + invTitleH + invGridH + 14;
+        int contX = (SCREEN_WIDTH - contW) / 2;
+        int contY = (SCREEN_HEIGHT - contH) / 2;
+
+        Vector2 mouse = Win32GetMousePosition();
+
+        // Light overlay
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 100});
+        // Container
+        DrawRectangle(contX, contY, contW, contH, (Color){45, 42, 50, 240});
+        DrawRectangleLines(contX, contY, contW, contH, (Color){90, 85, 100, 255});
+        DrawRectangleLines(contX + 1, contY + 1, contW - 2, contH - 2, (Color){65, 60, 75, 200});
+
+        // Chest title
+        int cy = contY + 8;
+        DrawGameText(S(STR_BLOCK_CHEST), contX + contW / 2 - MeasureGameTextWidth(S(STR_BLOCK_CHEST), 14) / 2, cy, 14, (Color){220, 210, 230, 255});
+        cy += chestTitleH;
+
+        // Chest grid (3 rows x 9 cols)
+        int chestGridX = contX + 14;
+        int tooltipId = -1;
+        const char *tooltipText = NULL;
+        int tooltipX = 0, tooltipY = 0;
+
+        for (int row = 0; row < chestRows; row++) {
+            for (int col = 0; col < INVENTORY_COLS; col++) {
+                int si = row * INVENTORY_COLS + col;
+                int sx = chestGridX + col * (slotSize + padding);
+                int sy = cy + row * (slotSize + padding);
+                Rectangle slotRect = { (float)sx, (float)sy, (float)slotSize, (float)slotSize };
+                bool hover = CheckCollisionPointRec(mouse, slotRect);
+                int hoverId = 600 + si;
+                float ha = GetHoverAlpha(hoverId, hover, GetFrameTime());
+                Color bg = { (unsigned char)(55 + 20 * ha), (unsigned char)(52 + 18 * ha), (unsigned char)(62 + 23 * ha), (unsigned char)(200 + 10 * ha) };
+                Color bd = { (unsigned char)(80 + 30 * ha), (unsigned char)(75 + 30 * ha), (unsigned char)(90 + 40 * ha), 200 };
+                if (ha > 0.01f) DrawRectangle(sx - 1, sy - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, (unsigned char)(35 * ha)});
+                DrawRectangle(sx, sy, slotSize, slotSize, bg);
+                DrawRectangle(sx, sy, slotSize, slotSize / 3, (Color){(unsigned char)(bg.r + 8), (unsigned char)(bg.g + 8), (unsigned char)(bg.b + 8), bg.a});
+                { int sc = 3; DrawCircleV((Vector2){(float)(sx+sc),(float)(sy+sc)},sc,bg); DrawCircleV((Vector2){(float)(sx+slotSize-sc),(float)(sy+sc)},sc,bg); DrawCircleV((Vector2){(float)(sx+sc),(float)(sy+slotSize-sc)},sc,bg); DrawCircleV((Vector2){(float)(sx+slotSize-sc),(float)(sy+slotSize-sc)},sc,bg); }
+                DrawRectangleLines(sx, sy, slotSize, slotSize, bd);
+
+                if (chestIdx >= 0 && chestData[chestIdx].items[si] != BLOCK_AIR) {
+                    uint8_t item = chestData[chestIdx].items[si];
+                    int cnt = chestData[chestIdx].counts[si];
+                    Rectangle dst = { (float)(sx + 4), (float)(sy + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
+                    Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+                    DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+                    if (cnt > 1) DrawGameText(TextFormat("%d", cnt), sx + slotSize - 20, sy + slotSize - 16, 12, WHITE);
+                    if (hover && heldItem == BLOCK_AIR) {
+                        tooltipId = item;
+                        tooltipText = GetBlockName((BlockType)item);
+                        tooltipX = (int)mouse.x;
+                        tooltipY = (int)mouse.y - 20;
+                    }
+                }
+
+                // Shift-click: transfer chest -> inventory
+                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && IsKeyDown(KEY_LEFT_SHIFT) && chestIdx >= 0 && chestData[chestIdx].items[si] != BLOCK_AIR) {
+                    uint8_t item = chestData[chestIdx].items[si];
+                    int cnt = chestData[chestIdx].counts[si];
+                    bool merged = false;
+                    for (int d = 0; d < INVENTORY_SLOTS; d++) {
+                        if (player.inventory[d] == item && player.inventoryCount[d] < 64) {
+                            int space = 64 - player.inventoryCount[d];
+                            int add = (cnt < space) ? cnt : space;
+                            player.inventoryCount[d] += add;
+                            cnt -= add;
+                            if (cnt <= 0) break;
+                        }
+                    }
+                    if (cnt <= 0) { chestData[chestIdx].items[si] = BLOCK_AIR; chestData[chestIdx].counts[si] = 0; merged = true; }
+                    if (!merged) {
+                        for (int d = 0; d < INVENTORY_SLOTS; d++) {
+                            if (player.inventory[d] == BLOCK_AIR) {
+                                player.inventory[d] = item;
+                                player.inventoryCount[d] = cnt;
+                                chestData[chestIdx].items[si] = BLOCK_AIR;
+                                chestData[chestIdx].counts[si] = 0;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Click handling for chest slots
+                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && chestIdx >= 0) {
+                    if (heldItem == BLOCK_AIR && chestData[chestIdx].items[si] != BLOCK_AIR) {
+                        heldItem = chestData[chestIdx].items[si];
+                        heldCount = chestData[chestIdx].counts[si];
+                        heldDurability = 0;
+                        chestData[chestIdx].items[si] = BLOCK_AIR;
+                        chestData[chestIdx].counts[si] = 0;
+                    } else if (heldItem != BLOCK_AIR && chestData[chestIdx].items[si] == BLOCK_AIR) {
+                        chestData[chestIdx].items[si] = heldItem;
+                        chestData[chestIdx].counts[si] = heldCount;
+                        heldItem = BLOCK_AIR;
+                        heldCount = 0;
+                        heldDurability = 0;
+                    } else if (heldItem != BLOCK_AIR && chestData[chestIdx].items[si] == heldItem && chestData[chestIdx].counts[si] < 64) {
+                        int space = 64 - chestData[chestIdx].counts[si];
+                        int add = (heldCount < space) ? heldCount : space;
+                        chestData[chestIdx].counts[si] += add;
+                        heldCount -= add;
+                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldDurability = 0; }
+                    }
+                }
+            }
+        }
+
+        cy += chestGridH + 4;
+        DrawRectangle(contX + 10, cy, contW - 20, dividerH, (Color){70, 65, 80, 200});
+        cy += dividerH + 4;
+
+        // Inventory title
+        DrawGameText(S(STR_INVENTORY), contX + contW / 2 - MeasureGameTextWidth(S(STR_INVENTORY), 12) / 2, cy, 12, (Color){180, 175, 190, 200});
+        cy += invTitleH;
+
+        // Player inventory grid (4 rows x 9 cols)
+        int invGridX = contX + 14;
+        for (int row = 0; row < INVENTORY_ROWS; row++) {
+            for (int col = 0; col < INVENTORY_COLS; col++) {
+                int si = row * INVENTORY_COLS + col;
+                int sx = invGridX + col * (slotSize + padding);
+                int sy = cy + row * (slotSize + padding);
+                Rectangle slotRect = { (float)sx, (float)sy, (float)slotSize, (float)slotSize };
+                bool hover = CheckCollisionPointRec(mouse, slotRect);
+                int hoverId = 700 + si;
+                float ha = GetHoverAlpha(hoverId, hover, GetFrameTime());
+                Color bg = { (unsigned char)(55 + 20 * ha), (unsigned char)(52 + 18 * ha), (unsigned char)(62 + 23 * ha), (unsigned char)(200 + 10 * ha) };
+                Color bd = { (unsigned char)(80 + 30 * ha), (unsigned char)(75 + 30 * ha), (unsigned char)(90 + 40 * ha), 200 };
+                if (ha > 0.01f) DrawRectangle(sx - 1, sy - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, (unsigned char)(35 * ha)});
+                DrawRectangle(sx, sy, slotSize, slotSize, bg);
+                DrawRectangle(sx, sy, slotSize, slotSize / 3, (Color){(unsigned char)(bg.r + 8), (unsigned char)(bg.g + 8), (unsigned char)(bg.b + 8), bg.a});
+                { int sc = 3; DrawCircleV((Vector2){(float)(sx+sc),(float)(sy+sc)},sc,bg); DrawCircleV((Vector2){(float)(sx+slotSize-sc),(float)(sy+sc)},sc,bg); DrawCircleV((Vector2){(float)(sx+sc),(float)(sy+slotSize-sc)},sc,bg); DrawCircleV((Vector2){(float)(sx+slotSize-sc),(float)(sy+slotSize-sc)},sc,bg); }
+                DrawRectangleLines(sx, sy, slotSize, slotSize, bd);
+
+                if (player.inventory[si] != BLOCK_AIR) {
+                    uint8_t item = player.inventory[si];
+                    int cnt = player.inventoryCount[si];
+                    Rectangle dst = { (float)(sx + 4), (float)(sy + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
+                    Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+                    DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+                    if (cnt > 1) DrawGameText(TextFormat("%d", cnt), sx + slotSize - 20, sy + slotSize - 16, 12, WHITE);
+                    if (hover && heldItem == BLOCK_AIR) {
+                        tooltipId = item;
+                        tooltipText = GetBlockName((BlockType)item);
+                        tooltipX = (int)mouse.x;
+                        tooltipY = (int)mouse.y - 20;
+                    }
+                }
+
+                // Click handling for inventory slots
+                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                    if (heldItem == BLOCK_AIR && player.inventory[si] != BLOCK_AIR) {
+                        heldItem = player.inventory[si];
+                        heldCount = player.inventoryCount[si];
+                        heldDurability = player.toolDurability[si];
+                        player.inventory[si] = BLOCK_AIR;
+                        player.inventoryCount[si] = 0;
+                        player.toolDurability[si] = 0;
+                    } else if (heldItem != BLOCK_AIR && player.inventory[si] == BLOCK_AIR) {
+                        player.inventory[si] = heldItem;
+                        player.inventoryCount[si] = heldCount;
+                        player.toolDurability[si] = heldDurability;
+                        heldItem = BLOCK_AIR;
+                        heldCount = 0;
+                        heldDurability = 0;
+                    } else if (heldItem != BLOCK_AIR && player.inventory[si] == heldItem && player.inventoryCount[si] < 64) {
+                        int space = 64 - player.inventoryCount[si];
+                        int add = (heldCount < space) ? heldCount : space;
+                        player.inventoryCount[si] += add;
+                        heldCount -= add;
+                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldDurability = 0; }
+                    }
+                }
+
+                // Shift-click: transfer inventory -> chest
+                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && IsKeyDown(KEY_LEFT_SHIFT) && player.inventory[si] != BLOCK_AIR && chestIdx >= 0) {
+                    uint8_t item = player.inventory[si];
+                    int cnt = player.inventoryCount[si];
+                    // Try to merge into existing chest slot
+                    bool merged = false;
+                    for (int ci = 0; ci < CHEST_SLOTS; ci++) {
+                        if (chestData[chestIdx].items[ci] == item && chestData[chestIdx].counts[ci] < 64) {
+                            int space = 64 - chestData[chestIdx].counts[ci];
+                            int add = (cnt < space) ? cnt : space;
+                            chestData[chestIdx].counts[ci] += add;
+                            cnt -= add;
+                            if (cnt <= 0) break;
+                        }
+                    }
+                    if (cnt <= 0) { player.inventory[si] = BLOCK_AIR; player.inventoryCount[si] = 0; player.toolDurability[si] = 0; merged = true; }
+                    // Place remaining in first empty slot
+                    if (!merged) {
+                        for (int ci = 0; ci < CHEST_SLOTS; ci++) {
+                            if (chestData[chestIdx].items[ci] == BLOCK_AIR) {
+                                chestData[chestIdx].items[ci] = item;
+                                chestData[chestIdx].counts[ci] = cnt;
+                                player.inventory[si] = BLOCK_AIR;
+                                player.inventoryCount[si] = 0;
+                                player.toolDurability[si] = 0;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tooltip
+        if (tooltipText) {
+            int tw = MeasureGameTextWidth(tooltipText, 14) + 10;
+            DrawRectangle(tooltipX, tooltipY - 14, tw, 20, (Color){30, 28, 38, 230});
+            DrawGameText(tooltipText, tooltipX + 5, tooltipY - 12, 14, WHITE);
+        }
+
+        // Draw held item on cursor
+        if (heldItem != BLOCK_AIR) {
+            int mx = (int)mouse.x, my = (int)mouse.y;
+            Rectangle dst = { (float)(mx - 12), (float)(my - 12), 24, 24 };
+            Rectangle src = { (float)(heldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+            DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+            if (heldCount > 1) DrawGameText(TextFormat("%d", heldCount), mx + 8, my + 8, 12, WHITE);
+        }
+
+        return;
+    }
+
     // --- Normal inventory screen (when furnace is NOT open) ---
     int padding = 3;
     int gridW = INVENTORY_COLS * slotSize + (INVENTORY_COLS - 1) * padding;
@@ -632,7 +896,9 @@ void DrawInventoryScreen(void)
             if (player.armor[i] != BLOCK_AIR) {
                 BlockType a = (BlockType)player.armor[i];
                 Color ac;
-                if (a >= ARMOR_IRON_HELMET) ac = (Color){200, 210, 220, 255};
+                if (a >= ARMOR_DIAMOND_HELMET) ac = (Color){80, 220, 230, 255};
+                else if (a >= ARMOR_GOLD_HELMET) ac = (Color){220, 180, 50, 255};
+                else if (a >= ARMOR_IRON_HELMET) ac = (Color){200, 210, 220, 255};
                 else if (a >= ARMOR_STONE_HELMET) ac = (Color){140, 140, 140, 255};
                 else ac = (Color){160, 120, 60, 255};
                 if (i == 0) hc = ac; else if (i == 1) cc = ac; else if (i == 2) lc = ac; else bc = ac;
@@ -678,6 +944,12 @@ void DrawInventoryScreen(void)
             DrawRectangle(cx + 6*scale, cy + 25*scale, 5*scale, 3*scale, bc);
         }
 
+        // Day/night tint to match in-game lighting
+        if (dayNight.lightLevel < 1.0f) {
+            unsigned char a = (unsigned char)(120 * (1.0f - dayNight.lightLevel));
+            DrawRectangle(cx - 2*scale, cy - 1*scale, 16*scale, 29*scale, (Color){5, 5, 25, a});
+        }
+
         // Health bar under preview
         int hpBarX = prevX + 4;
         int hpBarY = prevY + prevH - 14;
@@ -716,7 +988,7 @@ void DrawInventoryScreen(void)
         for (int i = 0; i < 4; i++) {
             int ay = armorY + i * (armorSlotSize + armorPad);
             Rectangle slotRect = { (float)armorX, (float)ay, (float)armorSlotSize, (float)armorSlotSize };
-            bool hover = CheckCollisionPointRec(mouse, slotRect) && !furnaceOpen;
+            bool hover = CheckCollisionPointRec(mouse, slotRect) && !furnaceOpen && !chestOpen;
 
             Color bg = hover ? (Color){75, 70, 85, 210} : (Color){55, 52, 62, 200};
             Color border = (Color){80, 75, 90, 200};
@@ -1120,7 +1392,7 @@ void DrawInventoryScreen(void)
     DrawCraftingPanel(craftX, craftY, craftPanelW, visibleRecipes, craftSlotH, craftPad, craftingTableOpen);
 
     // Drop held item by clicking outside the container (skip when furnace is open)
-    if (heldItem != BLOCK_AIR && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !furnaceOpen) {
+    if (heldItem != BLOCK_AIR && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !furnaceOpen && !chestOpen) {
         Rectangle container = { (float)containerX, (float)containerY, (float)totalW, (float)totalH };
         if (!CheckCollisionPointRec(mouse, container)) {
             PlaySoundDrop();
@@ -1134,7 +1406,7 @@ void DrawInventoryScreen(void)
     }
 
     // Tooltip for hovered slot (skip when furnace is open)
-    if (heldItem == BLOCK_AIR && !furnaceOpen) {
+    if (heldItem == BLOCK_AIR && !furnaceOpen && !chestOpen) {
         for (int row = 0; row < INVENTORY_ROWS; row++) {
             for (int col = 0; col < INVENTORY_COLS; col++) {
                 int idx = row * INVENTORY_COLS + col;
@@ -1322,27 +1594,31 @@ void DrawPlayerSprite(void)
     Color helmetColor = {0, 0, 0, 0}, chestColor = {0, 0, 0, 0}, legColor = {0, 0, 0, 0}, bootColor = {0, 0, 0, 0};
     if (player.armor[0] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[0];
-        if (a <= ARMOR_STONE_BOOTS) helmetColor = (Color){140, 140, 140, 255}; // stone
-        else if (a <= ARMOR_IRON_BOOTS) helmetColor = (Color){200, 210, 220, 255}; // iron
-        else helmetColor = (Color){160, 120, 60, 255}; // wood
+        if (a <= ARMOR_STONE_BOOTS) helmetColor = (Color){140, 140, 140, 255};
+        else if (a <= ARMOR_IRON_BOOTS) helmetColor = (Color){200, 210, 220, 255};
+        else if (a <= ARMOR_GOLD_BOOTS) helmetColor = (Color){220, 180, 50, 255};
+        else helmetColor = (Color){80, 220, 230, 255};
     }
     if (player.armor[1] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[1];
         if (a <= ARMOR_STONE_BOOTS) chestColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) chestColor = (Color){200, 210, 220, 255};
-        else chestColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_GOLD_BOOTS) chestColor = (Color){220, 180, 50, 255};
+        else chestColor = (Color){80, 220, 230, 255};
     }
     if (player.armor[2] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[2];
         if (a <= ARMOR_STONE_BOOTS) legColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) legColor = (Color){200, 210, 220, 255};
-        else legColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_GOLD_BOOTS) legColor = (Color){220, 180, 50, 255};
+        else legColor = (Color){80, 220, 230, 255};
     }
     if (player.armor[3] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[3];
         if (a <= ARMOR_STONE_BOOTS) bootColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) bootColor = (Color){200, 210, 220, 255};
-        else bootColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_GOLD_BOOTS) bootColor = (Color){220, 180, 50, 255};
+        else bootColor = (Color){80, 220, 230, 255};
     }
 
     if (facing) {
@@ -2032,21 +2308,32 @@ void DrawDeathScreen(float dt)
         int textW = MeasureGameTextWidth(text, fontSize);
         unsigned char textA = (unsigned char)((alpha - 0.4f) / 0.6f * 255);
         int tx = (SCREEN_WIDTH - textW) / 2;
-        int ty = SCREEN_HEIGHT / 2 - 50;
+        int ty = SCREEN_HEIGHT / 2 - 60;
         // Shadow
         DrawGameText(text, tx + 3, ty + 3, fontSize, (Color){0, 0, 0, (unsigned char)(textA * 0.5f)});
         DrawGameText(text, tx, ty, fontSize, (Color){220, 40, 40, textA});
+
+        // Death cause
+        const char *cause = S(lastDeathCause);
+        int causeW = MeasureGameTextWidth(cause, 18);
+        DrawGameText(cause, (SCREEN_WIDTH - causeW) / 2, ty + 60, 18, (Color){180, 170, 160, textA});
+
+        // Score (XP)
+        char scoreBuf[64];
+        snprintf(scoreBuf, sizeof(scoreBuf), S(STR_DEATH_SCORE), player.xp);
+        int scoreW = MeasureGameTextWidth(scoreBuf, 16);
+        DrawGameText(scoreBuf, (SCREEN_WIDTH - scoreW) / 2, ty + 85, 16, (Color){200, 200, 100, textA});
     }
 
     if (alpha > 0.8f) {
         const char *sub = S(STR_PRESS_SPACE_RESPAWN);
         int subW = MeasureGameTextWidth(sub, 18);
         unsigned char subA = (unsigned char)((alpha - 0.8f) * 5.0f * 255);
-        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, SCREEN_HEIGHT / 2 + 20, 18, (Color){200, 200, 200, subA});
+        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, SCREEN_HEIGHT / 2 + 30, 18, (Color){200, 200, 200, subA});
 
         const char *escHint = S(STR_PRESS_ESC_MENU);
         int escW = MeasureGameTextWidth(escHint,14);
-        DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, SCREEN_HEIGHT / 2 + 48,14, (Color){160, 155, 170, (unsigned char)(subA * 0.7f)});
+        DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, SCREEN_HEIGHT / 2 + 58,14, (Color){160, 155, 170, (unsigned char)(subA * 0.7f)});
     }
 }
 

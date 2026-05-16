@@ -315,6 +315,12 @@ float furnaceFuelBurn = 0.0f;
 // Crafting table state
 bool craftingTableOpen = false;
 
+// Chest state
+bool chestOpen = false;
+int chestBlockX = -1, chestBlockY = -1;
+ChestData chestData[MAX_CHESTS];
+int chestCount = 0;
+
 // Smelting recipes
 SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
 int smeltRecipeCount = 0;
