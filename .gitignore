@@ -66,10 +66,9 @@ MyWorld_private.h
 MyWorld_private.rc
 
 # VS Code
-.vscode/
+
 
 # Claude Code
-.claude/
 
 # Debug logs
 debug*.log

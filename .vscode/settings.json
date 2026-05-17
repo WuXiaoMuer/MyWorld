@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "*.h": "c",
-        "*.c": "c"
-    },
-    "C_Cpp.default.cStandard": "c11",
-    "editor.formatOnSave": false,
-    "files.encoding": "gbk"
-}

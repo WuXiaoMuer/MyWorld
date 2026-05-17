@@ -69,11 +69,15 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Iron Leggings",  {200,180,160,255}, {170,150,130,255}, false, false, false},
     {"Iron Boots",     {200,180,160,255}, {170,150,130,255}, false, false, false},
     // New ores
-    {"Gold Ore",    {130,110,100,255}, {220,180,50,255},  true,  false, true},
-    {"Diamond Ore", {130,110,100,255}, {80,220,230,255},  true,  false, true},
+    {"Gold Ore",      {130,110,100,255}, {220,180,50,255},  true,  false, true},
+    {"Diamond Ore",   {130,110,100,255}, {80,220,230,255},  true,  false, true},
+    {"Redstone Ore",  {130,110,100,255}, {200,30,30,255},   true,  false, true},
+    {"Lapis Ore",     {130,110,100,255}, {30,50,200,255},   true,  false, true},
     // New items
-    {"Gold Ingot",  {220,180,50,255},  {180,140,30,255},  false, false, false},
-    {"Diamond",     {80,220,230,255},  {50,180,200,255},  false, false, false},
+    {"Gold Ingot",    {220,180,50,255},  {180,140,30,255},  false, false, false},
+    {"Diamond",       {80,220,230,255},  {50,180,200,255},  false, false, false},
+    {"Redstone",      {200,30,30,255},   {150,20,20,255},   false, false, false},
+    {"Lapis Lazuli",  {30,50,200,255},   {20,35,150,255},   false, false, false},
     // Interactive blocks
     {"Chest",       {140,100,50,255},  {100,70,30,255},   true,  false, true},
     // Gold tools
@@ -96,6 +100,9 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Diamond Chest",     {80,220,230,255}, {50,180,200,255}, false, false, false},
     {"Diamond Leggings",  {80,220,230,255}, {50,180,200,255}, false, false, false},
     {"Diamond Boots",     {80,220,230,255}, {50,180,200,255}, false, false, false},
+    // Mob drops
+    {"Gunpowder",    {80,80,80,255},   {50,50,50,255},    false, false, false},
+    {"String",       {200,200,200,255},{160,160,160,255},  false, false, false},
 };
 
 //----------------------------------------------------------------------------------
@@ -626,6 +633,52 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case BLOCK_REDSTONE_ORE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = blockInfo[BLOCK_STONE].baseColor;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
+                if (h % 8 == 0) c = blockInfo[BLOCK_STONE].detailColor;
+                if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Redstone deposits with glow
+                if ((x >= 3 && x <= 5 && y >= 4 && y <= 6) ||
+                    (x >= 10 && x <= 12 && y >= 8 && y <= 10) ||
+                    (x >= 6 && x <= 8 && y >= 11 && y <= 13)) {
+                    c = detail;
+                    // Bright red glow
+                    if ((x == 4 && y == 5) || (x == 11 && y == 9))
+                        c = (Color){255, 80, 80, 255};
+                    // Dark crack
+                    if ((x == 5 && y == 6) || (x == 12 && y == 10))
+                        c = (Color){100, 15, 15, 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_LAPIS_ORE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = blockInfo[BLOCK_STONE].baseColor;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 4);
+                if (h % 8 == 0) c = blockInfo[BLOCK_STONE].detailColor;
+                if (h % 17 == 0) c = (Color){115, 115, 115, 255};
+                // Lapis deposits
+                if ((x >= 4 && x <= 6 && y >= 3 && y <= 5) ||
+                    (x >= 9 && x <= 11 && y >= 7 && y <= 9) ||
+                    (x >= 3 && x <= 5 && y >= 10 && y <= 12)) {
+                    c = detail;
+                    // Bright blue highlight
+                    if ((x == 5 && y == 4) || (x == 10 && y == 8))
+                        c = (Color){60, 100, 255, 255};
+                    // Dark blue shadow
+                    if ((x == 6 && y == 5) || (x == 5 && y == 12))
+                        c = (Color){15, 25, 100, 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     case ITEM_GOLD_INGOT:
         // Gold ingot with rich 3D shading
         for (int y = 5; y < 11; y++) for (int x = 3; x < 13; x++) {
@@ -661,6 +714,79 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                     ImageDrawPixel(img, px + x, py + y, c);
                 }
             }
+        break;
+
+    case ITEM_REDSTONE:
+        // Redstone dust - small red crystals
+        for (int y = 5; y < 12; y++)
+            for (int x = 4; x < 12; x++) {
+                unsigned int h = hash2D(x, y, 500);
+                if (h % 3 == 0) {
+                    Color c = base;
+                    if (h % 5 == 0) c = (Color){255, 60, 60, 255};
+                    if (h % 7 == 0) c = detail;
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
+            }
+        // Bright dust specks
+        ImageDrawPixel(img, px + 6, py + 7, (Color){255, 100, 100, 255});
+        ImageDrawPixel(img, px + 9, py + 9, (Color){255, 80, 80, 255});
+        break;
+
+    case ITEM_LAPIS:
+        // Lapis lazuli - blue chunks
+        for (int y = 4; y < 12; y++)
+            for (int x = 4; x < 12; x++) {
+                unsigned int h = hash2D(x, y, 501);
+                if (h % 3 == 0) {
+                    Color c = base;
+                    if (h % 5 == 0) c = (Color){50, 80, 255, 255};
+                    if (h % 7 == 0) c = detail;
+                    // Gold flecks (pyrite in lapis)
+                    if (h % 11 == 0) c = (Color){200, 180, 50, 255};
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
+            }
+        // Bright blue spots
+        ImageDrawPixel(img, px + 7, py + 6, (Color){70, 120, 255, 255});
+        ImageDrawPixel(img, px + 9, py + 9, (Color){60, 100, 255, 255});
+        break;
+
+    case ITEM_GUNPOWDER:
+        // Dark gray powder grains
+        for (int y = 5; y < 12; y++)
+            for (int x = 4; x < 12; x++) {
+                unsigned int h = hash2D(x, y, 502);
+                if (h % 3 == 0) {
+                    Color c = base;
+                    if (h % 5 == 0) c = (Color){60, 60, 60, 255};
+                    if (h % 7 == 0) c = detail;
+                    if (h % 11 == 0) c = (Color){100, 100, 100, 255};
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
+            }
+        // Bright specks
+        ImageDrawPixel(img, px + 6, py + 7, (Color){110, 110, 110, 255});
+        ImageDrawPixel(img, px + 9, py + 8, (Color){90, 90, 90, 255});
+        break;
+
+    case ITEM_STRING:
+        // Coiled string
+        for (int y = 4; y < 12; y++)
+            for (int x = 4; x < 12; x++) {
+                unsigned int h = hash2D(x, y, 503);
+                if (h % 4 == 0) {
+                    Color c = base;
+                    if (h % 6 == 0) c = detail;
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
+            }
+        // String line
+        for (int i = 0; i < 8; i++) {
+            int sx = 4 + i;
+            int sy = 7 + (i % 3 == 0 ? -1 : 0);
+            ImageDrawPixel(img, px + sx, py + sy, (Color){220, 220, 220, 255});
+        }
         break;
 
     case BLOCK_CHEST:
@@ -1067,6 +1193,34 @@ void GenerateBlockAtlas(void)
     }
     blockAtlas = LoadTextureFromImage(atlas);
     UnloadImage(atlas);
+
+    // Generate crack overlay textures (10 stages)
+    for (int stage = 0; stage < CRACK_STAGES; stage++) {
+        Image crack = GenImageColor(BLOCK_SIZE, BLOCK_SIZE, BLANK);
+        float intensity = (float)(stage + 1) / CRACK_STAGES;
+        // Seed crack lines based on stage
+        for (int i = 0; i < 3 + stage * 2; i++) {
+            int sx = (hash2D(i, stage, 900) % BLOCK_SIZE);
+            int sy = (hash2D(i, stage, 901) % BLOCK_SIZE);
+            int len = 3 + (int)(intensity * 8);
+            unsigned char a = (unsigned char)(80 + intensity * 120);
+            for (int j = 0; j < len; j++) {
+                int ex = sx + (hash2D(i + j, stage, 902) % 5) - 2;
+                int ey = sy + (hash2D(i + j, stage, 903) % 5) - 2;
+                if (ex >= 0 && ex < BLOCK_SIZE && ey >= 0 && ey < BLOCK_SIZE) {
+                    ImageDrawPixel(&crack, ex, ey, (Color){0, 0, 0, a});
+                    // Wider cracks at later stages
+                    if (stage >= 5 && ex + 1 < BLOCK_SIZE)
+                        ImageDrawPixel(&crack, ex + 1, ey, (Color){0, 0, 0, (unsigned char)(a * 0.6f)});
+                    if (stage >= 7 && ey + 1 < BLOCK_SIZE)
+                        ImageDrawPixel(&crack, ex, ey + 1, (Color){0, 0, 0, (unsigned char)(a * 0.4f)});
+                }
+                sx = ex; sy = ey;
+            }
+        }
+        crackTextures[stage] = LoadTextureFromImage(crack);
+        UnloadImage(crack);
+    }
 }
 
 //----------------------------------------------------------------------------------
@@ -1232,6 +1386,18 @@ void GenerateWorld(unsigned int seed)
                 float diamondThreshold = 0.82f - (y - 210) * 0.0002f;
                 float diamond = fbm(x * 0.16f, y * 0.16f, 2, 0.5f, seed + 6000);
                 if (diamond > diamondThreshold) { world[x][y] = BLOCK_DIAMOND_ORE; continue; }
+            }
+            // Redstone: deep, similar to diamond
+            if (y > 190) {
+                float redstoneThreshold = 0.80f - (y - 190) * 0.0003f;
+                float redstone = fbm(x * 0.15f, y * 0.15f, 2, 0.5f, seed + 7000);
+                if (redstone > redstoneThreshold) { world[x][y] = BLOCK_REDSTONE_ORE; continue; }
+            }
+            // Lapis: medium depth, moderate rarity
+            if (y > 160) {
+                float lapisThreshold = 0.77f - (y - 160) * 0.0004f;
+                float lapis = fbm(x * 0.13f, y * 0.13f, 2, 0.5f, seed + 8000);
+                if (lapis > lapisThreshold) { world[x][y] = BLOCK_LAPIS_ORE; continue; }
             }
         }
     }
@@ -1414,7 +1580,7 @@ void GenerateWorld(unsigned int seed)
 //----------------------------------------------------------------------------------
 // Chunk System - Hash table with linear probing, O(1) lookup
 //----------------------------------------------------------------------------------
-static void InitChunkTable(void)
+void InitChunkTable(void)
 {
     for (int i = 0; i < MAX_CHUNKS; i++) {
         loadedChunks[i].chunkX = CHUNK_EMPTY;
@@ -1533,13 +1699,6 @@ void InvalidateChunkAt(int worldBlockX, int worldBlockY)
 
 void UpdateChunks(void)
 {
-    // Initialize chunk table on first call
-    static bool initialized = false;
-    if (!initialized) {
-        InitChunkTable();
-        initialized = true;
-    }
-
     int playerBlockX = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
     int playerChunkX = playerBlockX / CHUNK_SIZE;
 

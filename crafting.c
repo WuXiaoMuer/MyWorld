@@ -100,6 +100,8 @@ void InitSmeltingRecipes(void)
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_COBBLESTONE, BLOCK_STONE, STR_SMELT_COBBLE};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_SAND, BLOCK_GLASS, STR_SMELT_SAND};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_GOLD_ORE, ITEM_GOLD_INGOT, STR_SMELT_GOLD};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_REDSTONE_ORE, ITEM_REDSTONE, STR_SMELT_REDSTONE};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_LAPIS_ORE, ITEM_LAPIS, STR_SMELT_LAPIS};
 }
 
 int FindSmeltRecipe(BlockType input)

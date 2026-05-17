@@ -516,7 +516,9 @@ void PlaySoundMob(MobType type) {
     if (!IsAudioDeviceReady()) return;
     if (type == MOB_ZOMBIE) { SetSoundVolume(sndZombie, sfxVolume); PlaySound(sndZombie); }
     else if (type == MOB_PIG) { SetSoundVolume(sndPig, sfxVolume); PlaySound(sndPig); }
-    else if (type == MOB_SKELETON) { SetSoundVolume(sndZombie, sfxVolume); PlaySound(sndZombie); }
+    else if (type == MOB_SKELETON) { SetSoundVolume(sndZombie, sfxVolume * 0.8f); PlaySound(sndZombie); }
+    else if (type == MOB_CREEPER) { SetSoundVolume(sndZombie, sfxVolume * 0.4f); PlaySound(sndZombie); }
+    else if (type == MOB_SPIDER) { SetSoundVolume(sndPig, sfxVolume * 0.6f); PlaySound(sndPig); }
 }
 
 void PlaySoundSplash(void) {

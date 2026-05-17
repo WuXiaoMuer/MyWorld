@@ -5,11 +5,11 @@
 // Mob globals defined in main.c
 
 // Mob properties per type
-static const int mobMaxHealth[] = { 0, 10, 20, 15 };       // NONE, PIG, ZOMBIE, SKELETON
-static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f };
-static const int mobWidth[] = { 0, 16, 12, 12 };
-static const int mobHeight[] = { 0, 12, 28, 28 };
-static const int mobDamage[] = { 0, 0, 4, 2 };            // contact damage
+static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16 };       // NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER
+static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f };
+static const int mobWidth[] = { 0, 16, 12, 12, 12, 20 };
+static const int mobHeight[] = { 0, 12, 28, 24, 24, 16 };
+static const int mobDamage[] = { 0, 0, 4, 2, 0, 3 };            // contact damage (creeper explodes)
 
 void InitMobs(void)
 {
@@ -123,6 +123,7 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].contactCooldown = 0.0f;
             mobs[i].deathTimer = 0.0f;
             mobs[i].attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
+            mobs[i].fuseTimer = 0.0f;
             mobs[i].active = true;
             return &mobs[i];
         }
@@ -177,10 +178,14 @@ static void UpdateMobPhysics(Mob *mob, float dt)
 
     if (hBlocked) {
         mob->velocity.x = 0;
-        // Try to jump over obstacle
-        if (mob->onGround && mob->type == MOB_ZOMBIE) {
+        // Try to jump over obstacle (zombies, creepers)
+        if (mob->onGround && (mob->type == MOB_ZOMBIE || mob->type == MOB_CREEPER)) {
             mob->velocity.y = -300.0f;
             mob->onGround = false;
+        }
+        // Spiders climb walls
+        if (mob->type == MOB_SPIDER) {
+            mob->velocity.y = SPIDER_WALL_CLIMB_VEL;
         }
     } else {
         mob->position.x = newX;
@@ -319,6 +324,137 @@ static void UpdateSkeletonAI(Mob *mob, float dt)
     }
 }
 
+static void UpdateCreeperAI(Mob *mob, float dt)
+{
+    float dx = player.position.x - mob->position.x;
+    float dist = fabsf(dx);
+
+    if (CanMobSeePlayer(mob) && dist < 300.0f) {
+        // Chase player
+        mob->aiState = 1;
+        mob->velocity.x = (dx > 0 ? 1 : -1) * mobSpeed[MOB_CREEPER];
+        mob->facingRight = dx > 0;
+
+        // Start fuse when close enough
+        if (dist < CREEPER_EXPLODE_DIST) {
+            mob->fuseTimer += dt;
+            // Explode!
+            if (mob->fuseTimer >= CREEPER_FUSE_TIME) {
+                // Damage player
+                float pdx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + mobWidth[MOB_CREEPER] / 2);
+                float pdy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + mobHeight[MOB_CREEPER] / 2);
+                float pdist = sqrtf(pdx * pdx + pdy * pdy);
+                if (pdist < CREEPER_EXPLODE_DIST * 1.5f) {
+                    float reduction = GetArmorDamageReduction();
+                    int finalDamage = (int)(CREEPER_DAMAGE * (1.0f - reduction));
+                    if (finalDamage < 1) finalDamage = 1;
+                    player.health -= finalDamage;
+                    if (player.health < 0) player.health = 0;
+                    if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_CREEPER);
+                    DamageArmor();
+                    player.damageFlashTimer = 0.5f;
+                    player.knockbackTimer = 0.3f;
+                    player.velocity.x = (pdx > 0 ? 1 : -1) * 300.0f;
+                    player.velocity.y = -250.0f;
+                    PlaySoundHurt();
+                }
+
+                // Destroy nearby blocks
+                int cx = (int)(mob->position.x + mobWidth[MOB_CREEPER] / 2) / BLOCK_SIZE;
+                int cy = (int)(mob->position.y + mobHeight[MOB_CREEPER] / 2) / BLOCK_SIZE;
+                for (int bx = cx - CREEPER_EXPLODE_RADIUS; bx <= cx + CREEPER_EXPLODE_RADIUS; bx++) {
+                    for (int by = cy - CREEPER_EXPLODE_RADIUS; by <= cy + CREEPER_EXPLODE_RADIUS; by++) {
+                        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                            float bdx = (bx - cx) * BLOCK_SIZE;
+                            float bdy = (by - cy) * BLOCK_SIZE;
+                            if (sqrtf(bdx * bdx + bdy * bdy) <= CREEPER_EXPLODE_RADIUS * BLOCK_SIZE) {
+                                BlockType bt = (BlockType)world[bx][by];
+                                if (bt != BLOCK_AIR && bt != BLOCK_BEDROCK) {
+                                    SpawnBlockParticles(bx, by, bt);
+                                    world[bx][by] = BLOCK_AIR;
+                                    InvalidateChunkAt(bx, by);
+                                    UpdateLightAt(bx, by);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Explosion particles
+                for (int p = 0; p < 20; p++) {
+                    float angle = (float)(rand() % 628) / 100.0f;
+                    float speed = 100.0f + (float)(rand() % 200);
+                    SpawnDamageParticles(mob->position.x + mobWidth[MOB_CREEPER] / 2,
+                                         mob->position.y + mobHeight[MOB_CREEPER] / 2,
+                                         (Color){255, 150, 50, 255});
+                }
+
+                // Kill the creeper
+                mob->health = 0;
+                mob->deathTimer = MOB_DEATH_TIME;
+                mob->velocity.x = 0;
+                PlaySoundDeath();
+                player.xp += 5;
+                if (player.xp > MAX_XP) player.xp = MAX_XP;
+            }
+        } else {
+            mob->fuseTimer = 0.0f; // Reset fuse if player moves away
+        }
+    } else {
+        // Wander
+        mob->fuseTimer = 0.0f;
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = MOB_AI_INTERVAL + (float)(rand() % 100) / 100.0f;
+            mob->aiState = rand() % 3;
+        }
+        switch (mob->aiState) {
+            case 0: mob->velocity.x = 0; break;
+            case 1: mob->velocity.x = -mobSpeed[MOB_CREEPER] * 0.5f; mob->facingRight = false; break;
+            case 2: mob->velocity.x = mobSpeed[MOB_CREEPER] * 0.5f; mob->facingRight = true; break;
+        }
+    }
+}
+
+static void UpdateSpiderAI(Mob *mob, float dt)
+{
+    float dx = player.position.x - mob->position.x;
+    float dist = fabsf(dx);
+
+    // Spiders are hostile at night, neutral during day
+    bool hostile = dayNight.lightLevel < 0.5f;
+
+    if (hostile && CanMobSeePlayer(mob) && dist < 400.0f) {
+        // Chase player
+        mob->aiState = 1;
+        mob->velocity.x = (dx > 0 ? 1 : -1) * mobSpeed[MOB_SPIDER];
+        mob->facingRight = dx > 0;
+
+        // Wall climbing - if hitting a wall, climb up
+        if (!mob->onGround && mob->velocity.x != 0) {
+            int checkX = (int)((mob->position.x + (dx > 0 ? mobWidth[MOB_SPIDER] + 2 : -2)) / BLOCK_SIZE);
+            int checkY = (int)(mob->position.y + mobHeight[MOB_SPIDER] / 2) / BLOCK_SIZE;
+            if (checkX >= 0 && checkX < WORLD_WIDTH && checkY >= 0 && checkY < WORLD_HEIGHT) {
+                if (IsBlockSolid(checkX, checkY)) {
+                    mob->velocity.y = SPIDER_WALL_CLIMB_VEL;
+                }
+            }
+        }
+    } else {
+        // Wander
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = MOB_AI_INTERVAL * 1.5f + (float)(rand() % 100) / 100.0f;
+            mob->aiState = rand() % 3;
+        }
+        switch (mob->aiState) {
+            case 0: mob->velocity.x = 0; break;
+            case 1: mob->velocity.x = -mobSpeed[MOB_SPIDER] * 0.4f; mob->facingRight = false; break;
+            case 2: mob->velocity.x = mobSpeed[MOB_SPIDER] * 0.4f; mob->facingRight = true; break;
+        }
+    }
+}
+
 static void UpdateMobContactDamage(Mob *mob, float dt)
 {
     if (mob->contactCooldown > 0) {
@@ -381,6 +517,8 @@ void DamageMob(Mob *mob, int damage)
             case MOB_PIG: deathColor = (Color){230, 160, 150, 255}; break;
             case MOB_ZOMBIE: deathColor = (Color){80, 140, 60, 255}; break;
             case MOB_SKELETON: deathColor = (Color){220, 210, 190, 255}; break;
+            case MOB_CREEPER: deathColor = (Color){60, 140, 50, 255}; break;
+            case MOB_SPIDER: deathColor = (Color){60, 40, 30, 255}; break;
             default: deathColor = (Color){180, 30, 30, 255}; break;
         }
         SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
@@ -398,6 +536,10 @@ void DamageMob(Mob *mob, int damage)
         } else if (mob->type == MOB_SKELETON) {
             SpawnItemEntity(ITEM_STICK, 1 + rand() % 3, dropX, dropY); // bones
             if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, dropX, dropY);
+        } else if (mob->type == MOB_CREEPER) {
+            SpawnItemEntity(ITEM_GUNPOWDER, 1 + rand() % 2, dropX, dropY);
+        } else if (mob->type == MOB_SPIDER) {
+            SpawnItemEntity(ITEM_STRING, 1 + rand() % 2, dropX, dropY);
         }
         PlaySoundDeath();
         player.xp += (mob->type == MOB_PIG) ? 3 : 5;
@@ -487,6 +629,48 @@ static void TrySpawnMobs(float dt)
                     uint8_t light = GetLightLevel(bx, y - 1);
                     if (light >= 8) {
                         SpawnMob(MOB_PIG, spawnX, (y - 2) * BLOCK_SIZE);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Creeper spawning: dark areas like zombie
+    if (count < 6 && (rand() % 4 == 0)) {
+        float angle = (float)(rand() % 628) / 100.0f;
+        float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
+        float spawnX = playerCX + cosf(angle) * dist;
+        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
+
+        int bx = (int)(spawnX / BLOCK_SIZE);
+        if (bx >= 0 && bx < WORLD_WIDTH) {
+            for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+                if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                    uint8_t light = GetLightLevel(bx, y - 1);
+                    if (light <= MOB_HOSTILE_LIGHT_MAX) {
+                        SpawnMob(MOB_CREEPER, spawnX, (y - 2) * BLOCK_SIZE);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Spider spawning: dark areas
+    if (count < 6 && (rand() % 4 == 0)) {
+        float angle = (float)(rand() % 628) / 100.0f;
+        float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
+        float spawnX = playerCX + cosf(angle) * dist;
+        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
+
+        int bx = (int)(spawnX / BLOCK_SIZE);
+        if (bx >= 0 && bx < WORLD_WIDTH) {
+            for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+                if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                    uint8_t light = GetLightLevel(bx, y - 1);
+                    if (light <= MOB_HOSTILE_LIGHT_MAX) {
+                        SpawnMob(MOB_SPIDER, spawnX, (y - 2) * BLOCK_SIZE);
                     }
                     break;
                 }
@@ -586,6 +770,8 @@ void UpdateMobs(float dt)
         if (mob->type == MOB_ZOMBIE) UpdateZombieAI(mob, dt);
         else if (mob->type == MOB_PIG) UpdatePigAI(mob, dt);
         else if (mob->type == MOB_SKELETON) UpdateSkeletonAI(mob, dt);
+        else if (mob->type == MOB_CREEPER) UpdateCreeperAI(mob, dt);
+        else if (mob->type == MOB_SPIDER) UpdateSpiderAI(mob, dt);
 
         // Physics
         UpdateMobPhysics(mob, dt);
@@ -692,6 +878,67 @@ static void DrawSkeletonSprite(Mob *mob)
     DrawRectangle((int)(x + 7), (int)(y + 20 - legSwing), 3, 8, (Color){220, 210, 190, alpha});
 }
 
+static void DrawCreeperSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float legSwing = moving ? sinf(time * 8.0f) * 2.0f : 0;
+
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+    }
+
+    // Flashing when about to explode
+    if (mob->attackTimer > 0.0f && mob->attackTimer < 1.5f) {
+        if ((int)(time * 8) % 2 == 0) alpha = (unsigned char)(alpha * 0.5f);
+    }
+
+    // Head (green, slightly taller)
+    DrawRectangle((int)(x + 1), (int)y, 10, 10, (Color){60, 140, 50, alpha});
+    // Face (darker green pattern - creeper face)
+    DrawRectangle((int)(x + 2), (int)(y + 2), 2, 2, (Color){30, 80, 25, alpha});
+    DrawRectangle((int)(x + 7), (int)(y + 2), 2, 2, (Color){30, 80, 25, alpha});
+    DrawRectangle((int)(x + 4), (int)(y + 5), 3, 2, (Color){30, 80, 25, alpha});
+    // Body (green)
+    DrawRectangle((int)(x + 2), (int)(y + 10), 8, 10, (Color){50, 120, 40, alpha});
+    // Legs (4 short legs)
+    DrawRectangle((int)(x + 1), (int)(y + 20 + legSwing), 3, 4, (Color){50, 120, 40, alpha});
+    DrawRectangle((int)(x + 8), (int)(y + 20 - legSwing), 3, 4, (Color){50, 120, 40, alpha});
+}
+
+static void DrawSpiderSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float legWave = moving ? sinf(time * 12.0f) * 3.0f : 0;
+
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+    }
+
+    // Body (dark brown/red)
+    DrawRectangle((int)(x + 4), (int)(y + 4), 12, 8, (Color){60, 40, 30, alpha});
+    // Head (lighter)
+    DrawRectangle((int)(x + 2), (int)(y + 3), 6, 6, (Color){80, 55, 40, alpha});
+    // Eyes (red, multiple)
+    DrawRectangle((int)(x + 3), (int)(y + 4), 2, 2, (Color){200, 50, 30, alpha});
+    DrawRectangle((int)(x + 6), (int)(y + 4), 2, 2, (Color){200, 50, 30, alpha});
+    DrawRectangle((int)(x + 4), (int)(y + 6), 1, 1, (Color){200, 50, 30, alpha});
+    // Legs (4 pairs, angled)
+    for (int i = 0; i < 4; i++) {
+        int lx = (int)(x + 5 + i * 3);
+        float offset = (i % 2 == 0) ? legWave : -legWave;
+        DrawRectangle(lx, (int)(y + 12 + offset), 2, 6, (Color){50, 35, 25, alpha});
+        DrawRectangle(lx - 2, (int)(y + 14 + offset), 2, 4, (Color){50, 35, 25, alpha});
+    }
+}
+
 void DrawMobs(void)
 {
     for (int i = 0; i < MAX_MOBS; i++) {
@@ -702,6 +949,8 @@ void DrawMobs(void)
             case MOB_ZOMBIE: DrawZombieSprite(mob); break;
             case MOB_PIG: DrawPigSprite(mob); break;
             case MOB_SKELETON: DrawSkeletonSprite(mob); break;
+            case MOB_CREEPER: DrawCreeperSprite(mob); break;
+            case MOB_SPIDER: DrawSpiderSprite(mob); break;
             default: break;
         }
 

@@ -306,7 +306,7 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
     if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) tier = 5.0f;
 
     // Correct tool bonus
-    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_GOLD_ORE || block == BLOCK_DIAMOND_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE || block == BLOCK_CHEST)) {
+    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_GOLD_ORE || block == BLOCK_DIAMOND_ORE || block == BLOCK_REDSTONE_ORE || block == BLOCK_LAPIS_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE || block == BLOCK_CHEST)) {
         return tier * 1.5f;
     }
     if (isAxe && (block == BLOCK_WOOD || block == BLOCK_PLANKS)) {
@@ -532,7 +532,7 @@ void PlayerBlockInteraction(void)
     float toolSpeed = GetToolMiningSpeed(selectedTool, (BlockType)world[blockX][blockY]);
 
     // Hold left to mine / attack mobs
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+    if (win32LMB) {
         // Check mob hit first
         for (int i = 0; i < MAX_MOBS; i++) {
             if (!mobs[i].active || mobs[i].deathTimer > 0) continue;
@@ -623,6 +623,8 @@ void PlayerBlockInteraction(void)
                 if (bt == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
                 else if (bt == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
                 else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
+                else if (bt == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
+                else if (bt == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
                 SpawnItemEntity(dropItem, 1, blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
                 PlaySoundBreak(bt);
                 UpdateLightAt(blockX, blockY);

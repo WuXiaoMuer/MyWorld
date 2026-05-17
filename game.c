@@ -117,15 +117,17 @@ void InitGame(void)
     GetSavePath(selectedSaveSlot, currentSavePath, sizeof(currentSavePath));
 
     if (SaveExists(currentSavePath) && LoadWorld(currentSavePath)) {
-        // Loaded successfully
+        // Loaded successfully - day/night and weather restored from save
     } else {
         GenerateWorld(worldSeed);
         InitPlayer();
+        InitDayNight();
+        InitWeather();
     }
 
     RecalculateAllLight();
     InitCameraSystem();
-    InitDayNight();
+    InitChunkTable();
     UpdateChunks();
     player.playerDead = false;
 }
@@ -703,6 +705,7 @@ void UpdateGame(float dt)
         PickupNearbyItems(player.position.x, player.position.y);
         UpdateCameraSystem(dt);
         UpdateDayNight(dt);
+        UpdateWeather(dt);
         if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
     }
     // Status effects (drowning, hunger) apply even with inventory open
@@ -777,6 +780,7 @@ void DrawGame(void)
 
     BeginMode2D(camera);
     DrawWorld();
+    DrawMiningCrack();
     DrawWater();
     DrawMobs();
     DrawProjectiles();
@@ -785,6 +789,9 @@ void DrawGame(void)
     if (!inventoryOpen && !gamePaused && !player.playerDead) DrawCrosshair();
     DrawPlayerSprite();
     EndMode2D();
+
+    // Weather effects (rain, lightning)
+    DrawWeather();
 
     if (dayNight.lightLevel < 1.0f) {
         unsigned char alpha = (unsigned char)(120 * (1.0f - dayNight.lightLevel));

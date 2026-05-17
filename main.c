@@ -255,6 +255,7 @@ Camera2D camera = { 0 };
 DayNightCycle dayNight = { 0 };
 
 Texture2D blockAtlas = { 0 };
+Texture2D crackTextures[CRACK_STAGES] = { 0 };
 bool showDebug = false;
 bool showLargeMap = false;
 bool inventoryOpen = false;

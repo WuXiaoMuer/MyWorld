@@ -113,7 +113,7 @@ void InitWin32WheelHook(void);
 #define CHEST_SLOTS         27
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        6
+#define SAVE_VERSION        7
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -184,6 +184,21 @@ void InitWin32WheelHook(void);
 #define PROJECTILE_DAMAGE   3
 #define PROJECTILE_LIFETIME 3.0f
 #define ARROW_GRAVITY       400.0f
+
+// Creeper explosion
+#define CREEPER_FUSE_TIME    1.5f
+#define CREEPER_EXPLODE_DIST 120.0f
+#define CREEPER_EXPLODE_RADIUS 3
+#define CREEPER_DAMAGE       14
+
+// Spider
+#define SPIDER_WALL_CLIMB_VEL -120.0f
+
+// Weather system
+#define MAX_RAIN_DROPS      200
+#define WEATHER_MIN_DURATION 60.0f
+#define WEATHER_MAX_DURATION 180.0f
+#define LIGHTNING_CHANCE    0.002f
 
 // Light system
 #define MAX_LIGHT_LEVEL     15
@@ -259,9 +274,13 @@ typedef enum {
     // New ores
     BLOCK_GOLD_ORE,
     BLOCK_DIAMOND_ORE,
+    BLOCK_REDSTONE_ORE,
+    BLOCK_LAPIS_ORE,
     // New items
     ITEM_GOLD_INGOT,
     ITEM_DIAMOND,
+    ITEM_REDSTONE,
+    ITEM_LAPIS,
     // New interactive blocks
     BLOCK_CHEST,
     // Gold tools
@@ -284,6 +303,9 @@ typedef enum {
     ARMOR_DIAMOND_CHESTPLATE,
     ARMOR_DIAMOND_LEGGINGS,
     ARMOR_DIAMOND_BOOTS,
+    // Mob drops
+    ITEM_GUNPOWDER,
+    ITEM_STRING,
     BLOCK_COUNT
 } BlockType;
 
@@ -391,6 +413,8 @@ typedef enum {
     STR_DEATH_STARVE,
     STR_DEATH_MOB_ZOMBIE,
     STR_DEATH_MOB_SKELETON,
+    STR_DEATH_MOB_CREEPER,
+    STR_DEATH_MOB_SPIDER,
     STR_DEATH_VOID,
     STR_DEATH_SCORE,
 
@@ -536,8 +560,12 @@ typedef enum {
     // New blocks/items
     STR_BLOCK_GOLD_ORE,
     STR_BLOCK_DIAMOND_ORE,
+    STR_BLOCK_REDSTONE_ORE,
+    STR_BLOCK_LAPIS_ORE,
     STR_ITEM_GOLD_INGOT,
     STR_ITEM_DIAMOND,
+    STR_ITEM_REDSTONE,
+    STR_ITEM_LAPIS,
     STR_BLOCK_CHEST,
     // Gold tools
     STR_TOOL_GOLD_PICKAXE,
@@ -559,6 +587,9 @@ typedef enum {
     STR_ARMOR_DIAMOND_CHESTPLATE,
     STR_ARMOR_DIAMOND_LEGGINGS,
     STR_ARMOR_DIAMOND_BOOTS,
+    // Mob drops
+    STR_ITEM_GUNPOWDER,
+    STR_ITEM_STRING,
 
     // Recipe Names
     STR_RECIPE_WOOD_PLANKS,
@@ -623,6 +654,8 @@ typedef enum {
     STR_SMELT_COBBLE,
     STR_SMELT_SAND,
     STR_SMELT_GOLD,
+    STR_SMELT_REDSTONE,
+    STR_SMELT_LAPIS,
 
     // Furnace messages
     STR_MSG_NO_FUEL,
@@ -662,6 +695,8 @@ typedef enum {
     MOB_PIG,
     MOB_ZOMBIE,
     MOB_SKELETON,
+    MOB_CREEPER,
+    MOB_SPIDER,
     MOB_TYPE_COUNT
 } MobType;
 
@@ -678,7 +713,8 @@ typedef struct {
     float contactCooldown;
     float deathTimer;   // >0 = dying
     float burnTimer;    // sunlight damage accumulator
-    float attackTimer;  // cooldown for ranged attacks
+    float attackTimer;  // cooldown for ranged attacks / creeper fuse
+    float fuseTimer;    // creeper explosion fuse countdown
     bool active;
 } Mob;
 
@@ -783,6 +819,30 @@ typedef struct {
 } DayNightCycle;
 
 //----------------------------------------------------------------------------------
+// Weather System
+//----------------------------------------------------------------------------------
+typedef enum {
+    WEATHER_CLEAR = 0,
+    WEATHER_RAIN,
+    WEATHER_THUNDER
+} WeatherType;
+
+typedef struct {
+    WeatherType type;
+    float duration;       // seconds remaining in current weather
+    float transitionTimer; // smooth transition between weather states
+    float rainAlpha;      // current rain opacity (0-1)
+    float lightningFlash; // >0 = screen flash intensity
+    float thunderTimer;   // delay for thunder sound after lightning
+} WeatherState;
+
+typedef struct {
+    float x, y;
+    float speed;
+    float length;
+} RainDrop;
+
+//----------------------------------------------------------------------------------
 // Extern Globals
 //----------------------------------------------------------------------------------
 extern uint8_t world[WORLD_WIDTH][WORLD_HEIGHT];
@@ -794,6 +854,8 @@ extern Camera2D camera;
 extern DayNightCycle dayNight;
 
 extern Texture2D blockAtlas;
+#define CRACK_STAGES 10
+extern Texture2D crackTextures[CRACK_STAGES];
 extern bool showDebug;
 extern bool showLargeMap;
 extern bool inventoryOpen;
@@ -871,6 +933,10 @@ extern int chestCount;
 extern SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
 extern int smeltRecipeCount;
 
+// Weather
+extern WeatherState weather;
+extern RainDrop rainDrops[MAX_RAIN_DROPS];
+
 // i18n / Font
 extern Language language;
 extern Font gameFont;
@@ -894,6 +960,7 @@ Chunk* GetChunk(int chunkX);
 void UnloadChunk(int chunkX);
 void GenerateChunkTexture(Chunk *chunk);
 void InvalidateChunkAt(int worldBlockX, int worldBlockY);
+void InitChunkTable(void);
 void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
 
@@ -933,6 +1000,7 @@ void UpdateHotbar(void);
 float GetMiningProgress(void);
 int GetMiningBlockX(void);
 int GetMiningBlockY(void);
+void DrawMiningCrack(void);
 bool IsPlayerUnderwater(void);
 
 // daynight.c
@@ -1038,6 +1106,12 @@ void UnloadGame(void);
 void UpdateDrawFrame(void);
 void ApplyWindowMode(int mode);
 void LoadSettings(void);
+
+// weather.c
+void InitWeather(void);
+void UpdateWeather(float dt);
+void DrawWeather(void);
+float GetWeatherLightModifier(void);
 
 // Smooth hover animation
 float GetHoverAlpha(int slotId, bool hovered, float dt);

@@ -1518,6 +1518,23 @@ void DrawWorld(void)
     }
 }
 
+void DrawMiningCrack(void)
+{
+    float progress = GetMiningProgress();
+    int bx = GetMiningBlockX();
+    int by = GetMiningBlockY();
+    if (progress <= 0.0f || bx < 0 || by < 0) return;
+
+    int stage = (int)(progress * (CRACK_STAGES - 1));
+    if (stage >= CRACK_STAGES) stage = CRACK_STAGES - 1;
+    if (stage < 0) return;
+
+    // Draw crack overlay on the block
+    Rectangle src = { 0, 0, BLOCK_SIZE, BLOCK_SIZE };
+    Rectangle dst = { (float)(bx * BLOCK_SIZE), (float)(by * BLOCK_SIZE), BLOCK_SIZE, BLOCK_SIZE };
+    DrawTexturePro(crackTextures[stage], src, dst, (Vector2){0, 0}, 0, WHITE);
+}
+
 //----------------------------------------------------------------------------------
 // Water Rendering (uses cached waterTopY per chunk)
 //----------------------------------------------------------------------------------
@@ -2038,6 +2055,8 @@ void DrawDebugInfo(void)
     DrawGameText(TextFormat(S(STR_DBG_CHUNKS), chunkCount), 10, y,16, c); y += lineH;
     DrawGameText(TextFormat(S(STR_DBG_TIME), dayNight.timeOfDay), 10, y,16, c); y += lineH;
     DrawGameText(TextFormat(S(STR_DBG_LIGHT), dayNight.lightLevel), 10, y,16, c); y += lineH;
+    const char *weatherStr = weather.type == WEATHER_CLEAR ? "Clear" : (weather.type == WEATHER_RAIN ? "Rain" : "Thunder");
+    DrawGameText(TextFormat("Weather: %s", weatherStr), 10, y, 16, c); y += lineH;
     DrawGameText(TextFormat(S(STR_DBG_GROUND), player.onGround ? S(STR_YES) : S(STR_NO)), 10, y,16, c); y += lineH;
     // Player status
     DrawGameText(TextFormat(S(STR_DBG_HP), player.health, MAX_HEALTH, player.hunger, MAX_HUNGER), 10, y,16, c); y += lineH;
@@ -3051,7 +3070,7 @@ void DrawSettingsScreen(void)
     DrawGameText(volText, musicSliderX + musicSliderW + 8, sectionY, 13, (Color){180, 175, 195, 220});
 
     Rectangle bgmTrack = { (float)musicSliderX, (float)(sectionY - 4), (float)musicSliderW, 26 };
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && (bgmHover || CheckCollisionPointRec(mouse, bgmTrack))) {
+    if (win32LMB && (bgmHover || CheckCollisionPointRec(mouse, bgmTrack))) {
         bgmVolumeSlider = (mouse.x - musicSliderX) / (float)musicSliderW;
         if (bgmVolumeSlider < 0.0f) bgmVolumeSlider = 0.0f;
         if (bgmVolumeSlider > 1.0f) bgmVolumeSlider = 1.0f;
@@ -3079,7 +3098,7 @@ void DrawSettingsScreen(void)
     DrawGameText(volText, sfxSliderX + sfxSliderW + 8, sectionY, 13, (Color){180, 175, 195, 220});
 
     Rectangle sfxTrack = { (float)sfxSliderX, (float)(sectionY - 4), (float)sfxSliderW, 26 };
-    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT) && (sfxHover || CheckCollisionPointRec(mouse, sfxTrack))) {
+    if (win32LMB && (sfxHover || CheckCollisionPointRec(mouse, sfxTrack))) {
         sfxVolumeSlider = (mouse.x - sfxSliderX) / (float)sfxSliderW;
         if (sfxVolumeSlider < 0.0f) sfxVolumeSlider = 0.0f;
         if (sfxVolumeSlider > 1.0f) sfxVolumeSlider = 1.0f;

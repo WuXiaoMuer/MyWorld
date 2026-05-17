@@ -18,6 +18,11 @@ void UpdateDayNight(float dt)
     else if (t < 0.7f) dayNight.lightLevel = 1.0f;
     else if (t < 0.8f) dayNight.lightLevel = 1.0f - (t - 0.7f) / 0.1f * 0.8f;
     else dayNight.lightLevel = 0.2f;
+
+    // Apply weather light modifier
+    float mod = GetWeatherLightModifier();
+    dayNight.lightLevel += mod;
+    if (dayNight.lightLevel < 0.05f) dayNight.lightLevel = 0.05f;
 }
 
 Color GetSkyColor(void)
@@ -26,5 +31,14 @@ Color GetSkyColor(void)
     unsigned char r = (unsigned char)(10 + l * 125);
     unsigned char g = (unsigned char)(10 + l * 196);
     unsigned char b = (unsigned char)(40 + l * 195);
+
+    // Darken sky during rain/thunder
+    if (weather.rainAlpha > 0.01f) {
+        float darkening = weather.rainAlpha * 0.3f;
+        r = (unsigned char)(r * (1.0f - darkening));
+        g = (unsigned char)(g * (1.0f - darkening));
+        b = (unsigned char)(b * (1.0f - darkening * 0.5f));
+    }
+
     return (Color){r, g, b, 255};
 }

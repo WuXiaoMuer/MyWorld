@@ -129,6 +129,10 @@ bool SaveWorld(const char *path)
         fwrite(chestData[i].counts, sizeof(int), CHEST_SLOTS, f);
     }
 
+    // Weather state (v7+)
+    fwrite(&weather.type, sizeof(int), 1, f);
+    fwrite(&weather.duration, sizeof(float), 1, f);
+
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {
         int y = 0;
@@ -252,6 +256,17 @@ bool LoadWorld(const char *path)
             }
         } else {
             chestCount = 0;
+        }
+        // v7+: weather state
+        if (version >= 7) {
+            int weatherType;
+            if (fread(&weatherType, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            weather.type = (WeatherType)weatherType;
+            if (fread(&weather.duration, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            weather.transitionTimer = 0;
+            weather.rainAlpha = (weather.type == WEATHER_CLEAR) ? 0 : 1;
+        } else {
+            InitWeather();
         }
     } else {
         // v2 compat: default values

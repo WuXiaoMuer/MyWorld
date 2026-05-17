@@ -106,6 +106,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_STARVE] = "Starved to death",
     [STR_DEATH_MOB_ZOMBIE] = "Slain by Zombie",
     [STR_DEATH_MOB_SKELETON] = "Shot by Skeleton",
+    [STR_DEATH_MOB_CREEPER] = "Blown up by Creeper",
+    [STR_DEATH_MOB_SPIDER] = "Slain by Spider",
     [STR_DEATH_VOID] = "Fell out of the world",
     [STR_DEATH_SCORE] = "Score: %d XP",
 
@@ -250,8 +252,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_IRON_BOOTS] = "Iron Boots",
     [STR_BLOCK_GOLD_ORE] = "Gold Ore",
     [STR_BLOCK_DIAMOND_ORE] = "Diamond Ore",
+    [STR_BLOCK_REDSTONE_ORE] = "Redstone Ore",
+    [STR_BLOCK_LAPIS_ORE] = "Lapis Lazuli Ore",
     [STR_ITEM_GOLD_INGOT] = "Gold Ingot",
     [STR_ITEM_DIAMOND] = "Diamond",
+    [STR_ITEM_REDSTONE] = "Redstone",
+    [STR_ITEM_LAPIS] = "Lapis Lazuli",
     [STR_BLOCK_CHEST] = "Chest",
     [STR_TOOL_GOLD_PICKAXE] = "Gold Pickaxe",
     [STR_TOOL_GOLD_AXE] = "Gold Axe",
@@ -269,6 +275,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_DIAMOND_CHESTPLATE] = "Diamond Chestplate",
     [STR_ARMOR_DIAMOND_LEGGINGS] = "Diamond Leggings",
     [STR_ARMOR_DIAMOND_BOOTS] = "Diamond Boots",
+    [STR_ITEM_GUNPOWDER] = "Gunpowder",
+    [STR_ITEM_STRING] = "String",
 
     // Recipe Names
     [STR_RECIPE_WOOD_PLANKS] = "Wood -> 4 Planks",
@@ -330,6 +338,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_COBBLE] = "Cobblestone -> Stone",
     [STR_SMELT_SAND] = "Sand -> Glass",
     [STR_SMELT_GOLD] = "Gold Ore -> Gold Ingot",
+    [STR_SMELT_REDSTONE] = "Redstone Ore -> Redstone",
+    [STR_SMELT_LAPIS] = "Lapis Ore -> Lapis Lazuli",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "No fuel",
@@ -414,6 +424,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_STARVE] = "饥饿致死",
     [STR_DEATH_MOB_ZOMBIE] = "被僵尸杀死",
     [STR_DEATH_MOB_SKELETON] = "被骷髅射杀",
+    [STR_DEATH_MOB_CREEPER] = "被苦力怕炸死",
+    [STR_DEATH_MOB_SPIDER] = "被蜘蛛杀死",
     [STR_DEATH_VOID] = "掉出了世界",
     [STR_DEATH_SCORE] = "得分: %d XP",
 
@@ -550,8 +562,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_IRON_BOOTS] = "铁靴子",                // 铁靴子
     [STR_BLOCK_GOLD_ORE] = "金矿石",
     [STR_BLOCK_DIAMOND_ORE] = "钻石矿石",
+    [STR_BLOCK_REDSTONE_ORE] = "红石矿石",
+    [STR_BLOCK_LAPIS_ORE] = "青金石矿石",
     [STR_ITEM_GOLD_INGOT] = "金锭",
     [STR_ITEM_DIAMOND] = "钻石",
+    [STR_ITEM_REDSTONE] = "红石",
+    [STR_ITEM_LAPIS] = "青金石",
     [STR_BLOCK_CHEST] = "箱子",
     [STR_TOOL_GOLD_PICKAXE] = "金镐",
     [STR_TOOL_GOLD_AXE] = "金斧",
@@ -569,6 +585,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_DIAMOND_CHESTPLATE] = "钻石胸甲",
     [STR_ARMOR_DIAMOND_LEGGINGS] = "钻石护腿",
     [STR_ARMOR_DIAMOND_BOOTS] = "钻石靴子",
+    [STR_ITEM_GUNPOWDER] = "火药",
+    [STR_ITEM_STRING] = "线",
 
     // Recipe names
     [STR_RECIPE_WOOD_PLANKS] = "木头 -> 4木板",   // 木头 -> 4木板
@@ -628,6 +646,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_COBBLE] = "圆石 -> 石头",          // 圆石 -> 石头
     [STR_SMELT_SAND] = "沙子 -> 玻璃",            // 沙子 -> 玻璃
     [STR_SMELT_GOLD] = "金矿 -> 金锭",
+    [STR_SMELT_REDSTONE] = "红石矿 -> 红石",
+    [STR_SMELT_LAPIS] = "青金石矿 -> 青金石",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "没有燃料",
@@ -712,6 +732,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_STARVE] = "飢え死にした",
     [STR_DEATH_MOB_ZOMBIE] = "ゾンビに殺された",
     [STR_DEATH_MOB_SKELETON] = "スケルトンに射殺された",
+    [STR_DEATH_MOB_CREEPER] = "クリーパーに爆破された",
+    [STR_DEATH_MOB_SPIDER] = "スパイダーに殺された",
     [STR_DEATH_VOID] = "世界から落ちた",
     [STR_DEATH_SCORE] = "スコア: %d XP",
 
@@ -848,8 +870,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_IRON_BOOTS] = "鉄のブーツ",                  // 鉄のブーツ
     [STR_BLOCK_GOLD_ORE] = "金鉱石",
     [STR_BLOCK_DIAMOND_ORE] = "ダイヤモンド鉱石",
+    [STR_BLOCK_REDSTONE_ORE] = "レッドストーン鉱石",
+    [STR_BLOCK_LAPIS_ORE] = "ラピスラズリ鉱石",
     [STR_ITEM_GOLD_INGOT] = "金の地金",
     [STR_ITEM_DIAMOND] = "ダイヤモンド",
+    [STR_ITEM_REDSTONE] = "レッドストーン",
+    [STR_ITEM_LAPIS] = "ラピスラズリ",
     [STR_BLOCK_CHEST] = "チェスト",
     [STR_TOOL_GOLD_PICKAXE] = "金のつるはし",
     [STR_TOOL_GOLD_AXE] = "金のオノ",
@@ -867,6 +893,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_DIAMOND_CHESTPLATE] = "ダイヤのチェスト",
     [STR_ARMOR_DIAMOND_LEGGINGS] = "ダイヤのレギンス",
     [STR_ARMOR_DIAMOND_BOOTS] = "ダイヤのブーツ",
+    [STR_ITEM_GUNPOWDER] = "火薬",
+    [STR_ITEM_STRING] = "糸",
 
     // Recipe names (Japanese)
     [STR_RECIPE_WOOD_PLANKS] = "材 -> 板×4",         // 材 -> 板×4
@@ -926,6 +954,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_COBBLE] = "コブルストーン -> 石",
     [STR_SMELT_SAND] = "砂 -> ガラス",            // 砂 -> ガラス
     [STR_SMELT_GOLD] = "金鉱石 -> 金の地金",
+    [STR_SMELT_REDSTONE] = "レッドストーン鉱石 -> レッドストーン",
+    [STR_SMELT_LAPIS] = "ラピスラズリ鉱石 -> ラピスラズリ",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "燃料がない",

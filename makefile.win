@@ -13,10 +13,10 @@ CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-finput-charset=UTF-8" "-fexec-charset=UTF-
 CFLAGS   = $(INCS) "-O2" "-pipe" "-finput-charset=UTF-8" "-fexec-charset=UTF-8"
 WINDRESFLAGS = 
 RES      = MyWorld_private.res
-OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o i18n.o $(RES)
+OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o i18n.o weather.o $(RES)
 BIN      = MyWorld.exe
-LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "MyWorld_private.res"
-CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "MyWorld_private.res" "MyWorld.exe"
+LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "weather.o" "MyWorld_private.res"
+CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "weather.o" "MyWorld_private.res" "MyWorld.exe"
 
 .PHONY: all all-before all-after clean clean-custom
 
@@ -73,6 +73,9 @@ light.o: light.c types.h
 
 i18n.o: i18n.c types.h
 	$(CC) -c "i18n.c" -o "i18n.o" $(CFLAGS)
+
+weather.o: weather.c types.h
+	$(CC) -c "weather.c" -o "weather.o" $(CFLAGS)
 
 MyWorld_private.res: MyWorld_private.rc
 	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS)
