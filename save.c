@@ -291,6 +291,12 @@ bool LoadWorld(const char *path)
     player.damageFlashTimer = 0.0f;
     player.sprinting = false;
     player.playerDead = false;
+    player.fallPeakVel = 0.0f;
+    player.knockbackTimer = 0.0f;
+    player.cameraShakeIntensity = 0.0f;
+    player.cameraShakeTimer = 0.0f;
+    player.coyoteTimer = 0.0f;
+    player.jumpBufferTimer = 0.0f;
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH; x++) {

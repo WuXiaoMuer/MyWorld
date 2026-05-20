@@ -1,6 +1,7 @@
 #include "types.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static StringId pendingDeathCause = STR_DEATH_FALL;
 
@@ -79,6 +80,10 @@ void InitPlayer(void)
     player.damageFlashTimer = 0.0f;
     player.playerDead = false;
     player.fallPeakVel = 0.0f;
+    player.coyoteTimer = 0.0f;
+    player.jumpBufferTimer = 0.0f;
+    player.cameraShakeIntensity = 0.0f;
+    player.cameraShakeTimer = 0.0f;
     player.spawnX = -1;
     player.spawnY = -1;
 
@@ -331,15 +336,40 @@ void PlayerPhysics(float dt)
     if (player.knockbackTimer > 0.0f) {
         player.knockbackTimer -= dt;
     } else {
-        player.velocity.x = 0;
-        if (Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT)) player.velocity.x = -MOVE_SPEED;
-        if (Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT)) player.velocity.x = MOVE_SPEED;
-    }
+        // Sprint determination (before movement so we can use it as target)
+        bool wantsSprint = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
+        player.sprinting = wantsSprint && player.onGround && player.hunger > 0;
 
-    // Sprint
-    bool wantsSprint = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
-    player.sprinting = wantsSprint && player.onGround && player.hunger > 0 && player.velocity.x != 0;
-    if (player.sprinting) player.velocity.x *= SPRINT_SPEED_MULT;
+        float targetSpeed = 0.0f;
+        bool left = Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
+        bool right = Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
+        if (left && !right) targetSpeed = -MOVE_SPEED;
+        else if (right && !left) targetSpeed = MOVE_SPEED;
+
+        // Apply sprint multiplier to target, not to velocity
+        if (player.sprinting && targetSpeed != 0.0f) {
+            targetSpeed *= SPRINT_SPEED_MULT;
+        }
+
+        float accel = (targetSpeed != 0.0f) ? MOVE_ACCEL : MOVE_DECEL;
+        float diff = targetSpeed - player.velocity.x;
+        if (fabsf(diff) < accel * dt) {
+            player.velocity.x = targetSpeed;
+        } else {
+            player.velocity.x += (diff > 0 ? 1.0f : -1.0f) * accel * dt;
+        }
+
+        // Sprint dust
+        if (player.sprinting && targetSpeed != 0.0f) {
+            static float dustTimer = 0.0f;
+            dustTimer -= dt;
+            if (dustTimer <= 0.0f) {
+                dustTimer = 0.08f;
+                SpawnSprintDust(player.position.x + PLAYER_WIDTH / 2.0f,
+                                player.position.y + PLAYER_HEIGHT);
+            }
+        }
+    }
 
     // Update facing direction
     if (player.velocity.x > 0.1f) player.facingRight = true;
@@ -348,7 +378,7 @@ void PlayerPhysics(float dt)
     // Footstep sounds
     bool isMoving = fabsf(player.velocity.x) > 10.0f && player.onGround;
     if (isMoving) {
-        float stepInterval = player.sprinting ? 0.2f : 0.35f;
+        float stepInterval = player.sprinting ? 0.35f : 0.5f;
         player.footstepTimer -= dt;
         if (player.footstepTimer <= 0.0f) {
             player.footstepTimer = stepInterval;
@@ -375,17 +405,41 @@ void PlayerPhysics(float dt)
                              (Color){120, 180, 230, 200});
     }
     player.wasInWater = inWater;
+
+    // Coyote time: track time since leaving ground
+    if (player.onGround) {
+        player.coyoteTimer = COYOTE_TIME;
+    } else {
+        player.coyoteTimer -= dt;
+    }
+
+    // Jump buffer: remember jump presses
+    bool jumpPressed = Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE);
+    if (jumpPressed) {
+        player.jumpBufferTimer = JUMP_BUFFER_TIME;
+    }
+    player.jumpBufferTimer -= dt;
+
+    bool jumpHeld = Win32IsKeyDown(KEY_W) || Win32IsKeyDown(KEY_UP) || Win32IsKeyDown(KEY_SPACE);
+
     if (inWater) {
         player.velocity.x *= WATER_SPEED_MULT;
-        if (Win32IsKeyDown(KEY_SPACE)) {
+        if (jumpHeld) {
             player.velocity.y = WATER_SWIM_VEL;
         }
     } else {
-        // Normal jump
-        if ((Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE)) && player.onGround) {
+        // Jump with coyote time + buffering
+        if (player.jumpBufferTimer > 0.0f && player.coyoteTimer > 0.0f) {
             player.velocity.y = JUMP_VELOCITY;
             player.onGround = false;
+            player.coyoteTimer = 0.0f;
+            player.jumpBufferTimer = 0.0f;
             PlaySoundJump();
+        }
+
+        // Variable jump height: cut velocity when jump released early
+        if (!jumpHeld && player.velocity.y < JUMP_VELOCITY * JUMP_CUT_MULT) {
+            player.velocity.y = JUMP_VELOCITY * JUMP_CUT_MULT;
         }
     }
 
@@ -461,7 +515,12 @@ void PlayerPhysics(float dt)
         if (player.velocity.y > 0) {
             newY = (int)(bottom / BLOCK_SIZE) * BLOCK_SIZE - PLAYER_HEIGHT;
             player.onGround = true;
-            if (!wasOnGround && player.velocity.y > 100.0f) PlaySoundLand();
+            if (!wasOnGround && player.velocity.y > 200.0f) {
+                PlaySoundLand();
+                SpawnLandingDust(player.position.x + PLAYER_WIDTH / 2.0f,
+                                 player.position.y + PLAYER_HEIGHT,
+                                 player.velocity.y / 400.0f);
+            }
             // Fall damage
             if (player.fallPeakVel > 300.0f) {
                 int damage = (int)((player.fallPeakVel - 300.0f) / 100.0f);
@@ -470,6 +529,7 @@ void PlayerPhysics(float dt)
                     if (player.health < 0) player.health = 0;
                     pendingDeathCause = STR_DEATH_FALL;
                     player.damageFlashTimer = 0.3f;
+                    TriggerCameraShake(3.0f, 0.2f);
                     SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
                                          player.position.y + PLAYER_HEIGHT,
                                          (Color){200, 50, 50, 255});
@@ -818,6 +878,16 @@ void UpdatePlayerStatus(float dt)
 
     bool underwater = IsPlayerUnderwater();
 
+    // --- Underwater bubbles ---
+    if (underwater) {
+        static float bubbleTimer = 0.0f;
+        bubbleTimer += dt;
+        if (bubbleTimer >= 0.15f) {
+            bubbleTimer = 0.0f;
+            SpawnBubble(player.position.x + PLAYER_WIDTH / 2, player.position.y + PLAYER_HEIGHT / 3);
+        }
+    }
+
     // --- Oxygen ---
     if (underwater) {
         player.oxygenTimer += dt;
@@ -919,10 +989,14 @@ void RespawnPlayer(void)
         player.armorDurability[i] = 0;
     }
     int spawnX, spawnY;
-    if (player.spawnX >= 0 && player.spawnY >= 0) {
+    if (player.spawnX >= 0 && player.spawnY >= 0 &&
+        player.spawnX < WORLD_WIDTH && player.spawnY < WORLD_HEIGHT &&
+        world[player.spawnX][player.spawnY] == BLOCK_BED) {
         spawnX = player.spawnX;
         spawnY = player.spawnY;
     } else {
+        player.spawnX = -1;
+        player.spawnY = -1;
         FindSpawnPoint(&spawnX, &spawnY);
     }
     player.position = (Vector2){ spawnX * BLOCK_SIZE, spawnY * BLOCK_SIZE };
@@ -946,6 +1020,10 @@ void RespawnPlayer(void)
     player.wasInWater = false;
     player.footstepTimer = 0.0f;
     player.fallPeakVel = 0.0f;
+    player.coyoteTimer = 0.0f;
+    player.jumpBufferTimer = 0.0f;
+    player.cameraShakeIntensity = 0.0f;
+    player.cameraShakeTimer = 0.0f;
     InitCameraSystem();
 }
 
@@ -966,7 +1044,36 @@ void UpdateCameraSystem(float dt)
         player.position.x + PLAYER_WIDTH / 2.0f,
         player.position.y + PLAYER_HEIGHT / 2.0f
     };
+
+    // Smooth camera lookahead (separate lerp so it doesn't jump on turn)
+    static float currentLookahead = 0.0f;
+    float targetLookahead = 0.0f;
+    if (fabsf(player.velocity.x) > 20.0f) {
+        targetLookahead = player.facingRight ? CAMERA_LOOKAHEAD : -CAMERA_LOOKAHEAD;
+    }
+    currentLookahead += (targetLookahead - currentLookahead) * 3.0f * dt;
+    playerCenter.x += currentLookahead;
+
     camera.target = Vector2Lerp(camera.target, playerCenter, 8.0f * dt);
+
+    // Camera shake with smooth decay
+    if (player.cameraShakeIntensity > 0.01f) {
+        player.cameraShakeIntensity -= CAMERA_SHAKE_DECAY * dt;
+        if (player.cameraShakeIntensity < 0.0f) player.cameraShakeIntensity = 0.0f;
+        float shake = player.cameraShakeIntensity;
+        float offsetX = ((float)(rand() % 100) / 50.0f - 1.0f) * shake;
+        float offsetY = ((float)(rand() % 100) / 50.0f - 1.0f) * shake;
+        camera.target.x += offsetX;
+        camera.target.y += offsetY;
+    }
+}
+
+void TriggerCameraShake(float intensity, float duration)
+{
+    (void)duration;
+    if (intensity > player.cameraShakeIntensity) {
+        player.cameraShakeIntensity = intensity;
+    }
 }
 
 //----------------------------------------------------------------------------------

@@ -35,8 +35,8 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SHOVEL, 1, STR_RECIPE_IRON_SHOVEL, false);
 
     // --- Block crafting ---
-    ADD_RECIPE(BLOCK_STONE, 4, BLOCK_BRICK, 4, STR_RECIPE_BRICK, false);
-    ADD_RECIPE(BLOCK_STONE, 8, BLOCK_FURNACE, 1, STR_RECIPE_FURNACE, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 4, BLOCK_BRICK, 4, STR_RECIPE_BRICK, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 8, BLOCK_FURNACE, 1, STR_RECIPE_FURNACE, false);
     ADD_RECIPE(ITEM_STICK, 2, BLOCK_TORCH, 4, STR_RECIPE_TORCHES, false);
     ADD_RECIPE(BLOCK_SAND, 4, BLOCK_SANDSTONE, 4, STR_RECIPE_SANDSTONE, false);
     ADD_RECIPE(BLOCK_GRAVEL, 4, BLOCK_COBBLESTONE, 4, STR_RECIPE_COBBLE, false);
@@ -117,12 +117,13 @@ bool CanCraft(int recipeIndex)
     if (recipeIndex < 0 || recipeIndex >= craftRecipeCount) return false;
     CraftingRecipe *r = &craftRecipes[recipeIndex];
 
+    int total = 0;
     for (int i = 0; i < INVENTORY_SLOTS; i++) {
-        if (player.inventory[i] == r->input && player.inventoryCount[i] >= r->inputCount) {
-            return true;
+        if (player.inventory[i] == r->input) {
+            total += player.inventoryCount[i];
         }
     }
-    return false;
+    return total >= r->inputCount;
 }
 
 void Craft(int recipeIndex)
@@ -130,15 +131,17 @@ void Craft(int recipeIndex)
     if (!CanCraft(recipeIndex)) return;
     CraftingRecipe *r = &craftRecipes[recipeIndex];
 
-    // Remove input
-    for (int i = 0; i < INVENTORY_SLOTS; i++) {
-        if (player.inventory[i] == r->input && player.inventoryCount[i] >= r->inputCount) {
-            player.inventoryCount[i] -= r->inputCount;
+    // Remove input (may span multiple slots)
+    int toRemove = r->inputCount;
+    for (int i = 0; i < INVENTORY_SLOTS && toRemove > 0; i++) {
+        if (player.inventory[i] == r->input) {
+            int take = player.inventoryCount[i] < toRemove ? player.inventoryCount[i] : toRemove;
+            player.inventoryCount[i] -= take;
+            toRemove -= take;
             if (player.inventoryCount[i] <= 0) {
                 player.inventory[i] = BLOCK_AIR;
                 player.inventoryCount[i] = 0;
             }
-            break;
         }
     }
 

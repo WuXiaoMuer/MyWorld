@@ -28,9 +28,32 @@ void UpdateDayNight(float dt)
 Color GetSkyColor(void)
 {
     float l = dayNight.lightLevel;
+    float t = dayNight.timeOfDay;
+
     unsigned char r = (unsigned char)(10 + l * 125);
     unsigned char g = (unsigned char)(10 + l * 196);
     unsigned char b = (unsigned char)(40 + l * 195);
+
+    // Dawn warm shift (timeOfDay 0.20-0.30)
+    if (t >= 0.20f && t < 0.30f) {
+        float dawnT = (t - 0.20f) / 0.10f;
+        float warm = sinf(dawnT * 3.14159f);
+        int rr = r + (int)(warm * 80);
+        int gg = g + (int)(warm * 30);
+        r = (unsigned char)(rr > 255 ? 255 : rr);
+        g = (unsigned char)(gg > 255 ? 255 : gg);
+    }
+    // Dusk warm shift (timeOfDay 0.70-0.80)
+    if (t >= 0.70f && t < 0.80f) {
+        float duskT = (t - 0.70f) / 0.10f;
+        float warm = sinf(duskT * 3.14159f);
+        int rr = r + (int)(warm * 100);
+        int gg = g + (int)(warm * 40);
+        int bb = b - (int)(warm * 20);
+        r = (unsigned char)(rr > 255 ? 255 : rr);
+        g = (unsigned char)(gg > 255 ? 255 : gg);
+        b = (unsigned char)(bb < 0 ? 0 : bb);
+    }
 
     // Darken sky during rain/thunder
     if (weather.rainAlpha > 0.01f) {

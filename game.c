@@ -55,6 +55,7 @@ char currentSavePath[256] = { 0 };
 TransitionState transitionState = TRANSITION_NONE;
 float transitionAlpha = 0.0f;
 GameState transitionTarget = STATE_MENU;
+bool g_resetMenuAnim = false;
 
 void StartTransition(GameState target)
 {
@@ -62,6 +63,7 @@ void StartTransition(GameState target)
     transitionState = TRANSITION_FADE_OUT;
     transitionAlpha = 0.0f;
     transitionTarget = target;
+    if (target == STATE_MENU) g_resetMenuAnim = true;
 }
 
 void UpdateTransition(float dt)
@@ -706,6 +708,7 @@ void UpdateGame(float dt)
         UpdateCameraSystem(dt);
         UpdateDayNight(dt);
         UpdateWeather(dt);
+        UpdateRainAmbient();
         if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
     }
     // Status effects (drowning, hunger) apply even with inventory open
@@ -798,10 +801,21 @@ void DrawGame(void)
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){5, 5, 25, alpha});
     }
 
+    // Underwater blue overlay
+    if (IsPlayerUnderwater()) {
+        float pulse = sinf((float)GetTime() * 1.5f) * 0.05f + 0.95f;
+        unsigned char ua = (unsigned char)(100 * pulse);
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){20, 60, 140, ua});
+        // Darker edges vignette
+        DrawRectangle(0, 0, SCREEN_WIDTH, 40, (Color){10, 30, 80, (unsigned char)(60 * pulse)});
+        DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 30, 80, (unsigned char)(60 * pulse)});
+    }
+
     // Damage flash overlay
     if (player.damageFlashTimer > 0.0f) {
-        unsigned char alpha = (unsigned char)(160 * (player.damageFlashTimer / 0.3f));
-        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){200, 30, 30, alpha});
+        float a = 160.0f * (player.damageFlashTimer / 0.3f);
+        if (a > 160.0f) a = 160.0f;
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){200, 30, 30, (unsigned char)a});
     }
 
     // Low health vignette (pulsing red edges when health <= 6)

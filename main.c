@@ -264,6 +264,7 @@ unsigned int worldSeed = 0;
 
 char messageText[128] = { 0 };
 float messageTimer = 0.0f;
+float messageSlide = 0.0f;
 Color messageColor = { 240, 100, 100, 255 };
 
 Mob mobs[MAX_MOBS];
@@ -279,6 +280,7 @@ int craftRecipeCount = 0;
 Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
 Sound sndFootstep, sndZombie, sndPig, sndSplash;
+Sound sndRain, sndCreeperFuse, sndThunder;
 Music bgm = { 0 };
 
 bool audioReady = false;

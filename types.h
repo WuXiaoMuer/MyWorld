@@ -93,6 +93,15 @@ void InitWin32WheelHook(void);
 #define MOVE_SPEED          120.0f
 #define SPRINT_SPEED_MULT   1.6f
 
+// Player feel
+#define COYOTE_TIME         0.1f
+#define JUMP_BUFFER_TIME    0.1f
+#define MOVE_ACCEL          400.0f
+#define MOVE_DECEL          350.0f
+#define JUMP_CUT_MULT       0.4f
+#define CAMERA_LOOKAHEAD    40.0f
+#define CAMERA_SHAKE_DECAY  12.0f
+
 // Water physics
 #define WATER_GRAVITY_MULT  0.15f
 #define WATER_SPEED_MULT    0.55f
@@ -177,7 +186,7 @@ void InitWin32WheelHook(void);
 #define MOB_DESPAWN_DIST    1200.0f
 #define MOB_AI_INTERVAL     0.5f
 #define MOB_CONTACT_COOLDOWN 1.0f
-#define MOB_DEATH_TIME      0.3f
+#define MOB_DEATH_TIME      0.5f
 #define MOB_GRAVITY         980.0f
 #define MAX_PROJECTILES     32
 #define PROJECTILE_SPEED    200.0f
@@ -754,6 +763,10 @@ typedef struct {
     bool wasInWater;         // for water splash detection
     float footstepTimer;     // for footstep sound intervals
     float fallPeakVel;       // peak downward velocity during current fall
+    float coyoteTimer;
+    float jumpBufferTimer;
+    float cameraShakeIntensity;
+    float cameraShakeTimer;
     int spawnX, spawnY;      // bed spawn point (-1 = use default)
     // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
     uint8_t armor[4];
@@ -865,6 +878,7 @@ extern unsigned int worldSeed;
 
 extern char messageText[128];
 extern float messageTimer;
+extern float messageSlide;
 extern Color messageColor;
 
 extern Mob mobs[MAX_MOBS];
@@ -897,6 +911,7 @@ extern int confirmDialogMode; // 0=overwrite, 1=delete
 extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 extern Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
 extern Sound sndFootstep, sndZombie, sndPig, sndSplash;
+extern Sound sndRain, sndCreeperFuse, sndThunder;
 extern Music bgm;
 
 extern const BlockInfo blockInfo[BLOCK_COUNT];
@@ -996,6 +1011,7 @@ void UpdatePlayerStatus(float dt);
 void RespawnPlayer(void);
 void InitCameraSystem(void);
 void UpdateCameraSystem(float dt);
+void TriggerCameraShake(float intensity, float duration);
 void UpdateHotbar(void);
 float GetMiningProgress(void);
 int GetMiningBlockX(void);
@@ -1080,6 +1096,10 @@ void PlaySoundDrop(void);
 void PlaySoundFootstep(void);
 void PlaySoundMob(MobType type);
 void PlaySoundSplash(void);
+void PlaySoundCreeperFuse(void);
+void PlaySoundThunder(void);
+void UpdateRainAmbient(void);
+void PlaySoundMobAt(MobType type, float mobX, float mobY);
 void SetSFXVolume(float volume);
 void UpdateBGM(void);
 void SetBGMVolume(float volume);
@@ -1088,6 +1108,9 @@ void SetBGMVolume(float volume);
 void InitParticles(void);
 void SpawnBlockParticles(int blockX, int blockY, BlockType block);
 void SpawnDamageParticles(float x, float y, Color color);
+void SpawnSprintDust(float x, float y);
+void SpawnLandingDust(float x, float y, float intensity);
+void SpawnBubble(float x, float y);
 void UpdateParticles(float dt);
 void DrawParticles(void);
 

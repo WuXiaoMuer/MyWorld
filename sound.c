@@ -199,6 +199,48 @@ static float splashGen(float t, float freq, unsigned int *rng) {
     return (noise * 0.4f + tone + bubble) * env;
 }
 
+// Creeper fuse hiss
+static float creeperFuseGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 3.0f);
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float hiss = fast_sine(t * 3000.0f) * 0.3f;
+    float sizzle = fast_sine(t * 5000.0f * (1.0f - t * 0.5f)) * 0.2f;
+    return (noise * 0.4f + hiss + sizzle) * env;
+}
+
+// Rain ambient - continuous filtered noise
+static float rainAmbientGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float mod = 0.5f + 0.5f * fast_sine(t * 0.8f);
+    float drip = fast_sine(t * 400.0f) * 0.1f * fast_sine(t * 2.0f);
+    return (noise * 0.15f + drip) * mod;
+}
+
+// Thunder - deep rumble with initial crack
+static float thunderGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    // Initial crack (first 0.1s)
+    float crackEnv = expf(-t * 20.0f);
+    *rng = *rng * 1103515245 + 12345;
+    float crackNoise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float crack = crackNoise * crackEnv * 0.6f;
+
+    // Low rumble (sustained)
+    float rumbleEnv = 1.0f - t * 0.4f;
+    if (rumbleEnv < 0) rumbleEnv = 0;
+    rumbleEnv *= rumbleEnv;
+    *rng = *rng * 1103515245 + 12345;
+    float rumbleNoise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float rumbleTone = fast_sine(t * 40.0f) * 0.3f;
+    float rumble = (rumbleNoise * 0.3f + rumbleTone) * rumbleEnv * 0.4f;
+
+    return crack + rumble;
+}
+
 //----------------------------------------------------------------------------------
 // Ambient BGM Generator
 //----------------------------------------------------------------------------------
@@ -385,6 +427,18 @@ void InitSounds(void)
     sndSplash = LoadSoundFromWave(w);
     UnloadWave(w);
 
+    w = GenerateWave(0.5f, sr, creeperFuseGen);
+    sndCreeperFuse = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(2.0f, sr, rainAmbientGen);
+    sndRain = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(2.5f, sr, thunderGen);
+    sndThunder = LoadSoundFromWave(w);
+    UnloadWave(w);
+
     InitBGM();
 }
 
@@ -422,6 +476,9 @@ void UnloadSounds(void)
     UnloadSound(sndZombie);
     UnloadSound(sndPig);
     UnloadSound(sndSplash);
+    UnloadSound(sndCreeperFuse);
+    UnloadSound(sndRain);
+    UnloadSound(sndThunder);
     if (bgm.stream.buffer) UnloadMusicStream(bgm);
     CloseAudioDevice();
 }
@@ -525,4 +582,58 @@ void PlaySoundSplash(void) {
     if (!IsAudioDeviceReady()) return;
     SetSoundVolume(sndSplash, sfxVolume);
     PlaySound(sndSplash);
+}
+
+void PlaySoundCreeperFuse(void) {
+    if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndCreeperFuse, sfxVolume * 0.6f);
+    PlaySound(sndCreeperFuse);
+}
+
+void PlaySoundThunder(void) {
+    if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndThunder, sfxVolume * 0.8f);
+    PlaySound(sndThunder);
+}
+
+static bool rainPlaying = false;
+
+void UpdateRainAmbient(void) {
+    if (!IsAudioDeviceReady()) return;
+    bool shouldPlay = (weather.rainAlpha > 0.1f);
+    if (shouldPlay) {
+        if (!IsSoundPlaying(sndRain)) {
+            SetSoundVolume(sndRain, sfxVolume * weather.rainAlpha * 0.4f);
+            PlaySound(sndRain);
+        } else {
+            SetSoundVolume(sndRain, sfxVolume * weather.rainAlpha * 0.4f);
+        }
+        rainPlaying = true;
+    } else if (rainPlaying) {
+        StopSound(sndRain);
+        rainPlaying = false;
+    }
+}
+
+void PlaySoundMobAt(MobType type, float mobX, float mobY) {
+    if (!IsAudioDeviceReady()) return;
+    float dx = mobX - (player.position.x + PLAYER_WIDTH / 2.0f);
+    float dy = mobY - (player.position.y + PLAYER_HEIGHT / 2.0f);
+    float dist = sqrtf(dx * dx + dy * dy);
+    float maxDist = 500.0f;
+    if (dist > maxDist) return;
+    float attenuation = 1.0f - (dist / maxDist);
+    attenuation *= attenuation;
+    float vol = sfxVolume * attenuation;
+
+    Sound s;
+    if (type == MOB_ZOMBIE) s = sndZombie;
+    else if (type == MOB_PIG) s = sndPig;
+    else if (type == MOB_SKELETON) s = sndZombie;
+    else if (type == MOB_CREEPER) s = sndZombie;
+    else if (type == MOB_SPIDER) s = sndPig;
+    else return;
+
+    SetSoundVolume(s, vol);
+    PlaySound(s);
 }

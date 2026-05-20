@@ -102,7 +102,7 @@ void UpdateWeather(float dt)
         if (weather.thunderTimer > 0) {
             weather.thunderTimer -= dt;
             if (weather.thunderTimer <= 0) {
-                PlaySoundHurt(); // reuse hurt sound for thunder
+                PlaySoundThunder();
             }
         }
     } else {

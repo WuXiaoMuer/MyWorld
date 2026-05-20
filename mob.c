@@ -338,6 +338,10 @@ static void UpdateCreeperAI(Mob *mob, float dt)
         // Start fuse when close enough
         if (dist < CREEPER_EXPLODE_DIST) {
             mob->fuseTimer += dt;
+            // Play fuse hiss at start and periodically
+            if (mob->fuseTimer <= dt || fmodf(mob->fuseTimer, 1.0f) < dt) {
+                PlaySoundCreeperFuse();
+            }
             // Explode!
             if (mob->fuseTimer >= CREEPER_FUSE_TIME) {
                 // Damage player
@@ -388,6 +392,8 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                                          mob->position.y + mobHeight[MOB_CREEPER] / 2,
                                          (Color){255, 150, 50, 255});
                 }
+
+                TriggerCameraShake(8.0f, 0.5f);
 
                 // Kill the creeper
                 mob->health = 0;
@@ -525,21 +531,21 @@ void DamageMob(Mob *mob, int damage)
                              mob->position.y + mobHeight[mob->type] / 2.0f,
                              deathColor);
 
-        // Drop items
-        float dropX = mob->position.x + mobWidth[mob->type] / 2;
-        float dropY = mob->position.y;
+        // Drop items with staggered positions
+        float baseDropX = mob->position.x + mobWidth[mob->type] / 2;
+        float baseDropY = mob->position.y;
         if (mob->type == MOB_PIG) {
-            SpawnItemEntity(FOOD_RAW_PORK, 1, dropX, dropY);
+            SpawnItemEntity(FOOD_RAW_PORK, 1, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_ZOMBIE) {
-            if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
-            if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
+            if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+            if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_SKELETON) {
-            SpawnItemEntity(ITEM_STICK, 1 + rand() % 3, dropX, dropY); // bones
-            if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, dropX, dropY);
+            SpawnItemEntity(ITEM_STICK, 1 + rand() % 3, baseDropX + (rand() % 10 - 5), baseDropY);
+            if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_CREEPER) {
-            SpawnItemEntity(ITEM_GUNPOWDER, 1 + rand() % 2, dropX, dropY);
+            SpawnItemEntity(ITEM_GUNPOWDER, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_SPIDER) {
-            SpawnItemEntity(ITEM_STRING, 1 + rand() % 2, dropX, dropY);
+            SpawnItemEntity(ITEM_STRING, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         }
         PlaySoundDeath();
         player.xp += (mob->type == MOB_PIG) ? 3 : 5;
@@ -603,8 +609,9 @@ static void TrySpawnMobs(float dt)
         float spawnY = playerCY + sinf(angle) * dist * 0.5f;
 
         int bx = (int)(spawnX / BLOCK_SIZE);
+        int by = (int)(spawnY / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
-            for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+            for (int y = by; y < WORLD_HEIGHT - 2; y++) {
                 if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     uint8_t light = GetLightLevel(bx, y - 1);
                     if (light <= MOB_HOSTILE_LIGHT_MAX) {
@@ -709,13 +716,15 @@ void UpdateMobs(float dt)
             }
         }
 
-        // Ambient mob sounds (closer = more likely)
+        // Ambient mob sounds (positional, closer = more likely)
         {
             float dist = fabsf(dx);
-            if (dist < 300.0f && mob->deathTimer <= 0) {
-                float soundChance = (1.0f - dist / 300.0f) * 0.003f;
+            if (dist < 500.0f && mob->deathTimer <= 0) {
+                float soundChance = (1.0f - dist / 500.0f) * 0.0008f;
                 if ((float)rand() / RAND_MAX < soundChance) {
-                    PlaySoundMob(mob->type);
+                    PlaySoundMobAt(mob->type,
+                                   mob->position.x + mobWidth[mob->type] / 2,
+                                   mob->position.y + mobHeight[mob->type] / 2);
                 }
             }
         }
@@ -793,10 +802,19 @@ static void DrawZombieSprite(Mob *mob)
     float armSwing = moving ? sinf(time * 8.0f) * 3.0f : 0;
     float legSwing = moving ? sinf(time * 8.0f) * 3.0f : 0;
 
-    // Death fade
+    // Death fade with white flash
     unsigned char alpha = 255;
     if (mob->deathTimer > 0) {
-        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+        // White flash at start of death (first 30% of death time)
+        float flashIntensity = 1.0f - deathProgress;
+        if (flashIntensity < 0.7f) flashIntensity = 0.0f;
+        else flashIntensity = (flashIntensity - 0.7f) / 0.3f;
+        if (flashIntensity > 0.01f) {
+            unsigned char flashA = (unsigned char)(flashIntensity * 180);
+            DrawRectangle((int)(x - 1), (int)(y - 1), (int)(mobWidth[MOB_ZOMBIE] + 2), (int)(mobHeight[MOB_ZOMBIE] + 2), (Color){255, 255, 255, flashA});
+        }
     }
 
     // Head (green-ish)
@@ -824,7 +842,15 @@ static void DrawPigSprite(Mob *mob)
 
     unsigned char alpha = 255;
     if (mob->deathTimer > 0) {
-        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+        float flashIntensity = 1.0f - deathProgress;
+        if (flashIntensity < 0.7f) flashIntensity = 0.0f;
+        else flashIntensity = (flashIntensity - 0.7f) / 0.3f;
+        if (flashIntensity > 0.01f) {
+            unsigned char flashA = (unsigned char)(flashIntensity * 180);
+            DrawRectangle((int)(x - 1), (int)(y - 1), (int)(mobWidth[MOB_PIG] + 2), (int)(mobHeight[MOB_PIG] + 2), (Color){255, 255, 255, flashA});
+        }
     }
 
     // Body (pink)
@@ -854,7 +880,15 @@ static void DrawSkeletonSprite(Mob *mob)
 
     unsigned char alpha = 255;
     if (mob->deathTimer > 0) {
-        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+        float flashIntensity = 1.0f - deathProgress;
+        if (flashIntensity < 0.7f) flashIntensity = 0.0f;
+        else flashIntensity = (flashIntensity - 0.7f) / 0.3f;
+        if (flashIntensity > 0.01f) {
+            unsigned char flashA = (unsigned char)(flashIntensity * 180);
+            DrawRectangle((int)(x - 1), (int)(y - 1), (int)(mobWidth[MOB_SKELETON] + 2), (int)(mobHeight[MOB_SKELETON] + 2), (Color){255, 255, 255, flashA});
+        }
     }
 
     // Head (bone white)
@@ -888,7 +922,15 @@ static void DrawCreeperSprite(Mob *mob)
 
     unsigned char alpha = 255;
     if (mob->deathTimer > 0) {
-        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+        float flashIntensity = 1.0f - deathProgress;
+        if (flashIntensity < 0.7f) flashIntensity = 0.0f;
+        else flashIntensity = (flashIntensity - 0.7f) / 0.3f;
+        if (flashIntensity > 0.01f) {
+            unsigned char flashA = (unsigned char)(flashIntensity * 180);
+            DrawRectangle((int)(x - 1), (int)(y - 1), (int)(mobWidth[MOB_CREEPER] + 2), (int)(mobHeight[MOB_CREEPER] + 2), (Color){255, 255, 255, flashA});
+        }
     }
 
     // Flashing when about to explode
@@ -919,7 +961,15 @@ static void DrawSpiderSprite(Mob *mob)
 
     unsigned char alpha = 255;
     if (mob->deathTimer > 0) {
-        alpha = (unsigned char)(255 * (mob->deathTimer / MOB_DEATH_TIME));
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+        float flashIntensity = 1.0f - deathProgress;
+        if (flashIntensity < 0.7f) flashIntensity = 0.0f;
+        else flashIntensity = (flashIntensity - 0.7f) / 0.3f;
+        if (flashIntensity > 0.01f) {
+            unsigned char flashA = (unsigned char)(flashIntensity * 180);
+            DrawRectangle((int)(x - 1), (int)(y - 1), (int)(mobWidth[MOB_SPIDER] + 2), (int)(mobHeight[MOB_SPIDER] + 2), (Color){255, 255, 255, flashA});
+        }
     }
 
     // Body (dark brown/red)
@@ -954,16 +1004,20 @@ void DrawMobs(void)
             default: break;
         }
 
-        // Health bar (when damaged)
-        if (mob->health < mob->maxHealth && mob->deathTimer <= 0) {
+        // Health bar (when damaged, fades during death)
+        if (mob->health < mob->maxHealth) {
+            unsigned char barAlpha = 180;
+            if (mob->deathTimer > 0) {
+                barAlpha = (unsigned char)(180 * (mob->deathTimer / MOB_DEATH_TIME));
+            }
             int w = mobWidth[mob->type];
             int barW = w;
             int barH = 3;
             int barX = (int)mob->position.x;
             int barY = (int)mob->position.y - 8;
             float pct = (float)mob->health / mob->maxHealth;
-            DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, 180});
-            DrawRectangle(barX, barY, (int)(barW * pct), barH, RED);
+            DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, barAlpha});
+            DrawRectangle(barX, barY, (int)(barW * pct), barH, (Color){200, 30, 30, barAlpha});
         }
     }
 }
