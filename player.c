@@ -84,6 +84,7 @@ void InitPlayer(void)
     player.jumpBufferTimer = 0.0f;
     player.cameraShakeIntensity = 0.0f;
     player.cameraShakeTimer = 0.0f;
+    player.attackCooldown = 0.0f;
     player.spawnX = -1;
     player.spawnY = -1;
 
@@ -181,7 +182,8 @@ bool IsTool(BlockType item)
            (item >= TOOL_STONE_PICKAXE && item <= TOOL_STONE_SHOVEL) ||
            (item >= TOOL_IRON_PICKAXE && item <= TOOL_IRON_SHOVEL) ||
            (item >= TOOL_GOLD_PICKAXE && item <= TOOL_GOLD_SHOVEL) ||
-           (item >= TOOL_DIAMOND_PICKAXE && item <= TOOL_DIAMOND_SHOVEL);
+           (item >= TOOL_DIAMOND_PICKAXE && item <= TOOL_DIAMOND_SHOVEL) ||
+           item == ITEM_BOW;
 }
 
 int GetToolMaxDurability(BlockType tool)
@@ -191,6 +193,7 @@ int GetToolMaxDurability(BlockType tool)
     if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) return DURABILITY_IRON;
     if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL) return DURABILITY_GOLD;
     if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) return DURABILITY_DIAMOND;
+    if (tool == ITEM_BOW) return DURABILITY_BOW;
     return 0;
 }
 
@@ -291,6 +294,20 @@ void DamageArmor(void)
             }
         }
     }
+}
+
+float GetAttackSpeed(BlockType tool)
+{
+    if (!IsTool(tool)) return ATTACK_SPEED_BARE;
+    bool isSword = (tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD || tool == TOOL_GOLD_SWORD || tool == TOOL_DIAMOND_SWORD);
+    bool isAxe = (tool == TOOL_WOOD_AXE || tool == TOOL_STONE_AXE || tool == TOOL_IRON_AXE || tool == TOOL_GOLD_AXE || tool == TOOL_DIAMOND_AXE);
+    bool isPick = (tool == TOOL_WOOD_PICKAXE || tool == TOOL_STONE_PICKAXE || tool == TOOL_IRON_PICKAXE || tool == TOOL_GOLD_PICKAXE || tool == TOOL_DIAMOND_PICKAXE);
+    bool isShovel = (tool == TOOL_WOOD_SHOVEL || tool == TOOL_STONE_SHOVEL || tool == TOOL_IRON_SHOVEL || tool == TOOL_GOLD_SHOVEL || tool == TOOL_DIAMOND_SHOVEL);
+    if (isSword) return ATTACK_SPEED_SWORD;
+    if (isAxe) return ATTACK_SPEED_AXE;
+    if (isPick) return ATTACK_SPEED_PICK;
+    if (isShovel) return ATTACK_SPEED_SHOVEL;
+    return ATTACK_SPEED_BARE;
 }
 
 float GetToolMiningSpeed(BlockType tool, BlockType block)
@@ -617,11 +634,20 @@ void PlayerBlockInteraction(void)
                         else if (selectedTool == TOOL_DIAMOND_SWORD) damage = 8;
                         else damage = 2; // Other tools
                     }
-                    static float attackCooldown = 0.0f;
-                    attackCooldown -= GetFrameTime();
-                    if (attackCooldown <= 0) {
+                    player.attackCooldown -= GetFrameTime();
+                    if (player.attackCooldown <= 0) {
+                        // Critical hit: falling fast enough
+                        bool crit = player.velocity.y > CRIT_FALL_THRESHOLD;
+                        if (crit) {
+                            damage = (int)(damage * CRIT_DAMAGE_MULT);
+                            ShowMessage(S(STR_MSG_CRIT_HIT), (Color){255, 215, 0, 255});
+                            TriggerCameraShake(4.0f, 0.2f);
+                            SpawnDamageParticles(mobs[i].position.x + mw / 2.0f,
+                                                 mobs[i].position.y + mh / 2.0f,
+                                                 (Color){255, 215, 0, 255});
+                        }
                         DamageMob(&mobs[i], damage);
-                        attackCooldown = 0.4f;
+                        player.attackCooldown = GetAttackSpeed(selectedTool);
                         // Consume durability
                         if (IsTool(selectedTool)) {
                             int slot = player.selectedSlot;
@@ -695,25 +721,7 @@ void PlayerBlockInteraction(void)
                 miningBlockX = -1;
 
                 // Sand/gravel gravity: make blocks above fall
-                for (int fy = blockY - 1; fy >= 0; fy--) {
-                    uint8_t above = world[blockX][fy];
-                    if (above == BLOCK_AIR) break;
-                    if (above == BLOCK_SAND || above == BLOCK_GRAVEL) {
-                        world[blockX][fy] = BLOCK_AIR;
-                        // Find where it lands
-                        int landY = fy + 1;
-                        while (landY < WORLD_HEIGHT && world[blockX][landY] == BLOCK_AIR) landY++;
-                        landY--;
-                        world[blockX][landY] = above;
-                        InvalidateChunkAt(blockX, fy);
-                        InvalidateChunkAt(blockX, landY);
-                        // Landing feedback
-                        SpawnBlockParticles(blockX, landY, (BlockType)above);
-                        PlaySoundLand();
-                    } else {
-                        break; // Non-gravity block stops the chain
-                    }
-                }
+                ApplyGravityAt(blockX, blockY);
 
                 // Leaves have a chance to drop apples
                 if (bt == BLOCK_LEAVES && (hash2D(blockX, blockY, 12345) % 20) == 0) {
@@ -798,8 +806,48 @@ void PlayerBlockInteraction(void)
             return;
         }
 
+        // Fire bow
+        if (selectedTool == ITEM_BOW) {
+            // Find arrows in inventory
+            int arrowSlot = -1;
+            for (int i = 0; i < INVENTORY_SLOTS; i++) {
+                if (player.inventory[i] == ITEM_ARROW && player.inventoryCount[i] > 0) {
+                    arrowSlot = i;
+                    break;
+                }
+            }
+            if (arrowSlot >= 0) {
+                // Fire toward mouse
+                float px = player.position.x + PLAYER_WIDTH / 2.0f;
+                float py = player.position.y + PLAYER_HEIGHT / 2.0f;
+                float dx = mouseWorld.x - px;
+                float dy = mouseWorld.y - py;
+                float dist = sqrtf(dx * dx + dy * dy);
+                if (dist > 1.0f) {
+                    float speed = PROJECTILE_SPEED * 1.5f;
+                    SpawnProjectile(px, py, (dx / dist) * speed, (dy / dist) * speed, true);
+                    // Consume arrow
+                    player.inventoryCount[arrowSlot]--;
+                    if (player.inventoryCount[arrowSlot] <= 0)
+                        player.inventory[arrowSlot] = BLOCK_AIR;
+                    // Bow durability
+                    player.toolDurability[player.selectedSlot]--;
+                    if (player.toolDurability[player.selectedSlot] <= 0) {
+                        player.inventory[player.selectedSlot] = BLOCK_AIR;
+                        player.inventoryCount[player.selectedSlot] = 0;
+                        player.toolDurability[player.selectedSlot] = 0;
+                        ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
+                    }
+                }
+                return;
+            } else {
+                ShowMessage("No arrows!", (Color){240, 80, 80, 255});
+                return;
+            }
+        }
+
         if (IsTool(selectedTool) || IsFood(selectedTool) || IsArmor(selectedTool)) return; // Can't place tools, food, or armor
-        if (selectedTool >= ITEM_STICK && selectedTool <= ITEM_IRON_INGOT) return; // Can't place items
+        if (selectedTool >= ITEM_STICK && selectedTool <= ITEM_BOW) return; // Can't place items
         if (selectedTool != BLOCK_AIR && player.inventoryCount[player.selectedSlot] > 0) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 float bLeft = blockX * BLOCK_SIZE;
@@ -830,6 +878,17 @@ void PlayerBlockInteraction(void)
                     InvalidateChunkAt(blockX, blockY);
                     if (blockX % CHUNK_SIZE == 0) InvalidateChunkAt(blockX - 1, blockY);
                     if (blockX % CHUNK_SIZE == CHUNK_SIZE - 1) InvalidateChunkAt(blockX + 1, blockY);
+                    // Gravity: sand/gravel falls when placed
+                    if (IsGravityBlock(selectedTool)) {
+                        world[blockX][blockY] = BLOCK_AIR;
+                        int landY = blockY;
+                        while (landY > 0 && world[blockX][landY - 1] == BLOCK_AIR) landY--;
+                        world[blockX][landY] = selectedTool;
+                        InvalidateChunkAt(blockX, blockY);
+                        InvalidateChunkAt(blockX, landY);
+                        UpdateLightAt(blockX, landY);
+                        ApplyGravityAt(blockX, landY);
+                    }
                 }
             }
         }

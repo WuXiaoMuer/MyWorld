@@ -486,7 +486,10 @@ void UnloadSounds(void)
 static bool IsStoneBlock(BlockType bt) {
     return bt == BLOCK_STONE || bt == BLOCK_COBBLESTONE || bt == BLOCK_BRICK ||
            bt == BLOCK_COAL_ORE || bt == BLOCK_IRON_ORE || bt == BLOCK_SANDSTONE ||
-           bt == BLOCK_GLASS || bt == BLOCK_FURNACE;
+           bt == BLOCK_GLASS || bt == BLOCK_FURNACE ||
+           bt == BLOCK_GOLD_ORE || bt == BLOCK_DIAMOND_ORE ||
+           bt == BLOCK_REDSTONE_ORE || bt == BLOCK_LAPIS_ORE ||
+           bt == BLOCK_MOSSY_COBBLESTONE || bt == BLOCK_BONE_BLOCK;
 }
 
 void SetSFXVolume(float volume) {

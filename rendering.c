@@ -649,10 +649,30 @@ void DrawInventoryScreen(void)
                     DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
                     if (cnt > 1) DrawGameText(TextFormat("%d", cnt), sx + slotSize - 20, sy + slotSize - 16, 12, WHITE);
                     if (hover && heldItem == BLOCK_AIR) {
-                        tooltipId = item;
-                        tooltipText = GetBlockName((BlockType)item);
-                        tooltipX = (int)mouse.x;
-                        tooltipY = (int)mouse.y - 20;
+                        BlockType bt = (BlockType)item;
+                        const char *name = GetBlockName(bt);
+                        const char *typeLabel = NULL; Color typeColor = {180,180,190,200};
+                        if (IsTool(bt)) { typeLabel = "Tool"; typeColor = (Color){100,160,220,255}; }
+                        else if (IsArmor(bt)) { typeLabel = "Armor"; typeColor = (Color){180,100,220,255}; }
+                        else if (IsFood(bt)) { typeLabel = "Food"; typeColor = (Color){100,200,100,255}; }
+                        else { typeLabel = "Block"; typeColor = (Color){180,175,190,200}; }
+                        int tw = MeasureGameTextWidth(name, 14);
+                        int typeW = MeasureGameTextWidth(typeLabel, 11);
+                        int maxW = tw > typeW ? tw : typeW;
+                        char info[64] = {0};
+                        if (IsFood(bt)) snprintf(info, sizeof(info), S(STR_TOOLTIP_HUNGER), GetFoodValue(bt));
+                        else if (IsArmor(bt)) snprintf(info, sizeof(info), S(STR_TOOLTIP_ARMOR), GetArmorValue(bt), 100);
+                        int infoW = info[0] ? MeasureGameTextWidth(info, 13) : 0;
+                        if (infoW > maxW) maxW = infoW;
+                        int ttH = 36 + (info[0] ? 16 : 0);
+                        int ttx = (int)mouse.x + 14, tty = (int)mouse.y - 18;
+                        if (ttx + maxW + 10 > SCREEN_WIDTH) ttx = (int)mouse.x - maxW - 14;
+                        if (tty < 4) tty = (int)mouse.y + 14;
+                        DrawRectangle(ttx-4, tty-2, maxW+10, ttH+2, (Color){25,22,32,240});
+                        DrawRectangleLines(ttx-4, tty-2, maxW+10, ttH+2, (Color){90,85,110,220});
+                        DrawGameText(typeLabel, ttx, tty, 11, typeColor);
+                        DrawGameText(name, ttx, tty+14, 14, (Color){230,225,240,255});
+                        if (info[0]) DrawGameText(info, ttx, tty+30, 13, (Color){180,200,180,255});
                     }
                 }
 

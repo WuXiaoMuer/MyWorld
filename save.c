@@ -295,6 +295,7 @@ bool LoadWorld(const char *path)
     player.knockbackTimer = 0.0f;
     player.cameraShakeIntensity = 0.0f;
     player.cameraShakeTimer = 0.0f;
+    player.attackCooldown = 0.0f;
     player.coyoteTimer = 0.0f;
     player.jumpBufferTimer = 0.0f;
 

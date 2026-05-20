@@ -172,6 +172,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_STARVING] = "Starving!",
     [STR_MSG_ATE] = "Ate %s (+%d hunger)",
     [STR_MSG_BROKE] = "%s broke!",
+    [STR_MSG_CRIT_HIT] = "Critical Hit!",
 
     // Tooltips
     [STR_TOOLTIP_ARMOR] = "+%d armor  Dur: %d%%",
@@ -277,6 +278,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_DIAMOND_BOOTS] = "Diamond Boots",
     [STR_ITEM_GUNPOWDER] = "Gunpowder",
     [STR_ITEM_STRING] = "String",
+    [STR_ITEM_BONE] = "Bone",
+    [STR_ITEM_ARROW] = "Arrow",
+    [STR_ITEM_BOW] = "Bow",
+    [STR_BLOCK_MOSSY_COBBLESTONE] = "Mossy Cobblestone",
+    [STR_BLOCK_BOOKSHELF] = "Bookshelf",
+    [STR_BLOCK_LANTERN] = "Lantern",
+    [STR_BLOCK_BONE_BLOCK] = "Bone Block",
 
     // Recipe Names
     [STR_RECIPE_WOOD_PLANKS] = "Wood -> 4 Planks",
@@ -332,6 +340,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_DIAMOND_LEGS] = "7 Diamond -> Diamond Leggings",
     [STR_RECIPE_DIAMOND_BOOTS] = "4 Diamond -> Diamond Boots",
     [STR_RECIPE_CHEST] = "8 Planks -> Chest",
+    [STR_RECIPE_ARROW] = "Stick -> 4 Arrows",
+    [STR_RECIPE_BOW] = "3 Sticks + 3 String -> Bow",
+    [STR_RECIPE_BONE_BLOCK] = "9 Bone -> Bone Block",
+    [STR_RECIPE_BONE_BLOCK_DECOMP] = "Bone Block -> 9 Bone",
+    [STR_RECIPE_BOOKSHELF] = "6 Planks -> Bookshelf",
+    [STR_RECIPE_LANTERN] = "4 Torches -> Lantern",
     // Smelt
     [STR_SMELT_IRON] = "Iron Ore -> Iron Ingot",
     [STR_SMELT_PORK] = "Raw Pork -> Cooked Pork",
@@ -340,6 +354,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_GOLD] = "Gold Ore -> Gold Ingot",
     [STR_SMELT_REDSTONE] = "Redstone Ore -> Redstone",
     [STR_SMELT_LAPIS] = "Lapis Ore -> Lapis Lazuli",
+    [STR_SMELT_CLAY] = "Clay -> Bricks",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "No fuel",
@@ -484,6 +499,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_STARVING] = "饥饿难耐!",            // 饥饿难耐!
     [STR_MSG_ATE] = "吃了 %s (+%d饥饿度)",   // 吃了 %s (+%d饥饿度)
     [STR_MSG_BROKE] = "%s 坏了!",                         // %s 坏了!
+    [STR_MSG_CRIT_HIT] = "暴击!",
 
     [STR_TOOLTIP_ARMOR] = "+%d护甲  耐久: %d%%",  // +%d护甲  耐久: %d%%
     [STR_TOOLTIP_HUNGER] = "+%d饥饿度",               // +%d饥饿度
@@ -587,6 +603,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_DIAMOND_BOOTS] = "钻石靴子",
     [STR_ITEM_GUNPOWDER] = "火药",
     [STR_ITEM_STRING] = "线",
+    [STR_ITEM_BONE] = "骨头",
+    [STR_ITEM_ARROW] = "箭",
+    [STR_ITEM_BOW] = "弓",
+    [STR_BLOCK_MOSSY_COBBLESTONE] = "苔石",
+    [STR_BLOCK_BOOKSHELF] = "书架",
+    [STR_BLOCK_LANTERN] = "灯笼",
+    [STR_BLOCK_BONE_BLOCK] = "骨块",
 
     // Recipe names
     [STR_RECIPE_WOOD_PLANKS] = "木头 -> 4木板",   // 木头 -> 4木板
@@ -641,6 +664,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_DIAMOND_LEGS] = "7钻石 -> 钻石护腿",
     [STR_RECIPE_DIAMOND_BOOTS] = "4钻石 -> 钻石靴子",
     [STR_RECIPE_CHEST] = "8木板 -> 箱子",
+    [STR_RECIPE_ARROW] = "木棍 -> 4箭",
+    [STR_RECIPE_BOW] = "3木棍 + 3线 -> 弓",
+    [STR_RECIPE_BONE_BLOCK] = "9骨头 -> 骨块",
+    [STR_RECIPE_BONE_BLOCK_DECOMP] = "骨块 -> 9骨头",
+    [STR_RECIPE_BOOKSHELF] = "6木板 -> 书架",
+    [STR_RECIPE_LANTERN] = "4火把 -> 灯笼",
     [STR_SMELT_IRON] = "铁矿 -> 铁锭",            // 铁矿 -> 铁锭
     [STR_SMELT_PORK] = "生猪肉 -> 烤猪肉", // 生猪肉 -> 烤猪肉
     [STR_SMELT_COBBLE] = "圆石 -> 石头",          // 圆石 -> 石头
@@ -648,6 +677,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_GOLD] = "金矿 -> 金锭",
     [STR_SMELT_REDSTONE] = "红石矿 -> 红石",
     [STR_SMELT_LAPIS] = "青金石矿 -> 青金石",
+    [STR_SMELT_CLAY] = "粘土 -> 砖块",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "没有燃料",
@@ -792,6 +822,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_STARVING] = "餓死!",                          // 餓死!
     [STR_MSG_ATE] = "%sを食べた (+%d満腹度)",  // %sを食べた (+%d満腹度)
     [STR_MSG_BROKE] = "%sが壊れた!",              // %sが壊れた!
+    [STR_MSG_CRIT_HIT] = "会心の一撃!",
 
     [STR_TOOLTIP_ARMOR] = "+%dアーマー  耐久: %d%%",  // +%dアーマー  耐久: %d%%
     [STR_TOOLTIP_HUNGER] = "+%d満腹度",               // +%d満腹度
@@ -895,6 +926,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ARMOR_DIAMOND_BOOTS] = "ダイヤのブーツ",
     [STR_ITEM_GUNPOWDER] = "火薬",
     [STR_ITEM_STRING] = "糸",
+    [STR_ITEM_BONE] = "骨",
+    [STR_ITEM_ARROW] = "矢",
+    [STR_ITEM_BOW] = "弓",
+    [STR_BLOCK_MOSSY_COBBLESTONE] = "苔むした丸石",
+    [STR_BLOCK_BOOKSHELF] = "本棚",
+    [STR_BLOCK_LANTERN] = "ランタン",
+    [STR_BLOCK_BONE_BLOCK] = "骨ブロック",
 
     // Recipe names (Japanese)
     [STR_RECIPE_WOOD_PLANKS] = "材 -> 板×4",         // 材 -> 板×4
@@ -949,6 +987,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_DIAMOND_LEGS] = "ダイヤ×7 -> ダイヤのレギンス",
     [STR_RECIPE_DIAMOND_BOOTS] = "ダイヤ×4 -> ダイヤのブーツ",
     [STR_RECIPE_CHEST] = "板×8 -> チェスト",
+    [STR_RECIPE_ARROW] = "棒 -> 矢×4",
+    [STR_RECIPE_BOW] = "棒×3 + 糸×3 -> 弓",
+    [STR_RECIPE_BONE_BLOCK] = "骨×9 -> 骨ブロック",
+    [STR_RECIPE_BONE_BLOCK_DECOMP] = "骨ブロック -> 骨×9",
+    [STR_RECIPE_BOOKSHELF] = "板×6 -> 本棚",
+    [STR_RECIPE_LANTERN] = "松明×4 -> ランタン",
     [STR_SMELT_IRON] = "鉄鉱石 -> 鉄の地金",  // 鉄鉱石 -> 鉄の地金
     [STR_SMELT_PORK] = "生ポーク -> 焼いたポーク",
     [STR_SMELT_COBBLE] = "コブルストーン -> 石",
@@ -956,6 +1000,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_GOLD] = "金鉱石 -> 金の地金",
     [STR_SMELT_REDSTONE] = "レッドストーン鉱石 -> レッドストーン",
     [STR_SMELT_LAPIS] = "ラピスラズリ鉱石 -> ラピスラズリ",
+    [STR_SMELT_CLAY] = "粘土 -> レンガ",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "燃料がない",

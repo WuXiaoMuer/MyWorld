@@ -30,7 +30,7 @@ void InitProjectiles(void)
     }
 }
 
-void SpawnProjectile(float x, float y, float vx, float vy)
+void SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer)
 {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         if (!projectiles[i].active) {
@@ -38,6 +38,7 @@ void SpawnProjectile(float x, float y, float vx, float vy)
             projectiles[i].velocity = (Vector2){ vx, vy };
             projectiles[i].lifetime = PROJECTILE_LIFETIME;
             projectiles[i].active = true;
+            projectiles[i].fromPlayer = fromPlayer;
             return;
         }
     }
@@ -71,22 +72,38 @@ void UpdateProjectiles(float dt)
             }
         }
 
-        // Check collision with player
-        float px = player.position.x;
-        float py = player.position.y;
-        if (p->position.x >= px && p->position.x <= px + PLAYER_WIDTH &&
-            p->position.y >= py && p->position.y <= py + PLAYER_HEIGHT) {
-            float reduction = GetArmorDamageReduction();
-            int finalDamage = (int)(PROJECTILE_DAMAGE * (1.0f - reduction));
-            if (finalDamage < 1) finalDamage = 1;
-            player.health -= finalDamage;
-            if (player.health < 0) player.health = 0;
-            if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_SKELETON);
-            DamageArmor();
-            player.damageFlashTimer = 0.3f;
-            SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
-            PlaySoundHurt();
-            p->active = false;
+        if (p->fromPlayer) {
+            // Player projectile: check collision with mobs
+            for (int m = 0; m < MAX_MOBS; m++) {
+                if (!mobs[m].active || mobs[m].deathTimer > 0) continue;
+                int mw = (mobs[m].type == MOB_ZOMBIE) ? 12 : 16;
+                int mh = (mobs[m].type == MOB_ZOMBIE) ? 28 : (mobs[m].type == MOB_SPIDER) ? 16 : 12;
+                if (p->position.x >= mobs[m].position.x && p->position.x <= mobs[m].position.x + mw &&
+                    p->position.y >= mobs[m].position.y && p->position.y <= mobs[m].position.y + mh) {
+                    DamageMob(&mobs[m], PROJECTILE_DAMAGE);
+                    SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
+                    p->active = false;
+                    break;
+                }
+            }
+        } else {
+            // Mob projectile: check collision with player
+            float px = player.position.x;
+            float py = player.position.y;
+            if (p->position.x >= px && p->position.x <= px + PLAYER_WIDTH &&
+                p->position.y >= py && p->position.y <= py + PLAYER_HEIGHT) {
+                float reduction = GetArmorDamageReduction();
+                int finalDamage = (int)(PROJECTILE_DAMAGE * (1.0f - reduction));
+                if (finalDamage < 1) finalDamage = 1;
+                player.health -= finalDamage;
+                if (player.health < 0) player.health = 0;
+                if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_SKELETON);
+                DamageArmor();
+                player.damageFlashTimer = 0.3f;
+                SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
+                PlaySoundHurt();
+                p->active = false;
+            }
         }
     }
 }
@@ -306,7 +323,7 @@ static void UpdateSkeletonAI(Mob *mob, float dt)
                 float arcComp = 0.5f * ARROW_GRAVITY * flightTime * flightTime;
                 float vx = (adx / adist) * speed;
                 float vy = (ady / adist) * speed - arcComp / flightTime;
-                SpawnProjectile(arrowX, arrowY, vx, vy);
+                SpawnProjectile(arrowX, arrowY, vx, vy, false);
             }
         }
     } else {
@@ -381,6 +398,12 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                                 }
                             }
                         }
+                    }
+                }
+                // Trigger gravity on affected columns
+                for (int bx = cx - CREEPER_EXPLODE_RADIUS; bx <= cx + CREEPER_EXPLODE_RADIUS; bx++) {
+                    if (bx >= 0 && bx < WORLD_WIDTH) {
+                        ApplyGravityAt(bx, cy + CREEPER_EXPLODE_RADIUS);
                     }
                 }
 
@@ -539,9 +562,11 @@ void DamageMob(Mob *mob, int damage)
         } else if (mob->type == MOB_ZOMBIE) {
             if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, baseDropX + (rand() % 10 - 5), baseDropY);
             if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
+            if (rand() % 20 == 0) SpawnItemEntity(ITEM_IRON_INGOT, 1, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_SKELETON) {
-            SpawnItemEntity(ITEM_STICK, 1 + rand() % 3, baseDropX + (rand() % 10 - 5), baseDropY);
+            SpawnItemEntity(ITEM_BONE, 1 + rand() % 3, baseDropX + (rand() % 10 - 5), baseDropY);
             if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+            if (rand() % 20 == 0) SpawnItemEntity(TOOL_IRON_SWORD, 1, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_CREEPER) {
             SpawnItemEntity(ITEM_GUNPOWDER, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_SPIDER) {
@@ -568,18 +593,20 @@ static void TrySpawnMobs(float dt)
     if (mobSpawnTimer > 0) return;
     mobSpawnTimer = MOB_SPAWN_INTERVAL;
 
-    // Count active mobs
-    int count = 0;
+    // Count active mobs by category
+    int hostileCount = 0, passiveCount = 0;
     for (int i = 0; i < MAX_MOBS; i++) {
-        if (mobs[i].active) count++;
+        if (!mobs[i].active) continue;
+        if (mobs[i].type == MOB_PIG) passiveCount++;
+        else hostileCount++;
     }
-    if (count >= MAX_MOBS / 2) return;
+    if (hostileCount + passiveCount >= MAX_MOBS - 4) return; // Leave room for spawns
 
     float playerCX = player.position.x + PLAYER_WIDTH / 2;
     float playerCY = player.position.y + PLAYER_HEIGHT / 2;
 
     // Zombie spawning: dark areas (night surface or underground)
-    if (count < 8) {
+    if (hostileCount < 12) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -602,7 +629,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Skeleton spawning: dark areas, less frequent
-    if (count < 6 && (rand() % 3 == 0)) {
+    if (hostileCount < 12 && (rand() % 3 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -624,7 +651,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Pig spawning: during day on grass, bright areas
-    if (dayNight.lightLevel > 0.5f && count < 6) {
+    if (dayNight.lightLevel > 0.5f && passiveCount < 8) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -644,7 +671,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Creeper spawning: dark areas like zombie
-    if (count < 6 && (rand() % 4 == 0)) {
+    if (hostileCount < 12 && (rand() % 4 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -665,7 +692,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Spider spawning: dark areas
-    if (count < 6 && (rand() % 4 == 0)) {
+    if (hostileCount < 12 && (rand() % 4 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -762,8 +789,13 @@ void UpdateMobs(float dt)
                     // Drop items like normal death
                     float dropX = mob->position.x + mobWidth[mob->type] / 2;
                     float dropY = mob->position.y;
-                    if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
-                    if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
+                    if (mob->type == MOB_SKELETON) {
+                        SpawnItemEntity(ITEM_BONE, 1 + rand() % 3, dropX, dropY);
+                        if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, dropX, dropY);
+                    } else {
+                        if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
+                        if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
+                    }
                     PlaySoundDeath();
                     player.xp += 5;
                     if (player.xp > MAX_XP) player.xp = MAX_XP;

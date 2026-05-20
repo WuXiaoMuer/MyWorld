@@ -89,6 +89,14 @@ void InitCraftingRecipes(void)
     // --- Chest ---
     ADD_RECIPE(BLOCK_PLANKS, 8, BLOCK_CHEST, 1, STR_RECIPE_CHEST, false);
 
+    // --- New recipes ---
+    ADD_RECIPE(ITEM_STICK, 1, ITEM_ARROW, 4, STR_RECIPE_ARROW, false);
+    ADD_RECIPE(ITEM_BONE, 9, BLOCK_BONE_BLOCK, 1, STR_RECIPE_BONE_BLOCK, false);
+    ADD_RECIPE(BLOCK_BONE_BLOCK, 1, ITEM_BONE, 9, STR_RECIPE_BONE_BLOCK_DECOMP, false);
+    ADD_RECIPE(BLOCK_PLANKS, 6, BLOCK_BOOKSHELF, 1, STR_RECIPE_BOOKSHELF, true);
+    ADD_RECIPE(BLOCK_TORCH, 4, BLOCK_LANTERN, 1, STR_RECIPE_LANTERN, false);
+    ADD_RECIPE(ITEM_STICK, 3, ITEM_BOW, 1, STR_RECIPE_BOW, false);
+
     #undef ADD_RECIPE
 }
 
@@ -102,6 +110,7 @@ void InitSmeltingRecipes(void)
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_GOLD_ORE, ITEM_GOLD_INGOT, STR_SMELT_GOLD};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_REDSTONE_ORE, ITEM_REDSTONE, STR_SMELT_REDSTONE};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_LAPIS_ORE, ITEM_LAPIS, STR_SMELT_LAPIS};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_CLAY, BLOCK_BRICK, STR_SMELT_CLAY};
 }
 
 int FindSmeltRecipe(BlockType input)

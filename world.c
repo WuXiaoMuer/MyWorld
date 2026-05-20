@@ -103,6 +103,15 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     // Mob drops
     {"Gunpowder",    {80,80,80,255},   {50,50,50,255},    false, false, false},
     {"String",       {200,200,200,255},{160,160,160,255},  false, false, false},
+    // New items
+    {"Bone",         {230,220,200,255},{200,190,170,255},  false, false, false},
+    {"Arrow",        {180,140,80,255}, {120,120,120,255},  false, false, false},
+    {"Bow",          {140,100,50,255}, {100,70,30,255},    false, false, false},
+    // New blocks
+    {"Mossy Cobble", {90,110,80,255},  {70,90,60,255},    true,  false, true},
+    {"Bookshelf",    {140,110,60,255}, {100,80,40,255},   true,  false, true},
+    {"Lantern",      {200,180,140,255},{255,220,100,255}, false, true,  true},
+    {"Bone Block",   {230,220,200,255},{200,190,170,255}, true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -1177,6 +1186,162 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
     }
+
+    case ITEM_BONE:
+        // White/cream bone with knobby ends
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = BLANK;
+                // Shaft (diagonal)
+                if (x >= 4 && x <= 11 && y >= 5 && y <= 10) {
+                    c = base;
+                    // Center hole
+                    if (x >= 7 && x <= 8 && y >= 7 && y <= 8)
+                        c = (Color){180, 170, 150, 255};
+                }
+                // Knobby ends
+                if ((x >= 2 && x <= 5 && y >= 3 && y <= 6) ||
+                    (x >= 10 && x <= 13 && y >= 9 && y <= 12))
+                    c = detail;
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_ARROW:
+        // Shaft + arrowhead + fletching
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = BLANK;
+                // Shaft (diagonal line)
+                if (x + y >= 8 && x + y <= 11 && x >= 2 && x <= 13) {
+                    c = base;
+                }
+                // Arrowhead (triangle at top-right)
+                if (x >= 11 && x <= 14 && y >= 1 && y <= 4) {
+                    if (x - 11 + y <= 3) c = detail;
+                }
+                // Fletching (at bottom-left)
+                if (x >= 1 && x <= 4 && y >= 11 && y <= 14) {
+                    if ((x + y) % 2 == 0) c = (Color){200, 50, 50, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_BOW:
+        // Bow: curved arc + string
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = BLANK;
+                // Bow limb (curved arc on the right side)
+                int cx2 = 12, cy2 = 8;
+                int dx = x - cx2, dy = y - cy2;
+                int dist = (int)sqrtf((float)(dx*dx + dy*dy));
+                if (dist >= 5 && dist <= 7 && x >= 8) {
+                    c = base;
+                    // Thicker at center of limb
+                    if (dist == 6) c = detail;
+                }
+                // String (vertical line on left)
+                if (x >= 4 && x <= 5 && y >= 3 && y <= 13) {
+                    c = (Color){200, 200, 200, 255};
+                }
+                // Grip wrap
+                if (x >= 5 && x <= 7 && y >= 7 && y <= 9) {
+                    c = (Color){80, 50, 20, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MOSSY_COBBLESTONE:
+        // Cobblestone with green moss patches
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, varSeed);
+                // Cobblestone pattern
+                if ((x + y) % 5 == 0 || h % 7 == 0) c = detail;
+                // Stone highlights
+                if (h % 11 == 0) c = (Color){120, 120, 110, 255};
+                // Moss patches (green)
+                unsigned int mh = hash2D(x + 3, y + 7, varSeed + 50);
+                if (mh % 9 == 0) c = (Color){60, 130, 50, 255};
+                if (mh % 13 == 0) c = (Color){50, 110, 40, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_BOOKSHELF:
+        // Plank border + vertical colored book spines
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                // Top and bottom plank border
+                if (y <= 1 || y >= 14) c = detail;
+                // Left and right plank border
+                if (x <= 1 || x >= 14) c = detail;
+                // Book spines (vertical lines with different colors)
+                if (y >= 2 && y <= 13 && x >= 2 && x <= 13) {
+                    int bookIdx = (x - 2) / 2;
+                    unsigned int bh = hash2D(bookIdx, 0, varSeed + 100);
+                    Color bookColors[] = {
+                        {180, 40, 40, 255}, {40, 40, 180, 255}, {40, 140, 40, 255},
+                        {180, 140, 40, 255}, {140, 40, 140, 255}, {40, 140, 140, 255}
+                    };
+                    c = bookColors[bh % 6];
+                    // Spine detail lines
+                    if (y == 5 || y == 10) c = (Color){(unsigned char)(c.r*0.7f), (unsigned char)(c.g*0.7f), (unsigned char)(c.b*0.7f), 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_LANTERN:
+        // Iron frame + warm yellow glow center
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = BLANK;
+                // Iron frame (border)
+                if ((x >= 4 && x <= 11 && (y == 2 || y == 13)) ||
+                    (y >= 2 && y <= 13 && (x == 4 || x == 11))) {
+                    c = base;
+                }
+                // Top hook
+                if (x >= 7 && x <= 8 && y >= 0 && y <= 2) c = base;
+                // Bottom point
+                if (x >= 7 && x <= 8 && y == 14) c = base;
+                // Cross bars
+                if (x >= 5 && x <= 10 && (y == 7 || y == 8)) c = (Color){160, 140, 100, 255};
+                // Warm glow center
+                if (x >= 6 && x <= 9 && y >= 4 && y <= 11) {
+                    c = detail;
+                    // Brighter center
+                    if (x >= 7 && x <= 8 && y >= 5 && y <= 10)
+                        c = (Color){255, 240, 150, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_BONE_BLOCK:
+        // Cream base with bone cross pattern
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, varSeed + 200);
+                // Subtle texture
+                if (h % 8 == 0) c = detail;
+                // Bone cross pattern (X shape)
+                if ((x == y || x == 15 - y) && x >= 2 && x <= 13)
+                    c = (Color){250, 240, 220, 255};
+                // Center circle
+                if ((x-8)*(x-8) + (y-8)*(y-8) <= 4)
+                    c = (Color){250, 240, 220, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     default:
         break;
     }
@@ -1220,6 +1385,32 @@ void GenerateBlockAtlas(void)
         }
         crackTextures[stage] = LoadTextureFromImage(crack);
         UnloadImage(crack);
+    }
+}
+
+//----------------------------------------------------------------------------------
+// Gravity System
+//----------------------------------------------------------------------------------
+bool IsGravityBlock(uint8_t block)
+{
+    return block == BLOCK_SAND || block == BLOCK_GRAVEL;
+}
+
+void ApplyGravityAt(int bx, int by)
+{
+    for (int fy = by - 1; fy >= 0; fy--) {
+        uint8_t above = world[bx][fy];
+        if (above == BLOCK_AIR || above == BLOCK_WATER) break;
+        if (!IsGravityBlock(above)) break;
+        world[bx][fy] = BLOCK_AIR;
+        int landY = fy + 1;
+        while (landY < WORLD_HEIGHT && world[bx][landY] == BLOCK_AIR) landY++;
+        landY--;
+        world[bx][landY] = above;
+        InvalidateChunkAt(bx, fy);
+        InvalidateChunkAt(bx, landY);
+        SpawnBlockParticles(bx, landY, (BlockType)above);
+        PlaySoundLand();
     }
 }
 
@@ -1493,7 +1684,127 @@ void GenerateWorld(unsigned int seed)
     }
 
     // ============================================================
-    // Pass 9: Water fill (sky-connected only)
+    // Pass 9: Underground Dungeons
+    // ============================================================
+    for (int d = 0; d < WORLD_WIDTH / 150; d++) {
+        // Try multiple positions per dungeon for better placement
+        int placed = 0;
+        for (int attempt = 0; attempt < 5 && !placed; attempt++) {
+            int dx = hash2D(d, attempt, seed + 11000) % (WORLD_WIDTH - 20) + 10;
+            int dy = CAVE_START + 10 + hash2D(d, attempt + 10, seed + 11100) % (CAVE_END - CAVE_START - 20);
+
+            // Variable room size: 5x5 to 9x9
+            int halfW = 2 + hash2D(d, attempt + 20, seed + 11200) % 3; // 2,3,4 -> 5,7,9 wide
+            int halfH = 2 + hash2D(d, attempt + 30, seed + 11250) % 3;
+
+            // Check if the area is mostly stone
+            int solidCount = 0, totalCheck = 0;
+            for (int tx = dx - halfW - 1; tx <= dx + halfW + 1; tx++) {
+                for (int ty = dy - halfH - 1; ty <= dy + halfH + 1; ty++) {
+                    if (tx >= 0 && tx < WORLD_WIDTH && ty >= 0 && ty < WORLD_HEIGHT) {
+                        totalCheck++;
+                        if (world[tx][ty] == BLOCK_STONE) solidCount++;
+                    }
+                }
+            }
+            if (solidCount < totalCheck * 7 / 10) continue;
+
+            // Build room
+            bool useMossy = hash2D(dx, dy, seed + 11300) % 2 == 0;
+            for (int tx = dx - halfW; tx <= dx + halfW; tx++) {
+                for (int ty = dy - halfH; ty <= dy + halfH; ty++) {
+                    if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= WORLD_HEIGHT) continue;
+                    if (tx == dx - halfW || tx == dx + halfW || ty == dy - halfH || ty == dy + halfH) {
+                        world[tx][ty] = useMossy ? BLOCK_MOSSY_COBBLESTONE : BLOCK_COBBLESTONE;
+                    } else {
+                        world[tx][ty] = BLOCK_AIR;
+                        // Floor decoration: some mossy cobblestone
+                        if (ty == dy + halfH - 1 && hash2D(tx, ty, seed + 11350) % 5 == 0) {
+                            world[tx][ty] = BLOCK_MOSSY_COBBLESTONE;
+                        }
+                    }
+                }
+            }
+
+            // Entrance: dig a corridor from the wall to the nearest cave/air
+            int side = hash2D(dx, dy, seed + 11400) % 4;
+            int ex = dx, ey = dy;
+            if (side == 0) ey = dy - halfH;      // North
+            else if (side == 1) ey = dy + halfH;  // South
+            else if (side == 2) ex = dx - halfW;  // West
+            else ex = dx + halfW;                  // East
+
+            // Clear entrance gap
+            for (int i = -1; i <= 1; i++) {
+                if (side <= 1) world[dx + i][ey] = BLOCK_AIR;
+                else world[ex][dy + i] = BLOCK_AIR;
+            }
+
+            // Dig corridor outward until we hit air or max 15 blocks
+            int cx = ex, cy = ey;
+            int dxDir = (side == 2) ? -1 : (side == 3) ? 1 : 0;
+            int dyDir = (side == 0) ? -1 : (side == 1) ? 1 : 0;
+            for (int step = 0; step < 15; step++) {
+                cx += dxDir;
+                cy += dyDir;
+                if (cx < 0 || cx >= WORLD_WIDTH || cy < 0 || cy >= WORLD_HEIGHT) break;
+                if (world[cx][cy] == BLOCK_AIR || world[cx][cy] == BLOCK_WATER) break; // Connected!
+                // Carve 2-wide corridor
+                for (int i = -1; i <= 1; i++) {
+                    int rx = cx + (dyDir != 0 ? i : 0);
+                    int ry = cy + (dxDir != 0 ? i : 0);
+                    if (rx >= 0 && rx < WORLD_WIDTH && ry >= 0 && ry < WORLD_HEIGHT) {
+                        world[rx][ry] = BLOCK_AIR;
+                    }
+                }
+            }
+
+            // Place chest in center
+            if (chestCount < MAX_CHESTS) {
+                world[dx][dy] = BLOCK_CHEST;
+                ChestData *c = &chestData[chestCount];
+                c->x = dx;
+                c->y = dy;
+                memset(c->items, 0, sizeof(c->items));
+                memset(c->counts, 0, sizeof(c->counts));
+
+                typedef struct { uint8_t item; int minCount; int maxCount; int weight; } LootEntry;
+                LootEntry loot[] = {
+                    {ITEM_IRON_INGOT, 1, 3, 20},
+                    {ITEM_GOLD_INGOT, 1, 2, 15},
+                    {ITEM_COAL, 3, 8, 25},
+                    {ITEM_DIAMOND, 1, 1, 5},
+                    {FOOD_BREAD, 2, 4, 20},
+                    {BLOCK_TORCH, 4, 8, 25},
+                    {ITEM_BONE, 2, 5, 20},
+                    {ITEM_STRING, 2, 4, 15},
+                    {ITEM_ARROW, 4, 8, 15},
+                    {ITEM_BOW, 1, 1, 5},
+                };
+                int lootCount = sizeof(loot) / sizeof(loot[0]);
+
+                int slots = 3 + hash2D(dx, dy, seed + 11500) % 4;
+                for (int s = 0; s < slots && s < CHEST_SLOTS; s++) {
+                    int totalWeight = 0;
+                    for (int l = 0; l < lootCount; l++) totalWeight += loot[l].weight;
+                    int roll = hash2D(dx + s, dy, seed + 11600 + s) % totalWeight;
+                    int chosen = 0;
+                    for (int l = 0; l < lootCount; l++) {
+                        roll -= loot[l].weight;
+                        if (roll < 0) { chosen = l; break; }
+                    }
+                    c->items[s] = loot[chosen].item;
+                    int range = loot[chosen].maxCount - loot[chosen].minCount + 1;
+                    c->counts[s] = loot[chosen].minCount + hash2D(dx, dy + s, seed + 11700 + s) % range;
+                }
+                chestCount++;
+            }
+            placed = 1;
+        }
+    }
+
+    // ============================================================
+    // Pass 10: Water fill (sky-connected only)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT; y++) {
@@ -1505,7 +1816,7 @@ void GenerateWorld(unsigned int seed)
     }
 
     // ============================================================
-    // Pass 10: Trees (biome-aware density)
+    // Pass 11: Trees (biome-aware density)
     // ============================================================
     for (int x = 5; x < WORLD_WIDTH - 5; x++) {
         float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
@@ -1549,7 +1860,7 @@ void GenerateWorld(unsigned int seed)
     }
 
     // ============================================================
-    // Pass 11: Flowers, tall grass, cacti (biome-aware)
+    // Pass 12: Flowers, tall grass, cacti (biome-aware)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);

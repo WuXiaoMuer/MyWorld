@@ -151,6 +151,7 @@ void InitWin32WheelHook(void);
 #define DURABILITY_IRON     251
 #define DURABILITY_GOLD     48
 #define DURABILITY_DIAMOND  800
+#define DURABILITY_BOW      385
 
 // Armor durability
 #define ARMOR_DURABILITY_WOOD    55
@@ -213,6 +214,15 @@ void InitWin32WheelHook(void);
 #define MAX_LIGHT_LEVEL     15
 #define TORCH_LIGHT         15
 #define SUNLIGHT_LEVEL      15
+
+// Attack speeds (seconds between attacks)
+#define ATTACK_SPEED_SWORD  0.6f
+#define ATTACK_SPEED_AXE    0.8f
+#define ATTACK_SPEED_PICK   1.0f
+#define ATTACK_SPEED_SHOVEL 1.0f
+#define ATTACK_SPEED_BARE   0.4f
+#define CRIT_FALL_THRESHOLD 200.0f
+#define CRIT_DAMAGE_MULT    1.5f
 
 //----------------------------------------------------------------------------------
 // Block Types
@@ -315,6 +325,15 @@ typedef enum {
     // Mob drops
     ITEM_GUNPOWDER,
     ITEM_STRING,
+    // New items
+    ITEM_BONE,
+    ITEM_ARROW,
+    ITEM_BOW,
+    // New blocks
+    BLOCK_MOSSY_COBBLESTONE,
+    BLOCK_BOOKSHELF,
+    BLOCK_LANTERN,
+    BLOCK_BONE_BLOCK,
     BLOCK_COUNT
 } BlockType;
 
@@ -599,6 +618,14 @@ typedef enum {
     // Mob drops
     STR_ITEM_GUNPOWDER,
     STR_ITEM_STRING,
+    // New items/blocks
+    STR_ITEM_BONE,
+    STR_ITEM_ARROW,
+    STR_ITEM_BOW,
+    STR_BLOCK_MOSSY_COBBLESTONE,
+    STR_BLOCK_BOOKSHELF,
+    STR_BLOCK_LANTERN,
+    STR_BLOCK_BONE_BLOCK,
 
     // Recipe Names
     STR_RECIPE_WOOD_PLANKS,
@@ -657,6 +684,15 @@ typedef enum {
     STR_RECIPE_DIAMOND_BOOTS,
     // Chest recipe
     STR_RECIPE_CHEST,
+    // New recipes
+    STR_RECIPE_ARROW,
+    STR_RECIPE_BOW,
+    STR_RECIPE_BONE_BLOCK,
+    STR_RECIPE_BONE_BLOCK_DECOMP,
+    STR_RECIPE_BOOKSHELF,
+    STR_RECIPE_LANTERN,
+    // Combat message
+    STR_MSG_CRIT_HIT,
     // Smelt
     STR_SMELT_IRON,
     STR_SMELT_PORK,
@@ -665,6 +701,7 @@ typedef enum {
     STR_SMELT_GOLD,
     STR_SMELT_REDSTONE,
     STR_SMELT_LAPIS,
+    STR_SMELT_CLAY,
 
     // Furnace messages
     STR_MSG_NO_FUEL,
@@ -732,6 +769,7 @@ typedef struct {
     Vector2 velocity;
     float lifetime;
     bool active;
+    bool fromPlayer;
 } Projectile;
 
 //----------------------------------------------------------------------------------
@@ -767,6 +805,7 @@ typedef struct {
     float jumpBufferTimer;
     float cameraShakeIntensity;
     float cameraShakeTimer;
+    float attackCooldown;
     int spawnX, spawnY;      // bed spawn point (-1 = use default)
     // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
     uint8_t armor[4];
@@ -978,6 +1017,8 @@ void InvalidateChunkAt(int worldBlockX, int worldBlockY);
 void InitChunkTable(void);
 void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
+bool IsGravityBlock(uint8_t block);
+void ApplyGravityAt(int bx, int by);
 
 // light.c
 void InitLightMap(void);
@@ -1018,6 +1059,7 @@ int GetMiningBlockX(void);
 int GetMiningBlockY(void);
 void DrawMiningCrack(void);
 bool IsPlayerUnderwater(void);
+float GetAttackSpeed(BlockType tool);
 
 // daynight.c
 void InitDayNight(void);
@@ -1073,7 +1115,7 @@ void UpdateMobs(float dt);
 void DrawMobs(void);
 Mob* SpawnMob(MobType type, float x, float y);
 void InitProjectiles(void);
-void SpawnProjectile(float x, float y, float vx, float vy);
+void SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer);
 void UpdateProjectiles(float dt);
 void DrawProjectiles(void);
 void DamageMob(Mob *mob, int damage);
