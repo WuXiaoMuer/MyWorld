@@ -1,5 +1,6 @@
 #include "types.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -146,6 +147,15 @@ bool SaveWorld(const char *path)
             fwrite(&count, sizeof(uint16_t), 1, f);
             y += count;
         }
+    }
+
+    // Modified blocks for multiplayer world sync (v8+)
+    uint32_t modCount = (uint32_t)modifiedBlockCount;
+    fwrite(&modCount, sizeof(uint32_t), 1, f);
+    for (uint32_t i = 0; i < modCount; i++) {
+        fwrite(&modifiedBlocks[i].x, sizeof(uint16_t), 1, f);
+        fwrite(&modifiedBlocks[i].y, sizeof(uint16_t), 1, f);
+        fwrite(&modifiedBlocks[i].blockType, sizeof(uint8_t), 1, f);
     }
 
     fclose(f);
@@ -311,6 +321,40 @@ bool LoadWorld(const char *path)
                 world[x][y + i] = block;
             }
             y += count;
+        }
+    }
+
+    // Modified blocks for multiplayer world sync (v8+)
+    modifiedBlockCount = 0;
+    if (version >= 8) {
+        uint32_t modCount = 0;
+        if (fread(&modCount, sizeof(uint32_t), 1, f) == 1) {
+            for (uint32_t i = 0; i < modCount && i < MAX_MODIFIED_BLOCKS; i++) {
+                if (fread(&modifiedBlocks[i].x, sizeof(uint16_t), 1, f) != 1) break;
+                if (fread(&modifiedBlocks[i].y, sizeof(uint16_t), 1, f) != 1) break;
+                if (fread(&modifiedBlocks[i].blockType, sizeof(uint8_t), 1, f) != 1) break;
+                modifiedBlockCount++;
+            }
+        }
+    } else {
+        // Pre-v8 save: compute modified blocks by comparing against freshly generated world
+        // Save current world, regenerate from seed, compare, restore
+        uint8_t (*savedWorld)[WORLD_HEIGHT] = malloc(WORLD_WIDTH * WORLD_HEIGHT);
+        if (savedWorld) {
+            memcpy(savedWorld, world, WORLD_WIDTH * WORLD_HEIGHT);
+            GenerateWorld(worldSeed);
+            for (int x = 0; x < WORLD_WIDTH && modifiedBlockCount < MAX_MODIFIED_BLOCKS; x++) {
+                for (int y = 0; y < WORLD_HEIGHT && modifiedBlockCount < MAX_MODIFIED_BLOCKS; y++) {
+                    if (savedWorld[x][y] != world[x][y]) {
+                        modifiedBlocks[modifiedBlockCount].x = (uint16_t)x;
+                        modifiedBlocks[modifiedBlockCount].y = (uint16_t)y;
+                        modifiedBlocks[modifiedBlockCount].blockType = savedWorld[x][y];
+                        modifiedBlockCount++;
+                    }
+                }
+            }
+            memcpy(world, savedWorld, WORLD_WIDTH * WORLD_HEIGHT);
+            free(savedWorld);
         }
     }
 

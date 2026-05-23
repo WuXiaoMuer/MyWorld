@@ -1,4 +1,5 @@
 #include "types.h"
+#include "net.h"
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -677,7 +678,7 @@ void DrawInventoryScreen(void)
                 }
 
                 // Shift-click: transfer chest -> inventory
-                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && IsKeyDown(KEY_LEFT_SHIFT) && chestIdx >= 0 && chestData[chestIdx].items[si] != BLOCK_AIR) {
+                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && Win32IsKeyDown(KEY_LEFT_SHIFT) && chestIdx >= 0 && chestData[chestIdx].items[si] != BLOCK_AIR) {
                     uint8_t item = chestData[chestIdx].items[si];
                     int cnt = chestData[chestIdx].counts[si];
                     bool merged = false;
@@ -797,7 +798,7 @@ void DrawInventoryScreen(void)
                 }
 
                 // Shift-click: transfer inventory -> chest
-                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && IsKeyDown(KEY_LEFT_SHIFT) && player.inventory[si] != BLOCK_AIR && chestIdx >= 0) {
+                if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && Win32IsKeyDown(KEY_LEFT_SHIFT) && player.inventory[si] != BLOCK_AIR && chestIdx >= 0) {
                     uint8_t item = player.inventory[si];
                     int cnt = player.inventoryCount[si];
                     // Try to merge into existing chest slot
@@ -1610,6 +1611,103 @@ void DrawWater(void)
 }
 
 //----------------------------------------------------------------------------------
+// Remote Players (multiplayer)
+//----------------------------------------------------------------------------------
+void DrawRemotePlayers(void)
+{
+    if (!NetIsConnected()) return;
+
+    float time = (float)GetTime();
+    float dt = GetFrameTime();
+    float lerpSpeed = 12.0f; // Smooth interpolation speed
+
+    for (int i = 0; i < MAX_NET_PLAYERS; i++) {
+        if (i == localPlayerId) continue;
+        if (!remotePlayers[i].active) continue;
+        if (players[i].health <= 0) continue;
+
+        // Smooth interpolation toward target position
+        float targetX = players[i].position.x;
+        float targetY = players[i].position.y;
+        remotePlayers[i].interpX += (targetX - remotePlayers[i].interpX) * lerpSpeed * dt;
+        remotePlayers[i].interpY += (targetY - remotePlayers[i].interpY) * lerpSpeed * dt;
+        float px = remotePlayers[i].interpX;
+        float py = remotePlayers[i].interpY;
+        bool moving = fabsf(players[i].velocity.x) > 10.0f;
+        bool facing = players[i].facingRight;
+        float armSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
+        float legSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
+
+        // Different shirt colors per player
+        Color skin = (Color){220, 180, 140, 255};
+        Color hair = (Color){80, 50, 30, 255};
+        Color shirt, pants;
+        switch (i) {
+            case 1: shirt = (Color){200, 50, 50, 255}; pants = (Color){40, 40, 60, 255}; break;
+            case 2: shirt = (Color){50, 200, 50, 255}; pants = (Color){40, 60, 40, 255}; break;
+            case 3: shirt = (Color){200, 200, 50, 255}; pants = (Color){60, 60, 40, 255}; break;
+            default: shirt = (Color){0, 100, 200, 255}; pants = (Color){60, 40, 20, 255}; break;
+        }
+
+        // Damage flash
+        if (players[i].damageFlashTimer > 0.0f) {
+            skin = (Color){255, 150, 150, 255};
+            shirt = (Color){100, 50, 50, 255};
+        }
+
+        float centerX = px + PLAYER_WIDTH / 2.0f;
+        float footY = py + PLAYER_HEIGHT;
+
+        // Shadow
+        DrawEllipse((int)centerX, (int)footY, 8, 3, (Color){0, 0, 0, 50});
+
+        // Legs
+        float legOffset = legSwing;
+        DrawRectangle((int)(centerX - 4), (int)(footY - 12 + legOffset * 0.5f), 4, 12, pants);
+        DrawRectangle((int)(centerX + 1), (int)(footY - 12 - legOffset * 0.5f), 4, 12, pants);
+
+        // Body
+        DrawRectangle((int)(centerX - 5), (int)(py + 10), 11, 14, shirt);
+
+        // Armor overlay (simplified)
+        for (int a = 0; a < 4; a++) {
+            if (players[i].armor[a] != BLOCK_AIR) {
+                BlockType at = (BlockType)players[i].armor[a];
+                Color ac;
+                if (at <= ARMOR_STONE_BOOTS) ac = (Color){140, 140, 140, 180};
+                else if (at <= ARMOR_IRON_BOOTS) ac = (Color){200, 210, 220, 180};
+                else if (at <= ARMOR_GOLD_BOOTS) ac = (Color){220, 180, 50, 180};
+                else ac = (Color){80, 220, 230, 180};
+                if (a == 0) DrawRectangle((int)(centerX - 4), (int)(py + 2), 9, 5, ac);
+                else if (a == 1) DrawRectangle((int)(centerX - 5), (int)(py + 10), 11, 8, ac);
+                else if (a == 2) DrawRectangle((int)(centerX - 5), (int)(py + 18), 11, 6, ac);
+                else if (a == 3) DrawRectangle((int)(centerX - 4), (int)(footY - 4), 4, 4, ac);
+            }
+        }
+
+        // Arms
+        float armX = facing ? 1.0f : -1.0f;
+        DrawRectangle((int)(centerX - 7 + armX * armSwing * 0.3f), (int)(py + 11), 3, 11, skin);
+        DrawRectangle((int)(centerX + 5 - armX * armSwing * 0.3f), (int)(py + 11), 3, 11, skin);
+
+        // Head
+        DrawRectangle((int)(centerX - 4), (int)(py + 2), 9, 8, skin);
+        // Hair
+        DrawRectangle((int)(centerX - 4), (int)(py + 2), 9, 3, hair);
+        // Eyes
+        int eyeX = facing ? (int)(centerX + 1) : (int)(centerX - 3);
+        DrawRectangle(eyeX, (int)(py + 6), 2, 2, (Color){40, 40, 40, 255});
+
+        // Name tag
+        char nameTag[16];
+        snprintf(nameTag, sizeof(nameTag), "P%d", i);
+        int nameW = MeasureGameTextWidth(nameTag, 12);
+        DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(py - 8), 12,
+                     (Color){255, 255, 255, 200});
+    }
+}
+
+//----------------------------------------------------------------------------------
 // Player Sprite
 //----------------------------------------------------------------------------------
 void DrawPlayerSprite(void)
@@ -1622,14 +1720,7 @@ void DrawPlayerSprite(void)
     float armSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
     float legSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
 
-    // Sprint dust particles
-    if (player.sprinting && player.onGround && moving) {
-        if ((int)(time * 15) % 2 == 0) {
-            float dustX = facing ? px : px + PLAYER_WIDTH;
-            SpawnDamageParticles(dustX, py + PLAYER_HEIGHT,
-                                 (Color){180, 170, 150, 120});
-        }
-    }
+    // Sprint dust is spawned by PlayerPhysics, not here (avoid duplicates)
 
     // Damage flash tint
     Color skin = (Color){220, 180, 140, 255};
@@ -2318,6 +2409,8 @@ void DrawPauseMenu(void)
     if (hoverM && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         PlaySoundUIClick();
         if (currentSavePath[0]) SaveWorld(currentSavePath);
+        if (NetIsHost()) NetHostStop();
+        else if (NetIsClient()) NetClientDisconnect();
         gamePaused = false;
         inventoryOpen = false;
         StartTransition(STATE_MENU);
@@ -2858,34 +2951,34 @@ void DrawMainMenu(void)
     // Buttons with staggered slide-in entrance
     int btnW = 260, btnH = 44;
     int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = 215;
-    int spacing = 56;
+    int btnY = 210;
+    int spacing = 50;
     float btnDelay0 = titleTotalDur + 0.2f;
 
     Vector2 mouse = Win32GetMousePosition();
 
-    const char *btnLabels[] = { S(STR_BTN_NEW_GAME), S(STR_BTN_LOAD_GAME), S(STR_BTN_SETTINGS), S(STR_BTN_QUIT) };
-    int btnCount = 4;
+    const char *btnLabels[] = { S(STR_BTN_NEW_GAME), S(STR_BTN_LOAD_GAME), S(STR_BTN_HOST_GAME), S(STR_BTN_JOIN_GAME), S(STR_BTN_SETTINGS), S(STR_BTN_QUIT) };
+    int btnCount = 6;
     bool hasAnySave = false;
     for (int i = 0; i < MAX_SAVE_SLOTS; i++) {
         SaveSlotInfo info;
         if (GetSlotInfo(i, &info) && info.exists) { hasAnySave = true; break; }
     }
-    bool btnEnabled[] = { true, hasAnySave, true, true };
+    bool btnEnabled[] = { true, hasAnySave, true, true, true, true };
     Color btnSelColors[] = {
-        {70, 140, 70, 255}, {60, 100, 160, 255}, {100, 80, 150, 255}, {150, 50, 50, 255}
+        {70, 140, 70, 255}, {60, 100, 160, 255}, {50, 120, 160, 255}, {140, 100, 50, 255}, {100, 80, 150, 255}, {150, 50, 50, 255}
     };
     Color btnNormColors[] = {
-        {40, 75, 40, 230}, {35, 58, 100, 230}, {58, 44, 90, 230}, {82, 30, 30, 230}
+        {40, 75, 40, 230}, {35, 58, 100, 230}, {30, 68, 100, 230}, {82, 60, 30, 230}, {58, 44, 90, 230}, {82, 30, 30, 230}
     };
     Color btnBorderSel[] = {
-        {160, 255, 160, 255}, {130, 190, 255, 255}, {170, 145, 220, 255}, {255, 130, 130, 255}
+        {160, 255, 160, 255}, {130, 190, 255, 255}, {120, 200, 255, 255}, {255, 200, 120, 255}, {170, 145, 220, 255}, {255, 130, 130, 255}
     };
     Color btnBorderNorm[] = {
-        {70, 110, 70, 200}, {60, 90, 140, 200}, {80, 65, 120, 200}, {120, 50, 50, 200}
+        {70, 110, 70, 200}, {60, 90, 140, 200}, {50, 100, 140, 200}, {120, 90, 50, 200}, {80, 65, 120, 200}, {120, 50, 50, 200}
     };
-    // Button icon shapes: 0=+, folder, gear, x
-    int btnIcons[] = { 0, 1, 2, 3 };
+    // Button icon shapes: 0=+, folder, globe, link, gear, x
+    int btnIcons[] = { 0, 1, 4, 5, 2, 3 };
 
     for (int i = 0; i < btnCount; i++) {
         // Staggered entrance animation
@@ -2992,6 +3085,19 @@ void DrawMainMenu(void)
                     DrawRectangle(iconX + l, iconY + l, 2, 2, iconC);
                     DrawRectangle(iconX + l, iconY - l, 2, 2, iconC);
                 }
+                break;
+            case 4: // globe for Host Game
+                DrawCircleLines(iconX, iconY, 5.0f, iconC);
+                DrawRectangle(iconX - 5, iconY, 10, 1, iconC);
+                DrawRectangle(iconX, iconY - 5, 1, 10, iconC);
+                DrawRectangle(iconX - 3, iconY - 3, 6, 1, iconC);
+                DrawRectangle(iconX - 3, iconY + 2, 6, 1, iconC);
+                break;
+            case 5: // link for Join Game
+                DrawRectangle(iconX - 5, iconY - 1, 4, 2, iconC);
+                DrawRectangle(iconX + 1, iconY - 1, 4, 2, iconC);
+                DrawRectangle(iconX - 3, iconY - 3, 2, 6, iconC);
+                DrawRectangle(iconX + 1, iconY - 3, 2, 6, iconC);
                 break;
         }
 

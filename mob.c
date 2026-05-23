@@ -5,11 +5,12 @@
 // Mob globals defined in main.c
 
 // Mob properties per type
-static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16 };       // NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER
-static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f };
-static const int mobWidth[] = { 0, 16, 12, 12, 12, 20 };
-static const int mobHeight[] = { 0, 12, 28, 24, 24, 16 };
-static const int mobDamage[] = { 0, 0, 4, 2, 0, 3 };            // contact damage (creeper explodes)
+// NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER, SLIME, ENDERMAN
+static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16, 8, 40 };
+static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f, 35.0f, 60.0f };
+static const int mobWidth[] = { 0, 16, 12, 12, 12, 20, 16, 10 };
+static const int mobHeight[] = { 0, 12, 28, 24, 24, 16, 12, 32 };
+static const int mobDamage[] = { 0, 0, 4, 2, 0, 3, 2, 5 };      // contact damage
 
 void InitMobs(void)
 {
@@ -393,6 +394,7 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                                 if (bt != BLOCK_AIR && bt != BLOCK_BEDROCK) {
                                     SpawnBlockParticles(bx, by, bt);
                                     world[bx][by] = BLOCK_AIR;
+                                    NetSyncBlockChange(bx, by, BLOCK_AIR);
                                     InvalidateChunkAt(bx, by);
                                     UpdateLightAt(bx, by);
                                 }
@@ -484,6 +486,117 @@ static void UpdateSpiderAI(Mob *mob, float dt)
     }
 }
 
+// Get biome at a world X position (must match GenerateWorld logic)
+static int GetBiomeAtX(int worldX)
+{
+    float biomeNoise = fbm(worldX * 0.008f, 0.0f, 2, 0.5f, worldSeed + 8000);
+    if (biomeNoise > 0.55f) return 1;       // desert
+    else if (biomeNoise > 0.35f) return 6;   // taiga
+    else if (biomeNoise > 0.15f) return 0;   // plains
+    else if (biomeNoise > -0.05f) return 4;  // swamp
+    else if (biomeNoise > -0.25f) return 2;  // forest
+    else if (biomeNoise > -0.45f) return 5;  // jungle
+    else return 3;                            // tundra
+}
+
+static void UpdateSlimeAI(Mob *mob, float dt)
+{
+    float dx = player.position.x - mob->position.x;
+    float dist = fabsf(dx);
+
+    if (CanMobSeePlayer(mob) && dist < 300.0f) {
+        // Hop toward player
+        mob->aiState = 1;
+        mob->facingRight = dx > 0;
+        mob->velocity.x = (dx > 0 ? 1 : -1) * mobSpeed[MOB_SLIME];
+
+        // Periodic hopping
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = 0.8f + (float)(rand() % 100) / 200.0f;
+            if (mob->onGround) {
+                mob->velocity.y = -220.0f;
+            }
+        }
+    } else {
+        // Wander with hops
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = MOB_AI_INTERVAL * 2.0f + (float)(rand() % 100) / 100.0f;
+            mob->aiState = rand() % 3;
+        }
+        switch (mob->aiState) {
+            case 0: mob->velocity.x = 0; break;
+            case 1: mob->velocity.x = -mobSpeed[MOB_SLIME] * 0.5f; mob->facingRight = false; break;
+            case 2: mob->velocity.x = mobSpeed[MOB_SLIME] * 0.5f; mob->facingRight = true; break;
+        }
+        // Random hops while wandering
+        if (mob->onGround && (rand() % 100) < 2) {
+            mob->velocity.y = -180.0f;
+        }
+    }
+}
+
+static void UpdateEndermanAI(Mob *mob, float dt)
+{
+    float dx = player.position.x - mob->position.x;
+    float dist = fabsf(dx);
+
+    // Check if player is looking at enderman (crosshair near mob center)
+    Vector2 mouseWorld = Win32GetMousePosition();
+    mouseWorld.x += camera.target.x - SCREEN_WIDTH / 2.0f;
+    mouseWorld.y += camera.target.y - SCREEN_HEIGHT / 2.0f;
+    float mobCenterX = mob->position.x + mobWidth[MOB_ENDERMAN] / 2.0f;
+    float mobCenterY = mob->position.y + mobHeight[MOB_ENDERMAN] / 2.0f;
+    float lookDist = sqrtf((mouseWorld.x - mobCenterX) * (mouseWorld.x - mobCenterX) +
+                           (mouseWorld.y - mobCenterY) * (mouseWorld.y - mobCenterY));
+    bool playerLooking = lookDist < 100.0f && dist < 400.0f;
+
+    if (playerLooking || mob->aiState == 1) {
+        // Provoked: chase + teleport
+        mob->aiState = 1;
+        mob->facingRight = dx > 0;
+        mob->velocity.x = (dx > 0 ? 1 : -1) * mobSpeed[MOB_ENDERMAN];
+
+        // Teleport logic
+        mob->attackTimer -= dt;
+        if (mob->attackTimer <= 0 && dist > 150.0f) {
+            mob->attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
+            // Teleport to a random position near player
+            float offset = (float)(rand() % 200 - 100);
+            float newX = player.position.x + offset;
+            // Find ground at new position
+            int bx = (int)(newX / BLOCK_SIZE);
+            if (bx >= 0 && bx < WORLD_WIDTH) {
+                float oldX = mob->position.x;
+                float oldY = mob->position.y;
+                for (int by = 0; by < WORLD_HEIGHT - 2; by++) {
+                    if (IsBlockSolid(bx, by) && !IsBlockSolid(bx, by - 1) && !IsBlockSolid(bx, by - 2)) {
+                        mob->position.x = newX;
+                        mob->position.y = (by - 2) * BLOCK_SIZE;
+                        // Spawn particles at old and new position
+                        SpawnDamageParticles(oldX + 5, oldY + 16, (Color){120, 80, 200, 255});
+                        SpawnDamageParticles(mob->position.x + 5, mob->position.y + 16, (Color){120, 80, 200, 255});
+                        break;
+                    }
+                }
+            }
+        }
+    } else {
+        // Neutral wander
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = MOB_AI_INTERVAL * 2.0f + (float)(rand() % 100) / 100.0f;
+            mob->aiState = rand() % 3;
+        }
+        switch (mob->aiState) {
+            case 0: mob->velocity.x = 0; break;
+            case 1: mob->velocity.x = -mobSpeed[MOB_ENDERMAN] * 0.3f; mob->facingRight = false; break;
+            case 2: mob->velocity.x = mobSpeed[MOB_ENDERMAN] * 0.3f; mob->facingRight = true; break;
+        }
+    }
+}
+
 static void UpdateMobContactDamage(Mob *mob, float dt)
 {
     if (mob->contactCooldown > 0) {
@@ -548,6 +661,8 @@ void DamageMob(Mob *mob, int damage)
             case MOB_SKELETON: deathColor = (Color){220, 210, 190, 255}; break;
             case MOB_CREEPER: deathColor = (Color){60, 140, 50, 255}; break;
             case MOB_SPIDER: deathColor = (Color){60, 40, 30, 255}; break;
+            case MOB_SLIME: deathColor = (Color){80, 200, 60, 255}; break;
+            case MOB_ENDERMAN: deathColor = (Color){120, 80, 200, 255}; break;
             default: deathColor = (Color){180, 30, 30, 255}; break;
         }
         SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
@@ -571,6 +686,17 @@ void DamageMob(Mob *mob, int damage)
             SpawnItemEntity(ITEM_GUNPOWDER, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_SPIDER) {
             SpawnItemEntity(ITEM_STRING, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
+        } else if (mob->type == MOB_SLIME) {
+            SpawnItemEntity(ITEM_SLIMEBALL, 1 + rand() % 3, baseDropX + (rand() % 10 - 5), baseDropY);
+            // Large slimes (fuseTimer==0) split into 2 small slimes
+            if (mob->fuseTimer == 0) {
+                Mob *s1 = SpawnMob(MOB_SLIME, mob->position.x - 10, mob->position.y);
+                Mob *s2 = SpawnMob(MOB_SLIME, mob->position.x + 10, mob->position.y);
+                if (s1) { s1->fuseTimer = 1; s1->health = 4; s1->maxHealth = 4; }
+                if (s2) { s2->fuseTimer = 1; s2->health = 4; s2->maxHealth = 4; }
+            }
+        } else if (mob->type == MOB_ENDERMAN) {
+            SpawnItemEntity(ITEM_ENDER_PEARL, 1, baseDropX + (rand() % 10 - 5), baseDropY);
         }
         PlaySoundDeath();
         player.xp += (mob->type == MOB_PIG) ? 3 : 5;
@@ -711,6 +837,51 @@ static void TrySpawnMobs(float dt)
             }
         }
     }
+
+    // Slime: swamp/jungle biome, daytime, bright areas
+    if (hostileCount + passiveCount < MAX_MOBS - 4) {
+        float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
+        float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
+        float spawnX = playerCX + cosf(angle) * dist;
+        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
+
+        int bx = (int)(spawnX / BLOCK_SIZE);
+        if (bx >= 0 && bx < WORLD_WIDTH) {
+            int biome = GetBiomeAtX(bx);
+            if (biome == 4 || biome == 5) { // swamp or jungle
+                for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+                    if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                        uint8_t light = GetLightLevel(bx, y - 1);
+                        if (light >= 8 && dayNight.lightLevel > 0.5f) {
+                            SpawnMob(MOB_SLIME, spawnX, (y - 2) * BLOCK_SIZE);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // Enderman: any biome, night, dark areas, rare
+    if (hostileCount + passiveCount < MAX_MOBS - 4 && (rand() % 4 == 0)) {
+        float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
+        float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
+        float spawnX = playerCX + cosf(angle) * dist;
+        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
+
+        int bx = (int)(spawnX / BLOCK_SIZE);
+        if (bx >= 0 && bx < WORLD_WIDTH) {
+            for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+                if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                    uint8_t light = GetLightLevel(bx, y - 1);
+                    if (light <= MOB_HOSTILE_LIGHT_MAX) {
+                        SpawnMob(MOB_ENDERMAN, spawnX, (y - 2) * BLOCK_SIZE);
+                    }
+                    break;
+                }
+            }
+        }
+    }
 }
 
 void UpdateMobs(float dt)
@@ -731,7 +902,7 @@ void UpdateMobs(float dt)
         }
 
         // Hostile mobs burn and despawn in sunlight
-        if (mob->type == MOB_ZOMBIE || mob->type == MOB_SKELETON) {
+        if (mob->type == MOB_ZOMBIE || mob->type == MOB_SKELETON || mob->type == MOB_ENDERMAN) {
             int mbx = (int)(mob->position.x / BLOCK_SIZE);
             int mby = (int)(mob->position.y / BLOCK_SIZE);
             uint8_t light = GetLightLevel(mbx, mby);
@@ -813,6 +984,8 @@ void UpdateMobs(float dt)
         else if (mob->type == MOB_SKELETON) UpdateSkeletonAI(mob, dt);
         else if (mob->type == MOB_CREEPER) UpdateCreeperAI(mob, dt);
         else if (mob->type == MOB_SPIDER) UpdateSpiderAI(mob, dt);
+        else if (mob->type == MOB_SLIME) UpdateSlimeAI(mob, dt);
+        else if (mob->type == MOB_ENDERMAN) UpdateEndermanAI(mob, dt);
 
         // Physics
         UpdateMobPhysics(mob, dt);
@@ -1021,6 +1194,82 @@ static void DrawSpiderSprite(Mob *mob)
     }
 }
 
+static void DrawSlimeSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    int w = mobWidth[MOB_SLIME];
+    int h = mobHeight[MOB_SLIME];
+
+    // Squash/stretch animation
+    float bounce = mob->onGround ? 1.0f : 0.8f;
+    int drawH = (int)(h * bounce);
+    int drawW = (int)(w / bounce);
+
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+    }
+
+    // Body (green blob)
+    DrawRectangle((int)x, (int)(y + h - drawH), drawW, drawH, (Color){80, 200, 60, alpha});
+    // Darker spots
+    DrawRectangle((int)(x + 3), (int)(y + 3), 3, 3, (Color){60, 170, 40, alpha});
+    DrawRectangle((int)(x + 9), (int)(y + 5), 2, 2, (Color){60, 170, 40, alpha});
+    // Eyes (white with dark pupil)
+    DrawRectangle((int)(x + 4), (int)(y + 3), 3, 3, (Color){255, 255, 255, alpha});
+    DrawRectangle((int)(x + 9), (int)(y + 3), 3, 3, (Color){255, 255, 255, alpha});
+    DrawRectangle((int)(x + 5), (int)(y + 4), 2, 2, (Color){30, 30, 30, alpha});
+    DrawRectangle((int)(x + 10), (int)(y + 4), 2, 2, (Color){30, 30, 30, alpha});
+    // Highlight
+    DrawRectangle((int)(x + 2), (int)(y + 1), 2, 2, (Color){120, 230, 100, alpha});
+}
+
+static void DrawEndermanSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    int w = mobWidth[MOB_ENDERMAN];
+    int h = mobHeight[MOB_ENDERMAN];
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float armSwing = moving ? sinf(time * 6.0f) * 4.0f : 0;
+    float bob = sinf(time * 3.0f) * 1.5f;
+
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        float deathProgress = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * deathProgress);
+    }
+
+    // Body (tall, dark)
+    DrawRectangle((int)(x + 2), (int)(y + 8 + bob), 6, 16, (Color){20, 20, 25, alpha});
+    // Head
+    DrawRectangle((int)(x + 1), (int)(y + bob), 8, 8, (Color){25, 25, 30, alpha});
+    // Eyes (bright purple, glowing)
+    DrawRectangle((int)(x + 3), (int)(y + 3 + bob), 2, 2, (Color){140, 80, 220, alpha});
+    DrawRectangle((int)(x + 6), (int)(y + 3 + bob), 2, 2, (Color){140, 80, 220, alpha});
+    // Arms (long, thin)
+    DrawRectangle((int)(x - 1), (int)(y + 10 + armSwing + bob), 2, 14, (Color){20, 20, 25, alpha});
+    DrawRectangle((int)(x + 9), (int)(y + 10 - armSwing + bob), 2, 14, (Color){20, 20, 25, alpha});
+    // Legs (long, thin)
+    float legSwing = moving ? sinf(time * 8.0f) * 3.0f : 0;
+    DrawRectangle((int)(x + 2), (int)(y + 24 + legSwing + bob), 2, 8, (Color){20, 20, 25, alpha});
+    DrawRectangle((int)(x + 6), (int)(y + 24 - legSwing + bob), 2, 8, (Color){20, 20, 25, alpha});
+
+    // Purple particle trail when provoked
+    if (mob->aiState == 1) {
+        float particleTime = time * 5.0f;
+        for (int i = 0; i < 3; i++) {
+            float px = x + 5 + sinf(particleTime + i * 2.0f) * 8;
+            float py = y + 10 + cosf(particleTime + i * 1.5f) * 6 + bob;
+            DrawRectangle((int)px, (int)py, 2, 2, (Color){120, 60, 200, (unsigned char)(alpha / 2)});
+        }
+    }
+}
+
 void DrawMobs(void)
 {
     for (int i = 0; i < MAX_MOBS; i++) {
@@ -1033,6 +1282,8 @@ void DrawMobs(void)
             case MOB_SKELETON: DrawSkeletonSprite(mob); break;
             case MOB_CREEPER: DrawCreeperSprite(mob); break;
             case MOB_SPIDER: DrawSpiderSprite(mob); break;
+            case MOB_SLIME: DrawSlimeSprite(mob); break;
+            case MOB_ENDERMAN: DrawEndermanSprite(mob); break;
             default: break;
         }
 

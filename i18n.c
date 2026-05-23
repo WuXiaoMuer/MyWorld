@@ -108,6 +108,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_MOB_SKELETON] = "Shot by Skeleton",
     [STR_DEATH_MOB_CREEPER] = "Blown up by Creeper",
     [STR_DEATH_MOB_SPIDER] = "Slain by Spider",
+    [STR_DEATH_MOB_SLIME] = "Slain by Slime",
+    [STR_DEATH_MOB_ENDERMAN] = "Slain by Enderman",
     [STR_DEATH_VOID] = "Fell out of the world",
     [STR_DEATH_SCORE] = "Score: %d XP",
 
@@ -285,6 +287,21 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_BOOKSHELF] = "Bookshelf",
     [STR_BLOCK_LANTERN] = "Lantern",
     [STR_BLOCK_BONE_BLOCK] = "Bone Block",
+    [STR_BLOCK_SNOW] = "Snow",
+    [STR_BLOCK_ICE] = "Ice",
+    [STR_BLOCK_PACKED_ICE] = "Packed Ice",
+    [STR_BLOCK_MUD] = "Mud",
+    [STR_BLOCK_MOSS_BLOCK] = "Moss Block",
+    [STR_BLOCK_JUNGLE_WOOD] = "Jungle Wood",
+    [STR_BLOCK_JUNGLE_LEAVES] = "Jungle Leaves",
+    [STR_BLOCK_VINE] = "Vine",
+    [STR_BLOCK_PUMPKIN] = "Pumpkin",
+    [STR_BLOCK_MELON] = "Melon",
+    [STR_BLOCK_SNOWY_GRASS] = "Snowy Grass",
+    [STR_BLOCK_COARSE_DIRT] = "Coarse Dirt",
+    [STR_BLOCK_PODZOL] = "Podzol",
+    [STR_ITEM_SLIMEBALL] = "Slimeball",
+    [STR_ITEM_ENDER_PEARL] = "Ender Pearl",
 
     // Recipe Names
     [STR_RECIPE_WOOD_PLANKS] = "Wood -> 4 Planks",
@@ -364,6 +381,15 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Additional controls
     [STR_KEY_F11] = "F11",
     [STR_ACT_FULLSCREEN] = "Toggle fullscreen",
+
+    // Multiplayer
+    [STR_BTN_HOST_GAME] = "Host Game",
+    [STR_BTN_JOIN_GAME] = "Join Game",
+    [STR_HOST_WAITING] = "Waiting for players...",
+    [STR_HOST_IP_HINT] = "Your IP: %s:%d",
+    [STR_JOIN_TITLE] = "Join Game",
+    [STR_JOIN_IP_HINT] = "Enter host IP address:",
+    [STR_JOIN_CONNECTING] = "Connecting...",
 },
 
 // ===== SIMPLIFIED CHINESE =====
@@ -441,6 +467,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_MOB_SKELETON] = "被骷髅射杀",
     [STR_DEATH_MOB_CREEPER] = "被苦力怕炸死",
     [STR_DEATH_MOB_SPIDER] = "被蜘蛛杀死",
+    [STR_DEATH_MOB_SLIME] = "被史莱姆杀死",
+    [STR_DEATH_MOB_ENDERMAN] = "被末影人杀死",
     [STR_DEATH_VOID] = "掉出了世界",
     [STR_DEATH_SCORE] = "得分: %d XP",
 
@@ -610,6 +638,21 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_BOOKSHELF] = "书架",
     [STR_BLOCK_LANTERN] = "灯笼",
     [STR_BLOCK_BONE_BLOCK] = "骨块",
+    [STR_BLOCK_SNOW] = "雪",
+    [STR_BLOCK_ICE] = "冰",
+    [STR_BLOCK_PACKED_ICE] = "浮冰",
+    [STR_BLOCK_MUD] = "泥巴",
+    [STR_BLOCK_MOSS_BLOCK] = "苔藓块",
+    [STR_BLOCK_JUNGLE_WOOD] = "丛林木",
+    [STR_BLOCK_JUNGLE_LEAVES] = "丛林树叶",
+    [STR_BLOCK_VINE] = "藤蔓",
+    [STR_BLOCK_PUMPKIN] = "南瓜",
+    [STR_BLOCK_MELON] = "西瓜",
+    [STR_BLOCK_SNOWY_GRASS] = "雪草方块",
+    [STR_BLOCK_COARSE_DIRT] = "砂土",
+    [STR_BLOCK_PODZOL] = "灰化土",
+    [STR_ITEM_SLIMEBALL] = "粘液球",
+    [STR_ITEM_ENDER_PEARL] = "末影珍珠",
 
     // Recipe names
     [STR_RECIPE_WOOD_PLANKS] = "木头 -> 4木板",   // 木头 -> 4木板
@@ -687,6 +730,15 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Additional controls
     [STR_KEY_F11] = "F11",
     [STR_ACT_FULLSCREEN] = "切换全屏",
+
+    // Multiplayer
+    [STR_BTN_HOST_GAME] = "创建主机",
+    [STR_BTN_JOIN_GAME] = "加入游戏",
+    [STR_HOST_WAITING] = "等待玩家加入...",
+    [STR_HOST_IP_HINT] = "你的IP: %s:%d",
+    [STR_JOIN_TITLE] = "加入游戏",
+    [STR_JOIN_IP_HINT] = "输入主机IP地址:",
+    [STR_JOIN_CONNECTING] = "连接中...",
 },
 
 // ===== JAPANESE =====
@@ -764,6 +816,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_MOB_SKELETON] = "スケルトンに射殺された",
     [STR_DEATH_MOB_CREEPER] = "クリーパーに爆破された",
     [STR_DEATH_MOB_SPIDER] = "スパイダーに殺された",
+    [STR_DEATH_MOB_SLIME] = "スライムに殺された",
+    [STR_DEATH_MOB_ENDERMAN] = "エンダーマンに殺された",
     [STR_DEATH_VOID] = "世界から落ちた",
     [STR_DEATH_SCORE] = "スコア: %d XP",
 
@@ -933,6 +987,21 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_BOOKSHELF] = "本棚",
     [STR_BLOCK_LANTERN] = "ランタン",
     [STR_BLOCK_BONE_BLOCK] = "骨ブロック",
+    [STR_BLOCK_SNOW] = "雪",
+    [STR_BLOCK_ICE] = "氷",
+    [STR_BLOCK_PACKED_ICE] = "氷塊",
+    [STR_BLOCK_MUD] = "泥",
+    [STR_BLOCK_MOSS_BLOCK] = "苔ブロック",
+    [STR_BLOCK_JUNGLE_WOOD] = "ジャングルの木",
+    [STR_BLOCK_JUNGLE_LEAVES] = "ジャングルの葉",
+    [STR_BLOCK_VINE] = "ツタ",
+    [STR_BLOCK_PUMPKIN] = "カボチャ",
+    [STR_BLOCK_MELON] = "スイカ",
+    [STR_BLOCK_SNOWY_GRASS] = "雪草ブロック",
+    [STR_BLOCK_COARSE_DIRT] = "粗い土",
+    [STR_BLOCK_PODZOL] = "ポドゾル",
+    [STR_ITEM_SLIMEBALL] = "スライムボール",
+    [STR_ITEM_ENDER_PEARL] = "エンダーパール",
 
     // Recipe names (Japanese)
     [STR_RECIPE_WOOD_PLANKS] = "材 -> 板×4",         // 材 -> 板×4
@@ -1010,6 +1079,15 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Additional controls
     [STR_KEY_F11] = "F11",
     [STR_ACT_FULLSCREEN] = "フルスクリーン切替",
+
+    // Multiplayer
+    [STR_BTN_HOST_GAME] = "ホストゲーム",
+    [STR_BTN_JOIN_GAME] = "ゲーム参加",
+    [STR_HOST_WAITING] = "プレイヤーを待っています...",
+    [STR_HOST_IP_HINT] = "あなたのIP: %s:%d",
+    [STR_JOIN_TITLE] = "ゲーム参加",
+    [STR_JOIN_IP_HINT] = "ホストのIPアドレスを入力:",
+    [STR_JOIN_CONNECTING] = "接続中...",
 },
 };
 

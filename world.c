@@ -112,6 +112,23 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Bookshelf",    {140,110,60,255}, {100,80,40,255},   true,  false, true},
     {"Lantern",      {200,180,140,255},{255,220,100,255}, false, true,  true},
     {"Bone Block",   {230,220,200,255},{200,190,170,255}, true,  false, true},
+    // Phase 1: Biome blocks
+    {"Snow",         {240,245,255,255},{220,225,240,255}, true,  false, true},
+    {"Ice",          {180,210,240,255},{150,185,220,255}, true,  true,  true},
+    {"Packed Ice",   {160,195,230,255},{130,170,210,255}, true,  false, true},
+    {"Mud",          {100,80,60,255},  {80,60,45,255},    true,  false, true},
+    {"Moss Block",   {80,120,60,255},  {60,100,45,255},   true,  false, true},
+    {"Jungle Wood",  {110,80,40,255},  {85,60,30,255},    true,  false, true},
+    {"Jungle Leaves",{30,140,20,255},  {20,110,15,255},   true,  true,  true},
+    {"Vine",         {40,130,25,255},  {30,100,18,255},   false, true,  true},
+    {"Pumpkin",      {220,150,30,255}, {180,100,20,255},  true,  false, true},
+    {"Melon",        {100,180,60,255}, {70,140,40,255},   true,  false, true},
+    {"Snowy Grass",  {220,230,240,255},{200,210,220,255}, true,  false, true},
+    {"Coarse Dirt",  {120,85,55,255},  {100,70,45,255},   true,  false, true},
+    {"Podzol",       {110,80,45,255},  {85,60,35,255},    true,  false, true},
+    // Phase 1: New items
+    {"Slimeball",    {120,200,80,255}, {90,170,60,255},   false, false, false},
+    {"Ender Pearl",  {20,20,30,255},   {120,80,200,255},  false, false, false},
 };
 
 //----------------------------------------------------------------------------------
@@ -1342,6 +1359,235 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case BLOCK_SNOW:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 50);
+                Color c = base;
+                if (h % 9 == 0) c = (Color){230, 235, 250, 255};
+                else if (h % 13 == 0) c = (Color){215, 220, 235, 255};
+                if (y > 13) c = (Color){(unsigned char)(base.r - 8), (unsigned char)(base.g - 8), (unsigned char)(base.b - 5), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_ICE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 51);
+                Color c = base;
+                if (h % 7 == 0) c = (Color){200, 225, 250, 255};
+                // Crack lines
+                if ((x + y * 3) % 11 == 0) c = (Color){140, 180, 220, 255};
+                // Highlight
+                if (x < 3 && y < 3) c = (Color){220, 240, 255, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_PACKED_ICE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 52);
+                Color c = base;
+                if (h % 6 == 0) c = detail;
+                if ((x + y) % 8 == 0) c = (Color){145, 180, 215, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MUD:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 53);
+                Color c = base;
+                if (h % 7 == 0) c = detail;
+                else if (h % 11 == 0) c = (Color){110, 90, 70, 255};
+                if (y > 13) c = (Color){70, 55, 40, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MOSS_BLOCK:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 54);
+                Color c = base;
+                if (h % 5 == 0) c = (Color){60, 140, 40, 255};
+                else if (h % 8 == 0) c = detail;
+                else if (h % 13 == 0) c = (Color){90, 130, 50, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_JUNGLE_WOOD:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 55);
+                Color c = base;
+                // Vertical bark lines
+                if (x % 4 == 0 || x % 4 == 1) c = detail;
+                if (h % 9 == 0) c = (Color){95, 65, 35, 255};
+                // Knot details
+                if ((x == 6 && y == 5) || (x == 10 && y == 11))
+                    c = (Color){75, 50, 25, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_JUNGLE_LEAVES:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 56);
+                Color c = base;
+                if (h % 4 == 0) c = (Color){40, 155, 25, 255};
+                else if (h % 7 == 0) c = detail;
+                else if (h % 11 == 0) c = (Color){25, 130, 15, 255};
+                // Leaf gaps (transparent feel)
+                if (h % 15 == 0) c = (Color){20, 100, 10, 200};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_VINE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 57);
+                Color c = {0, 0, 0, 0};
+                // Vine strands
+                if (x == 4 || x == 8 || x == 12) {
+                    c = base;
+                    if (h % 5 == 0) c = detail;
+                }
+                // Hanging leaves
+                if (y > 8 && (x == 3 || x == 7 || x == 11)) {
+                    c = (Color){50, 145, 30, 255};
+                }
+                if (h % 17 == 0 && c.a > 0) c = (Color){35, 120, 20, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_PUMPKIN:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 58);
+                Color c = base;
+                // Vertical segments
+                if (x % 5 == 0) c = (Color){190, 120, 20, 255};
+                if (h % 8 == 0) c = detail;
+                // Face (top area)
+                if (y < 4) c = (Color){80, 120, 30, 255}; // stem
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MELON:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 59);
+                Color c = base;
+                // Vertical stripes
+                if (x % 3 == 0) c = detail;
+                if (h % 10 == 0) c = (Color){80, 160, 50, 255};
+                // Darker spots
+                if (h % 15 == 0) c = (Color){60, 130, 35, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_SNOWY_GRASS:
+        // Dirt base
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 60);
+                Color c = (Color){134, 96, 67, 255};
+                if (h % 7 == 0) c = (Color){115, 80, 55, 255};
+                else if (h % 11 == 0) c = (Color){150, 110, 80, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        // Snow top with icy edge
+        for (int y = 0; y < 5; y++)
+            for (int x = 0; x < 16; x++) {
+                int wave = (int)(sinf(x * 0.7f + varSeed * 0.1f) * 1.5f);
+                int snowEdge = 3 + wave;
+                if (y < snowEdge) {
+                    unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 61);
+                    Color c = (Color){235, 240, 250, 255};
+                    if (h % 5 == 0) c = (Color){220, 230, 245, 255};
+                    ImageDrawPixel(img, px + x, py + y, c);
+                }
+            }
+        break;
+
+    case BLOCK_COARSE_DIRT:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 62);
+                Color c = base;
+                if (h % 5 == 0) c = detail;
+                else if (h % 9 == 0) c = (Color){100, 70, 42, 255};
+                // Gravel patches
+                if (h % 13 == 0) c = (Color){130, 115, 100, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_PODZOL:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 63);
+                Color c = base;
+                // Dark organic layer on top
+                if (y < 4) {
+                    c = (Color){60, 40, 20, 255};
+                    if (h % 7 == 0) c = (Color){50, 35, 18, 255};
+                } else {
+                    if (h % 6 == 0) c = detail;
+                    else if (h % 11 == 0) c = (Color){130, 100, 65, 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_SLIMEBALL:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int dx = x - 8, dy = y - 8;
+                Color c = {0, 0, 0, 0};
+                if (dx * dx + dy * dy < 30) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 64);
+                    if (h % 5 == 0) c = (Color){100, 220, 70, 255};
+                    // Highlight
+                    if (dx < 0 && dy < 0 && dx * dx + dy * dy < 12)
+                        c = (Color){150, 230, 110, 255};
+                    // Dark spot
+                    if (dx > 1 && dy > 1 && dx * dx + dy * dy < 8)
+                        c = detail;
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_ENDER_PEARL:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                int dx = x - 8, dy = y - 8;
+                Color c = {0, 0, 0, 0};
+                if (dx * dx + dy * dy < 28) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 65);
+                    // Purple swirl
+                    if ((x + y) % 3 == 0) c = detail;
+                    if (h % 7 == 0) c = (Color){80, 40, 160, 255};
+                    // Bright center
+                    if (dx * dx + dy * dy < 6) c = (Color){160, 100, 220, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     default:
         break;
     }
@@ -1393,7 +1639,7 @@ void GenerateBlockAtlas(void)
 //----------------------------------------------------------------------------------
 bool IsGravityBlock(uint8_t block)
 {
-    return block == BLOCK_SAND || block == BLOCK_GRAVEL;
+    return block == BLOCK_SAND || block == BLOCK_GRAVEL || block == BLOCK_MUD;
 }
 
 void ApplyGravityAt(int bx, int by)
@@ -1409,6 +1655,8 @@ void ApplyGravityAt(int bx, int by)
         world[bx][landY] = above;
         InvalidateChunkAt(bx, fy);
         InvalidateChunkAt(bx, landY);
+        NetSyncBlockChange(bx, fy, BLOCK_AIR);
+        NetSyncBlockChange(bx, landY, above);
         SpawnBlockParticles(bx, landY, (BlockType)above);
         PlaySoundLand();
     }
@@ -1458,10 +1706,16 @@ void GenerateWorld(unsigned int seed)
         }
 
         // --- Biome ---
+        // 0=plains, 1=desert, 2=forest, 3=tundra, 4=swamp, 5=jungle, 6=taiga
         float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        int biome = 0; // 0=plains, 1=desert, 2=forest
-        if (biomeNoise > 0.55f) biome = 1;      // desert
-        else if (biomeNoise < -0.25f) biome = 2; // forest
+        int biome = 0;
+        if (biomeNoise > 0.55f) biome = 1;       // desert
+        else if (biomeNoise > 0.35f) biome = 6;   // taiga
+        else if (biomeNoise > 0.15f) biome = 0;   // plains
+        else if (biomeNoise > -0.05f) biome = 4;  // swamp
+        else if (biomeNoise > -0.25f) biome = 2;  // forest
+        else if (biomeNoise > -0.45f) biome = 5;  // jungle
+        else biome = 3;                            // tundra
 
         // --- Calculate surface Y ---
         // Terrain is lower Y = higher on screen
@@ -1469,7 +1723,16 @@ void GenerateWorld(unsigned int seed)
         // Apply base noise (gentle continent shape)
         surfaceY += (int)(base * 30.0f * continental);
         // Apply hills (biome-dependent amplitude)
-        float hillAmp = (biome == 1) ? 12.0f : (biome == 2) ? 28.0f : 22.0f;
+        float hillAmp;
+        switch (biome) {
+            case 1: hillAmp = 12.0f; break;  // desert: flat
+            case 2: hillAmp = 28.0f; break;  // forest: hilly
+            case 3: hillAmp = 15.0f; break;  // tundra: gentle
+            case 4: hillAmp = 8.0f; break;   // swamp: very flat
+            case 5: hillAmp = 32.0f; break;  // jungle: very hilly
+            case 6: hillAmp = 20.0f; break;  // taiga: moderate
+            default: hillAmp = 22.0f; break; // plains
+        }
         surfaceY += (int)(hills * hillAmp * continental);
         // Detail bumps
         surfaceY += (int)(detail * 10.0f * continental);
@@ -1497,10 +1760,14 @@ void GenerateWorld(unsigned int seed)
             } else if (y == surfaceY) {
                 if (isStonePeak) world[x][y] = BLOCK_STONE;        // mountain peak
                 else if (biome == 1) world[x][y] = BLOCK_SAND;     // desert
-                else world[x][y] = BLOCK_GRASS;                     // plains/forest
+                else if (biome == 3) world[x][y] = BLOCK_SNOWY_GRASS; // tundra
+                else if (biome == 4) world[x][y] = BLOCK_MUD;      // swamp
+                else if (biome == 6) world[x][y] = BLOCK_SNOWY_GRASS; // taiga
+                else world[x][y] = BLOCK_GRASS;                     // plains/forest/jungle
             } else if (y < surfaceY + 4) {
                 if (isStonePeak) world[x][y] = BLOCK_STONE;        // mountain subsurface
                 else if (biome == 1) world[x][y] = BLOCK_SAND;     // desert sand layers
+                else if (biome == 4) world[x][y] = BLOCK_MUD;      // swamp mud layers
                 else world[x][y] = BLOCK_DIRT;
             } else if (y < WORLD_HEIGHT - 1) {
                 world[x][y] = BLOCK_STONE;
@@ -1599,7 +1866,8 @@ void GenerateWorld(unsigned int seed)
     for (int x = 0; x < WORLD_WIDTH; x++) {
         float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
         bool isDesert = biomeNoise > 0.55f;
-        if (isDesert) continue; // desert already has sand
+        bool isTundra = biomeNoise < -0.45f;
+        if (isDesert || isTundra) continue; // desert has sand, tundra has ice/snow
         for (int y = SEA_LEVEL - 3; y <= SEA_LEVEL + 2; y++) {
             if (y < 0 || y >= WORLD_HEIGHT) continue;
             if (world[x][y] == BLOCK_GRASS || world[x][y] == BLOCK_DIRT) {
@@ -1816,73 +2084,250 @@ void GenerateWorld(unsigned int seed)
     }
 
     // ============================================================
-    // Pass 11: Trees (biome-aware density)
+    // Pass 10b: Freeze water surface in tundra biome
     // ============================================================
-    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
+    for (int x = 0; x < WORLD_WIDTH; x++) {
         float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        bool isDesert = biomeNoise > 0.55f;
-        bool isForest = biomeNoise < -0.25f;
-
-        // Desert: no trees. Forest: denser trees.
-        int treeChance = isDesert ? 999 : (isForest ? 6 : 12);
-        if (hash2D(x, 0, seed + 999) % treeChance != 0) continue;
-
-        int surfaceY = -1;
-        for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_GRASS) { surfaceY = y; break; }
-        }
-        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
-
-        int trunkH = isForest ? (5 + (hash2D(x, 1, seed + 888) % 4)) : (4 + (hash2D(x, 1, seed + 888) % 3));
-        for (int i = 1; i <= trunkH && surfaceY - i >= 0; i++) {
-            world[x][surfaceY - i] = BLOCK_WOOD;
-        }
-
-        int canopyTop = surfaceY - trunkH;
-        for (int dy = -2; dy <= 0; dy++) {
-            for (int dx = -2; dx <= 2; dx++) {
-                int bx = x + dx;
-                int by = canopyTop + dy;
-                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                        world[bx][by] = BLOCK_LEAVES;
-                    }
+        bool isTundra = biomeNoise < -0.45f;
+        if (!isTundra) continue;
+        for (int y = SEA_LEVEL; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_WATER) {
+                // Freeze the top surface layer
+                bool hasAirAbove = (y > 0 && world[x][y - 1] == BLOCK_AIR);
+                if (hasAirAbove) {
+                    world[x][y] = BLOCK_ICE;
                 }
-            }
-        }
-        for (int dx = -1; dx <= 1; dx++) {
-            int bx = x + dx;
-            int by = canopyTop - 1;
-            if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                if (world[bx][by] == BLOCK_AIR) world[bx][by] = BLOCK_LEAVES;
+            } else if (IsBlockSolid(x, y)) {
+                break;
             }
         }
     }
 
     // ============================================================
-    // Pass 12: Flowers, tall grass, cacti (biome-aware)
+    // Pass 11: Trees (biome-aware density and type)
+    // ============================================================
+    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
+        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
+        int biome = 0;
+        if (biomeNoise > 0.55f) biome = 1;       // desert
+        else if (biomeNoise > 0.35f) biome = 6;   // taiga
+        else if (biomeNoise > 0.15f) biome = 0;   // plains
+        else if (biomeNoise > -0.05f) biome = 4;  // swamp
+        else if (biomeNoise > -0.25f) biome = 2;  // forest
+        else if (biomeNoise > -0.45f) biome = 5;  // jungle
+        else biome = 3;                            // tundra
+
+        // Biome-specific tree density
+        int treeChance;
+        switch (biome) {
+            case 1: treeChance = 999; break;  // desert: no trees
+            case 2: treeChance = 6; break;    // forest: dense
+            case 3: treeChance = 20; break;   // tundra: sparse
+            case 4: treeChance = 10; break;   // swamp: moderate
+            case 5: treeChance = 4; break;    // jungle: very dense
+            case 6: treeChance = 8; break;    // taiga: moderate-dense
+            default: treeChance = 12; break;  // plains
+        }
+        if (hash2D(x, 0, seed + 999) % treeChance != 0) continue;
+
+        // Find surface - check for grass, snowy grass, or mud
+        int surfaceY = -1;
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            uint8_t b = world[x][y];
+            if (b == BLOCK_GRASS || b == BLOCK_SNOWY_GRASS || b == BLOCK_MUD) {
+                surfaceY = y;
+                break;
+            }
+        }
+        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
+
+        int trunkH;
+        BlockType trunkBlock = BLOCK_WOOD;
+        BlockType leafBlock = BLOCK_LEAVES;
+
+        switch (biome) {
+            case 3: // tundra: short sparse trees
+                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
+                break;
+            case 4: // swamp: short wide trees
+                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
+                break;
+            case 5: // jungle: tall trees
+                trunkH = 8 + (hash2D(x, 1, seed + 888) % 5);
+                trunkBlock = BLOCK_JUNGLE_WOOD;
+                leafBlock = BLOCK_JUNGLE_LEAVES;
+                break;
+            case 6: // taiga: medium narrow trees
+                trunkH = 5 + (hash2D(x, 1, seed + 888) % 3);
+                break;
+            default: // plains/forest
+                trunkH = (biome == 2) ? (5 + (hash2D(x, 1, seed + 888) % 4)) : (4 + (hash2D(x, 1, seed + 888) % 3));
+                break;
+        }
+
+        // Place trunk
+        for (int i = 1; i <= trunkH && surfaceY - i >= 0; i++) {
+            world[x][surfaceY - i] = trunkBlock;
+        }
+
+        int canopyTop = surfaceY - trunkH;
+
+        if (biome == 5) {
+            // Jungle: large canopy with vines
+            for (int dy = -3; dy <= 0; dy++) {
+                for (int dx = -3; dx <= 3; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            world[bx][by] = leafBlock;
+                        }
+                    }
+                }
+            }
+            // Top cap
+            for (int dx = -1; dx <= 1; dx++) {
+                int bx = x + dx;
+                int by = canopyTop - 2;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (world[bx][by] == BLOCK_AIR) world[bx][by] = leafBlock;
+                }
+            }
+            // Vines hanging from canopy edges
+            for (int dx = -3; dx <= 3; dx += 2) {
+                int bx = x + dx;
+                if (bx < 0 || bx >= WORLD_WIDTH) continue;
+                for (int dy = 1; dy <= 3; dy++) {
+                    int by = canopyTop + dy;
+                    if (by >= 0 && by < WORLD_HEIGHT && world[bx][by] == BLOCK_AIR) {
+                        if (hash2D(bx, by, seed + 998) % 3 == 0)
+                            world[bx][by] = BLOCK_VINE;
+                    }
+                }
+            }
+        } else if (biome == 6) {
+            // Taiga: triangular/narrow canopy
+            for (int dy = -3; dy <= 0; dy++) {
+                int width = 1 + (dy + 3); // narrows toward top
+                for (int dx = -width; dx <= width; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            world[bx][by] = leafBlock;
+                        }
+                    }
+                }
+            }
+        } else if (biome == 3) {
+            // Tundra: small sparse canopy
+            for (int dy = -1; dy <= 0; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            world[bx][by] = leafBlock;
+                        }
+                    }
+                }
+            }
+        } else if (biome == 4) {
+            // Swamp: wide flat canopy
+            for (int dy = -1; dy <= 0; dy++) {
+                for (int dx = -3; dx <= 3; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            world[bx][by] = leafBlock;
+                        }
+                    }
+                }
+            }
+            // Moss patches under swamp trees
+            if (surfaceY + 1 < WORLD_HEIGHT && world[x][surfaceY + 1] != BLOCK_WATER) {
+                for (int dx = -2; dx <= 2; dx++) {
+                    int bx = x + dx;
+                    if (bx >= 0 && bx < WORLD_WIDTH && world[bx][surfaceY] == BLOCK_MUD) {
+                        if (hash2D(bx, surfaceY, seed + 997) % 3 == 0)
+                            world[bx][surfaceY] = BLOCK_MOSS_BLOCK;
+                    }
+                }
+            }
+        } else {
+            // Default canopy (plains/forest)
+            for (int dy = -2; dy <= 0; dy++) {
+                for (int dx = -2; dx <= 2; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            world[bx][by] = leafBlock;
+                        }
+                    }
+                }
+            }
+            for (int dx = -1; dx <= 1; dx++) {
+                int bx = x + dx;
+                int by = canopyTop - 1;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (world[bx][by] == BLOCK_AIR) world[bx][by] = leafBlock;
+                }
+            }
+        }
+    }
+
+    // ============================================================
+    // Pass 12: Flowers, tall grass, decorations (biome-aware)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        bool isDesert = biomeNoise > 0.55f;
-        bool isForest = biomeNoise < -0.25f;
+        int biome = 0;
+        if (biomeNoise > 0.55f) biome = 1;       // desert
+        else if (biomeNoise > 0.35f) biome = 6;   // taiga
+        else if (biomeNoise > 0.15f) biome = 0;   // plains
+        else if (biomeNoise > -0.05f) biome = 4;  // swamp
+        else if (biomeNoise > -0.25f) biome = 2;  // forest
+        else if (biomeNoise > -0.45f) biome = 5;  // jungle
+        else biome = 3;                            // tundra
 
         for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
-            if (world[x][y] != BLOCK_GRASS && world[x][y] != BLOCK_SAND) continue;
+            uint8_t surface = world[x][y];
+            if (surface != BLOCK_GRASS && surface != BLOCK_SAND &&
+                surface != BLOCK_SNOWY_GRASS && surface != BLOCK_MUD) continue;
             if (world[x][y - 1] != BLOCK_AIR) continue;
 
             unsigned int h = hash2D(x, y, seed + 6000);
-            if (isDesert) {
-                // Desert: rare cacti (tall grass as placeholder)
-                if (h % 30 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-            } else if (isForest) {
-                // Forest: more flowers and grass
-                if (h % 12 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                else if (h % 4 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-            } else {
-                // Plains
-                if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                else if (h % 8 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+            switch (biome) {
+                case 1: // Desert: sparse tall grass
+                    if (h % 30 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
+                case 2: // Forest: more flowers and grass
+                    if (h % 12 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    else if (h % 4 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
+                case 3: // Tundra: very sparse, some flowers
+                    if (h % 25 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    else if (h % 15 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
+                case 4: // Swamp: dense grass, pumpkins
+                    if (h % 5 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    else if (h % 40 == 0) world[x][y - 1] = BLOCK_PUMPKIN;
+                    break;
+                case 5: // Jungle: very dense, melons
+                    if (h % 3 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    else if (h % 8 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    else if (h % 30 == 0) world[x][y - 1] = BLOCK_MELON;
+                    break;
+                case 6: // Taiga: moderate, flowers
+                    if (h % 10 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    else if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    break;
+                default: // Plains
+                    if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    else if (h % 8 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
             }
         }
     }

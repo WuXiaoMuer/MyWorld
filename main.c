@@ -5,18 +5,61 @@
 ********************************************************************************************/
 
 #include "types.h"
+#include "net.h"
 #include <process.h>
+#include <string.h>
 
 //----------------------------------------------------------------------------------
 // Win32 Input Override Implementation
+// Uses GetForegroundWindow() to completely isolate input between multiple instances.
+// When this window is NOT the foreground window, ALL input reads return zero/false.
 //----------------------------------------------------------------------------------
 int win32MouseX = 0, win32MouseY = 0;
 int win32MousePrevX = 0, win32MousePrevY = 0;
 bool win32LMB = false, win32LMBPrev = false;
 bool win32RMB = false, win32RMBPrev = false;
 
+// Set once per frame in UpdateWin32Input; all other input functions read this.
+static bool g_windowForeground = false;
+
 // Per-frame "pressed this frame" tracking for keys
 static bool keyPrev[256] = {0};
+
+static int MapRaylibToVK(int key)
+{
+    if (key >= KEY_A && key <= KEY_Z) return 0x41 + (key - KEY_A);
+    if (key >= KEY_ZERO && key <= KEY_NINE) return 0x30 + (key - KEY_ZERO);
+    if (key >= KEY_ONE && key <= KEY_NINE) return 0x31 + (key - KEY_ONE);
+    if (key == KEY_SPACE) return VK_SPACE;
+    if (key == KEY_ESCAPE) return VK_ESCAPE;
+    if (key == KEY_ENTER) return VK_RETURN;
+    if (key == KEY_BACKSPACE) return VK_BACK;
+    if (key == KEY_TAB) return VK_TAB;
+    if (key == KEY_DELETE) return VK_DELETE;
+    if (key == KEY_LEFT) return VK_LEFT;
+    if (key == KEY_RIGHT) return VK_RIGHT;
+    if (key == KEY_UP) return VK_UP;
+    if (key == KEY_DOWN) return VK_DOWN;
+    if (key == KEY_LEFT_SHIFT) return VK_SHIFT;
+    if (key == KEY_RIGHT_SHIFT) return VK_SHIFT;
+    if (key == KEY_LEFT_CONTROL) return VK_CONTROL;
+    if (key == KEY_RIGHT_CONTROL) return VK_CONTROL;
+    if (key == KEY_LEFT_ALT) return VK_MENU;
+    if (key == KEY_RIGHT_ALT) return VK_MENU;
+    if (key == KEY_F3) return VK_F3;
+    if (key == KEY_F11) return VK_F11;
+    if (key == VK_OEM_PERIOD) return VK_OEM_PERIOD;
+    if (key == VK_OEM_2) return VK_OEM_2;
+    return 0;
+}
+
+// Reset all input tracking when losing foreground (avoids stale "pressed" on refocus)
+static void ResetAllInputState(void)
+{
+    win32LMB = false; win32LMBPrev = false;
+    win32RMB = false; win32RMBPrev = false;
+    memset(keyPrev, 0, sizeof(keyPrev));
+}
 
 void UpdateWin32Input(void)
 {
@@ -26,17 +69,35 @@ void UpdateWin32Input(void)
     win32LMBPrev = win32LMB;
     win32RMBPrev = win32RMB;
 
+    // Check if THIS window is the foreground window
+    void *hwnd = GetWindowHandle();
+    void *fgWnd = GetForegroundWindow();
+    bool wasForeground = g_windowForeground;
+    g_windowForeground = (hwnd != NULL && hwnd == fgWnd);
+
+    // If we just lost foreground, reset all input to zero
+    if (wasForeground && !g_windowForeground) {
+        ResetAllInputState();
+        return;
+    }
+
+    // If not foreground, keep everything at zero
+    if (!g_windowForeground) {
+        win32LMB = false;
+        win32RMB = false;
+        return;
+    }
+
     // Get raw screen cursor position
     long pt[2];
     GetCursorPos(pt);
 
     // Convert to window client coordinates
-    void *hwnd = GetWindowHandle();
     if (hwnd) ScreenToClient(hwnd, pt);
     win32MouseX = (int)pt[0];
     win32MouseY = (int)pt[1];
 
-    // Mouse buttons
+    // Mouse buttons (only when foreground)
     win32LMB = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
     win32RMB = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 }
@@ -53,13 +114,15 @@ Vector2 Win32GetMouseDelta(void)
 
 bool Win32IsMouseButtonPressed(int button)
 {
-    if (button == 0) return win32LMB && !win32LMBPrev;  // LEFT
-    if (button == 1) return win32RMB && !win32RMBPrev;  // RIGHT
+    if (!g_windowForeground) return false;
+    if (button == 0) return win32LMB && !win32LMBPrev;
+    if (button == 1) return win32RMB && !win32RMBPrev;
     return false;
 }
 
 bool Win32IsMouseButtonReleased(int button)
 {
+    if (!g_windowForeground) return false;
     if (button == 0) return !win32LMB && win32LMBPrev;
     if (button == 1) return !win32RMB && win32RMBPrev;
     return false;
@@ -67,57 +130,16 @@ bool Win32IsMouseButtonReleased(int button)
 
 bool Win32IsKeyDown(int key)
 {
-    int vk = 0;
-    // Map raylib KEY_ codes to VK_ codes
-    if (key >= KEY_A && key <= KEY_Z) vk = 0x41 + (key - KEY_A);
-    else if (key >= KEY_ZERO && key <= KEY_NINE) vk = 0x30 + (key - KEY_ZERO);
-    else if (key >= KEY_ONE && key <= KEY_NINE) vk = 0x31 + (key - KEY_ONE);
-    else if (key == KEY_SPACE) vk = VK_SPACE;
-    else if (key == KEY_ESCAPE) vk = VK_ESCAPE;
-    else if (key == KEY_ENTER) vk = VK_RETURN;
-    else if (key == KEY_BACKSPACE) vk = VK_BACK;
-    else if (key == KEY_TAB) vk = VK_TAB;
-    else if (key == KEY_DELETE) vk = VK_DELETE;
-    else if (key == KEY_LEFT) vk = VK_LEFT;
-    else if (key == KEY_RIGHT) vk = VK_RIGHT;
-    else if (key == KEY_UP) vk = VK_UP;
-    else if (key == KEY_DOWN) vk = VK_DOWN;
-    else if (key == KEY_LEFT_SHIFT) vk = VK_SHIFT;
-    else if (key == KEY_RIGHT_SHIFT) vk = VK_SHIFT;
-    else if (key == KEY_LEFT_CONTROL) vk = VK_CONTROL;
-    else if (key == KEY_RIGHT_CONTROL) vk = VK_CONTROL;
-    else if (key == KEY_LEFT_ALT) vk = VK_MENU;
-    else if (key == KEY_RIGHT_ALT) vk = VK_MENU;
-    else if (key == KEY_F3) vk = VK_F3;
-    else if (key == KEY_F11) vk = VK_F11;
+    if (!g_windowForeground) return false;
+    int vk = MapRaylibToVK(key);
     if (vk == 0) return false;
     return (GetAsyncKeyState(vk) & 0x8000) != 0;
 }
 
 bool Win32IsKeyPressed(int key)
 {
-    int vk = 0;
-    if (key >= KEY_A && key <= KEY_Z) vk = 0x41 + (key - KEY_A);
-    else if (key >= KEY_ZERO && key <= KEY_NINE) vk = 0x30 + (key - KEY_ZERO);
-    else if (key >= KEY_ONE && key <= KEY_NINE) vk = 0x31 + (key - KEY_ONE);
-    else if (key == KEY_SPACE) vk = VK_SPACE;
-    else if (key == KEY_ESCAPE) vk = VK_ESCAPE;
-    else if (key == KEY_ENTER) vk = VK_RETURN;
-    else if (key == KEY_BACKSPACE) vk = VK_BACK;
-    else if (key == KEY_TAB) vk = VK_TAB;
-    else if (key == KEY_DELETE) vk = VK_DELETE;
-    else if (key == KEY_LEFT) vk = VK_LEFT;
-    else if (key == KEY_RIGHT) vk = VK_RIGHT;
-    else if (key == KEY_UP) vk = VK_UP;
-    else if (key == KEY_DOWN) vk = VK_DOWN;
-    else if (key == KEY_LEFT_SHIFT) vk = VK_SHIFT;
-    else if (key == KEY_RIGHT_SHIFT) vk = VK_SHIFT;
-    else if (key == KEY_LEFT_CONTROL) vk = VK_CONTROL;
-    else if (key == KEY_RIGHT_CONTROL) vk = VK_CONTROL;
-    else if (key == KEY_LEFT_ALT) vk = VK_MENU;
-    else if (key == KEY_RIGHT_ALT) vk = VK_MENU;
-    else if (key == KEY_F3) vk = VK_F3;
-    else if (key == KEY_F11) vk = VK_F11;
+    if (!g_windowForeground) return false;
+    int vk = MapRaylibToVK(key);
     if (vk == 0) return false;
     bool down = (GetAsyncKeyState(vk) & 0x8000) != 0;
     bool wasDown = keyPrev[vk & 0xFF];
@@ -143,6 +165,8 @@ static void PushChar(int c)
 
 int Win32GetCharPressed(void)
 {
+    if (!g_windowForeground) return 0;
+
     // Drain: return queued character if available
     if (charQueueTail != charQueueHead) {
         int c = charQueue[charQueueTail];
@@ -157,7 +181,7 @@ int Win32GetCharPressed(void)
     for (int vk = 0x41; vk <= 0x5A; vk++) {
         bool down = (GetAsyncKeyState(vk) & 0x8000) != 0;
         if (down && !charKeyPrev[vk]) {
-            int c = shift ? vk : (vk + 32); // uppercase or lowercase
+            int c = shift ? vk : (vk + 32);
             charKeyPrev[vk] = true;
             return c;
         }
@@ -170,11 +194,10 @@ int Win32GetCharPressed(void)
         if (down && !charKeyPrev[vk]) {
             charKeyPrev[vk] = true;
             if (shift) {
-                // Shift+digit symbols on US keyboard
                 static const char shiftDigits[] = ")!@#$%^&*(";
                 return shiftDigits[vk - 0x30];
             }
-            return vk; // '0'-'9'
+            return vk;
         }
         charKeyPrev[vk] = down;
     }
@@ -187,6 +210,25 @@ int Win32GetCharPressed(void)
             return ' ';
         }
         charKeyPrev[VK_SPACE] = down;
+    }
+
+    // Period (for IP input)
+    {
+        bool down = (GetAsyncKeyState(VK_OEM_PERIOD) & 0x8000) != 0;
+        if (down && !charKeyPrev[VK_OEM_PERIOD]) {
+            charKeyPrev[VK_OEM_PERIOD] = true;
+            return shift ? '>' : '.';
+        }
+        charKeyPrev[VK_OEM_PERIOD] = down;
+    }
+    // Slash (for IP input)
+    {
+        bool down = (GetAsyncKeyState(VK_OEM_2) & 0x8000) != 0;
+        if (down && !charKeyPrev[VK_OEM_2]) {
+            charKeyPrev[VK_OEM_2] = true;
+            return shift ? '?' : '/';
+        }
+        charKeyPrev[VK_OEM_2] = down;
     }
 
     return 0;
@@ -205,18 +247,12 @@ __declspec(dllimport) long long __stdcall CallNextHookEx(void*, int, long long, 
 #define WM_MOUSEWHEEL 0x020A
 #define HC_ACTION 0
 
-// Thread-specific hook: intercepts WM_MOUSEWHEEL from GLFW's message loop.
-// lParam points to MSG struct when nCode >= 0 and wParam == PM_REMOVE (1).
-// MSG layout (64-bit): hwnd(8) + message(4) + pad(4) + wP(8) + lP(8) + time(4) + pad(4) + ptX(4) + ptY(4)
-// message at byte 8, wParam at byte 16
 static long long __stdcall WheelGetMsgProc(int nCode, long long wParam, long long lParam)
 {
-    if (nCode >= 0 && wParam == 1) { // HC_ACTION, PM_REMOVE
+    if (nCode >= 0 && wParam == 1) {
         unsigned int *raw = (unsigned int *)lParam;
-        unsigned int msgType = raw[2]; // byte 8 / sizeof(UINT)=4 → index 2 (on both 32/64 with padding)
+        unsigned int msgType = raw[2];
         if (msgType == WM_MOUSEWHEEL) {
-            // On 64-bit: wParam field at byte 16 → size_t index = 16/8 = 2
-            // On 32-bit: wParam field at byte 8 → size_t index = 8/4 = 2
             size_t *fields = (size_t *)lParam;
             size_t wp = fields[2];
             short delta = (short)(wp >> 16);
@@ -228,7 +264,6 @@ static long long __stdcall WheelGetMsgProc(int nCode, long long wParam, long lon
 
 void InitWin32WheelHook(void)
 {
-    // Get GLFW window's thread ID and install hook on that thread
     void *hwnd = GetWindowHandle();
     if (hwnd) {
         unsigned long glfwTid = GetWindowThreadProcessId(hwnd, NULL);
@@ -238,6 +273,10 @@ void InitWin32WheelHook(void)
 
 float Win32GetMouseWheelMove(void)
 {
+    if (!g_windowForeground) {
+        wheelAccum = 0.0f;
+        return 0.0f;
+    }
     float v = wheelAccum;
     wheelAccum = 0.0f;
     return v;
@@ -250,7 +289,9 @@ uint8_t world[WORLD_WIDTH][WORLD_HEIGHT];
 uint8_t lightMap[WORLD_WIDTH][WORLD_HEIGHT];
 Chunk loadedChunks[MAX_CHUNKS];
 
-Player player = { 0 };
+Player players[MAX_NET_PLAYERS] = { 0 };
+int localPlayerId = 0;
+RemotePlayer remotePlayers[MAX_NET_PLAYERS] = { 0 };
 Camera2D camera = { 0 };
 DayNightCycle dayNight = { 0 };
 
@@ -363,6 +404,7 @@ int main(void)
     InitCraftingRecipes();
     InitCameraSystem();
     InitDayNight();
+    NetInit();
 
     gameState = STATE_MENU;
 

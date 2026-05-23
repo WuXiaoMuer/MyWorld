@@ -6,17 +6,17 @@ CC       = "gcc.exe"
 WINDRES  = "windres.exe"
 RM       = del /q /f
 CD       = cd /d
-LIBS     = "-LE:/github/MyWorld/lib" "-Wl,--stack,12582912" "-s" "-lraylib" "-lopengl32" "-lgdi32" "-lwinmm" "-static"
+LIBS     = "-LE:/github/MyWorld/lib" "-Wl,--stack,12582912" "-s" "-lraylib" "-lopengl32" "-lgdi32" "-lwinmm" "-lws2_32" "-static"
 INCS     = "-IE:/github/MyWorld/include"
 CXXINCS  = "-IE:/github/MyWorld/include"
 CXXFLAGS = $(CXXINCS) "-O2" "-pipe" "-finput-charset=UTF-8" "-fexec-charset=UTF-8"
 CFLAGS   = $(INCS) "-O2" "-pipe" "-finput-charset=UTF-8" "-fexec-charset=UTF-8"
 WINDRESFLAGS = 
 RES      = MyWorld_private.res
-OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o i18n.o weather.o $(RES)
+OBJ      = noise.o main.o crafting.o save.o world.o game.o player.o daynight.o rendering.o sound.o mob.o particles.o entities.o light.o i18n.o weather.o net.o $(RES)
 BIN      = MyWorld.exe
-LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "weather.o" "MyWorld_private.res"
-CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "weather.o" "MyWorld_private.res" "MyWorld.exe"
+LINKOBJ  = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "weather.o" "net.o" "MyWorld_private.res"
+CLEANOBJ = "noise.o" "main.o" "crafting.o" "save.o" "world.o" "game.o" "player.o" "daynight.o" "rendering.o" "sound.o" "mob.o" "particles.o" "entities.o" "light.o" "i18n.o" "weather.o" "net.o" "MyWorld_private.res" "MyWorld.exe"
 
 .PHONY: all all-before all-after clean clean-custom
 
@@ -76,6 +76,9 @@ i18n.o: i18n.c types.h
 
 weather.o: weather.c types.h
 	$(CC) -c "weather.c" -o "weather.o" $(CFLAGS)
+
+net.o: net.c net.h types.h
+	$(CC) -c "net.c" -o "net.o" $(CFLAGS)
 
 MyWorld_private.res: MyWorld_private.rc
 	$(WINDRES) -i "MyWorld_private.rc" --input-format=rc -o "MyWorld_private.res" -O coff $(WINDRESFLAGS)

@@ -18,6 +18,7 @@ typedef long LONG;
 __declspec(dllimport) BOOL __stdcall GetCursorPos(LONG*);
 __declspec(dllimport) BOOL __stdcall ScreenToClient(void*, LONG*);
 __declspec(dllimport) short __stdcall GetAsyncKeyState(int);
+__declspec(dllimport) short __stdcall GetKeyState(int);
 __declspec(dllimport) void* __stdcall GetForegroundWindow(void);
 __declspec(dllimport) void* __stdcall GetFocus(void);
 #ifndef VK_LBUTTON
@@ -39,6 +40,8 @@ __declspec(dllimport) void* __stdcall GetFocus(void);
 #define VK_DOWN     0x28
 #define VK_F3       0x72
 #define VK_F11      0x7A
+#define VK_OEM_PERIOD 0xBE
+#define VK_OEM_2    0xBF
 #endif
 #endif
 
@@ -116,13 +119,15 @@ void InitWin32WheelHook(void);
 #define BREAK_RANGE         6
 #define PLACE_RANGE         6
 
-#define MAX_CRAFT_RECIPES   64
-#define MAX_SMELT_RECIPES   10
+#define MAX_CRAFT_RECIPES   128
+#define MAX_SMELT_RECIPES   20
 #define MAX_CHESTS          64
 #define CHEST_SLOTS         27
 
+#define MAX_NET_PLAYERS     4
+
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        7
+#define SAVE_VERSION        8
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -334,6 +339,23 @@ typedef enum {
     BLOCK_BOOKSHELF,
     BLOCK_LANTERN,
     BLOCK_BONE_BLOCK,
+    // Phase 1: Biome blocks
+    BLOCK_SNOW,
+    BLOCK_ICE,
+    BLOCK_PACKED_ICE,
+    BLOCK_MUD,
+    BLOCK_MOSS_BLOCK,
+    BLOCK_JUNGLE_WOOD,
+    BLOCK_JUNGLE_LEAVES,
+    BLOCK_VINE,
+    BLOCK_PUMPKIN,
+    BLOCK_MELON,
+    BLOCK_SNOWY_GRASS,
+    BLOCK_COARSE_DIRT,
+    BLOCK_PODZOL,
+    // Phase 1: New items
+    ITEM_SLIMEBALL,
+    ITEM_ENDER_PEARL,
     BLOCK_COUNT
 } BlockType;
 
@@ -372,6 +394,8 @@ typedef enum {
     STR_BTN_LOAD_GAME,
     STR_BTN_SETTINGS,
     STR_BTN_QUIT,
+    STR_BTN_HOST_GAME,
+    STR_BTN_JOIN_GAME,
     STR_HINT_NAVIGATE,
     STR_HINT_CONTROLS,
 
@@ -384,6 +408,11 @@ typedef enum {
     STR_RANDOM,
     STR_SLOT,
     STR_SEED_DISPLAY,
+    STR_HOST_WAITING,
+    STR_HOST_IP_HINT,
+    STR_JOIN_TITLE,
+    STR_JOIN_IP_HINT,
+    STR_JOIN_CONNECTING,
     STR_OCCUPIED,
     STR_EMPTY_NEW,
     STR_EMPTY_LOAD,
@@ -443,6 +472,8 @@ typedef enum {
     STR_DEATH_MOB_SKELETON,
     STR_DEATH_MOB_CREEPER,
     STR_DEATH_MOB_SPIDER,
+    STR_DEATH_MOB_SLIME,
+    STR_DEATH_MOB_ENDERMAN,
     STR_DEATH_VOID,
     STR_DEATH_SCORE,
 
@@ -626,6 +657,23 @@ typedef enum {
     STR_BLOCK_BOOKSHELF,
     STR_BLOCK_LANTERN,
     STR_BLOCK_BONE_BLOCK,
+    // Phase 1: Biome blocks
+    STR_BLOCK_SNOW,
+    STR_BLOCK_ICE,
+    STR_BLOCK_PACKED_ICE,
+    STR_BLOCK_MUD,
+    STR_BLOCK_MOSS_BLOCK,
+    STR_BLOCK_JUNGLE_WOOD,
+    STR_BLOCK_JUNGLE_LEAVES,
+    STR_BLOCK_VINE,
+    STR_BLOCK_PUMPKIN,
+    STR_BLOCK_MELON,
+    STR_BLOCK_SNOWY_GRASS,
+    STR_BLOCK_COARSE_DIRT,
+    STR_BLOCK_PODZOL,
+    // Phase 1: New items
+    STR_ITEM_SLIMEBALL,
+    STR_ITEM_ENDER_PEARL,
 
     // Recipe Names
     STR_RECIPE_WOOD_PLANKS,
@@ -743,6 +791,8 @@ typedef enum {
     MOB_SKELETON,
     MOB_CREEPER,
     MOB_SPIDER,
+    MOB_SLIME,
+    MOB_ENDERMAN,
     MOB_TYPE_COUNT
 } MobType;
 
@@ -810,6 +860,10 @@ typedef struct {
     // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
     uint8_t armor[4];
     int armorDurability[4];
+    // Network control
+    bool netControlled;      // true = driven by network input, not keyboard
+    float moveInput;         // -1.0 to 1.0, used when netControlled
+    bool jumpHeld;           // jump key state from network
 } Player;
 
 //----------------------------------------------------------------------------------
@@ -848,7 +902,9 @@ typedef enum {
     STATE_MENU = 0,
     STATE_PLAYING,
     STATE_SETTINGS,
-    STATE_SLOT_SELECT
+    STATE_SLOT_SELECT,
+    STATE_HOST_WAITING,
+    STATE_JOIN_GAME
 } GameState;
 
 typedef struct {
@@ -869,6 +925,22 @@ typedef struct {
     float daySpeed;
     float lightLevel;
 } DayNightCycle;
+
+//----------------------------------------------------------------------------------
+// Multiplayer
+//----------------------------------------------------------------------------------
+typedef struct {
+    Vector2 position;
+    Vector2 velocity;
+    bool facingRight;
+    bool sprinting;
+    bool onGround;
+    int selectedSlot;
+    uint8_t armor[4];
+    int health;
+    bool active;
+    float interpX, interpY; // Interpolation targets
+} RemotePlayer;
 
 //----------------------------------------------------------------------------------
 // Weather System
@@ -901,7 +973,10 @@ extern uint8_t world[WORLD_WIDTH][WORLD_HEIGHT];
 extern uint8_t lightMap[WORLD_WIDTH][WORLD_HEIGHT];
 extern Chunk loadedChunks[MAX_CHUNKS];
 
-extern Player player;
+extern Player players[MAX_NET_PLAYERS];
+extern int localPlayerId;
+#define player (players[localPlayerId])
+extern RemotePlayer remotePlayers[MAX_NET_PLAYERS];
 extern Camera2D camera;
 extern DayNightCycle dayNight;
 
@@ -927,6 +1002,12 @@ extern float mobSpawnTimer;
 extern Particle particles[MAX_PARTICLES];
 extern ItemEntity entities[MAX_ENTITIES];
 extern GameState gameState;
+
+// Modified block tracking for multiplayer world sync
+#define MAX_MODIFIED_BLOCKS 16384
+typedef struct { uint16_t x, y; uint8_t blockType; } ModifiedBlock;
+extern ModifiedBlock modifiedBlocks[];
+extern int modifiedBlockCount;
 
 // Crafting search
 extern char craftSearchBuf[32];
@@ -1090,6 +1171,7 @@ void DrawLargeMap(void);
 void DrawSettingsScreen(void);
 void ReturnHeldItem(void);
 void ShowMessage(const char *msg, Color color);
+void NetSyncBlockChange(int x, int y, uint8_t blockType);
 
 // save.c
 bool SaveExists(const char *path);
@@ -1207,5 +1289,16 @@ bool ReloadGameFont(const char *path);
 void DrawGameText(const char *text, int posX, int posY, int fsize, Color color);
 Vector2 MeasureGameText(const char *text, int fsize);
 int MeasureGameTextWidth(const char *text, int fsize);
+
+// network.c (multiplayer)
+void InitNetwork(void);
+void ShutdownNetwork(void);
+void UpdateNetworkGame(float dt);
+void NetCaptureAndSendInput(void);
+void NetReceiveAndApplyState(void);
+void NetBroadcastBlockChange(int x, int y, uint8_t block);
+void NetApplyRemoteInput(int playerId, float moveX, bool jump, bool sprint,
+                         float cursorX, float cursorY, int selectedSlot);
+void DrawRemotePlayers(void);
 
 #endif // TYPES_H

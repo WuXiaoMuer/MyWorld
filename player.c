@@ -87,6 +87,8 @@ void InitPlayer(void)
     player.attackCooldown = 0.0f;
     player.spawnX = -1;
     player.spawnY = -1;
+    player.netControlled = false;
+    player.moveInput = 0.0f;
 
     for (int i = 0; i < 4; i++) {
         player.armor[i] = BLOCK_AIR;
@@ -354,14 +356,21 @@ void PlayerPhysics(float dt)
         player.knockbackTimer -= dt;
     } else {
         // Sprint determination (before movement so we can use it as target)
-        bool wantsSprint = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
-        player.sprinting = wantsSprint && player.onGround && player.hunger > 0;
-
+        bool wantsSprint;
         float targetSpeed = 0.0f;
-        bool left = Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
-        bool right = Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
-        if (left && !right) targetSpeed = -MOVE_SPEED;
-        else if (right && !left) targetSpeed = MOVE_SPEED;
+        if (player.netControlled) {
+            // Network-controlled: use moveInput from server
+            wantsSprint = player.sprinting;
+            targetSpeed = player.moveInput * MOVE_SPEED;
+        } else {
+            // Local keyboard input
+            wantsSprint = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
+            bool left = Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
+            bool right = Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
+            if (left && !right) targetSpeed = -MOVE_SPEED;
+            else if (right && !left) targetSpeed = MOVE_SPEED;
+        }
+        player.sprinting = wantsSprint && player.onGround && player.hunger > 0;
 
         // Apply sprint multiplier to target, not to velocity
         if (player.sprinting && targetSpeed != 0.0f) {
@@ -376,8 +385,8 @@ void PlayerPhysics(float dt)
             player.velocity.x += (diff > 0 ? 1.0f : -1.0f) * accel * dt;
         }
 
-        // Sprint dust
-        if (player.sprinting && targetSpeed != 0.0f) {
+        // Sprint dust (local player only)
+        if (!player.netControlled && player.sprinting && targetSpeed != 0.0f) {
             static float dustTimer = 0.0f;
             dustTimer -= dt;
             if (dustTimer <= 0.0f) {
@@ -409,17 +418,21 @@ void PlayerPhysics(float dt)
     bool inWater = IsPlayerUnderwater();
     // Water splash on entry
     if (inWater && !player.wasInWater) {
-        PlaySoundSplash();
-        SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
-                             player.position.y + PLAYER_HEIGHT / 2,
-                             (Color){100, 160, 220, 200});
+        if (!player.netControlled) {
+            PlaySoundSplash();
+            SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                                 player.position.y + PLAYER_HEIGHT / 2,
+                                 (Color){100, 160, 220, 200});
+        }
     }
     // Water splash on exit
     if (!inWater && player.wasInWater) {
-        PlaySoundSplash();
-        SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
-                             player.position.y + PLAYER_HEIGHT,
-                             (Color){120, 180, 230, 200});
+        if (!player.netControlled) {
+            PlaySoundSplash();
+            SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                                 player.position.y + PLAYER_HEIGHT,
+                                 (Color){120, 180, 230, 200});
+        }
     }
     player.wasInWater = inWater;
 
@@ -431,13 +444,18 @@ void PlayerPhysics(float dt)
     }
 
     // Jump buffer: remember jump presses
-    bool jumpPressed = Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE);
+    bool jumpPressed, jumpHeld;
+    if (player.netControlled) {
+        jumpPressed = false; // jump is applied directly from network
+        jumpHeld = player.jumpHeld;
+    } else {
+        jumpPressed = Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE);
+        jumpHeld = Win32IsKeyDown(KEY_W) || Win32IsKeyDown(KEY_UP) || Win32IsKeyDown(KEY_SPACE);
+    }
     if (jumpPressed) {
         player.jumpBufferTimer = JUMP_BUFFER_TIME;
     }
     player.jumpBufferTimer -= dt;
-
-    bool jumpHeld = Win32IsKeyDown(KEY_W) || Win32IsKeyDown(KEY_UP) || Win32IsKeyDown(KEY_SPACE);
 
     if (inWater) {
         player.velocity.x *= WATER_SPEED_MULT;
@@ -533,10 +551,12 @@ void PlayerPhysics(float dt)
             newY = (int)(bottom / BLOCK_SIZE) * BLOCK_SIZE - PLAYER_HEIGHT;
             player.onGround = true;
             if (!wasOnGround && player.velocity.y > 200.0f) {
-                PlaySoundLand();
-                SpawnLandingDust(player.position.x + PLAYER_WIDTH / 2.0f,
-                                 player.position.y + PLAYER_HEIGHT,
-                                 player.velocity.y / 400.0f);
+                if (!player.netControlled) {
+                    PlaySoundLand();
+                    SpawnLandingDust(player.position.x + PLAYER_WIDTH / 2.0f,
+                                     player.position.y + PLAYER_HEIGHT,
+                                     player.velocity.y / 400.0f);
+                }
             }
             // Fall damage
             if (player.fallPeakVel > 300.0f) {
@@ -546,10 +566,12 @@ void PlayerPhysics(float dt)
                     if (player.health < 0) player.health = 0;
                     pendingDeathCause = STR_DEATH_FALL;
                     player.damageFlashTimer = 0.3f;
-                    TriggerCameraShake(3.0f, 0.2f);
-                    SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
-                                         player.position.y + PLAYER_HEIGHT,
-                                         (Color){200, 50, 50, 255});
+                    if (!player.netControlled) {
+                        TriggerCameraShake(3.0f, 0.2f);
+                        SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                                             player.position.y + PLAYER_HEIGHT,
+                                             (Color){200, 50, 50, 255});
+                    }
                     PlaySoundHurt();
                     ShowMessage(S(STR_MSG_FALL_DAMAGE), (Color){240, 100, 100, 255});
                 }
@@ -584,6 +606,7 @@ static float miningProgress = 0.0f;
 void PlayerBlockInteraction(void)
 {
     if (inventoryOpen || gamePaused) return;
+    if (player.netControlled) return; // Skip block interaction for remote players
 
     Vector2 mouseWorld = GetScreenToWorld2D(Win32GetMousePosition(), camera);
     int blockX = (int)(mouseWorld.x / BLOCK_SIZE);
@@ -703,6 +726,7 @@ void PlayerBlockInteraction(void)
                     }
                 }
                 world[blockX][blockY] = BLOCK_AIR;
+                NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Ore drop special cases
                 uint8_t dropItem = bt;
@@ -863,6 +887,7 @@ void PlayerBlockInteraction(void)
                 if (!(pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom)) {
                     bool wasWater = (world[blockX][blockY] == BLOCK_WATER);
                     world[blockX][blockY] = selectedTool;
+                    NetSyncBlockChange(blockX, blockY, selectedTool);
                     player.inventoryCount[player.selectedSlot]--;
                     if (player.inventoryCount[player.selectedSlot] <= 0) {
                         player.inventory[player.selectedSlot] = BLOCK_AIR;
@@ -881,9 +906,11 @@ void PlayerBlockInteraction(void)
                     // Gravity: sand/gravel falls when placed
                     if (IsGravityBlock(selectedTool)) {
                         world[blockX][blockY] = BLOCK_AIR;
+                        NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                         int landY = blockY;
                         while (landY > 0 && world[blockX][landY - 1] == BLOCK_AIR) landY--;
                         world[blockX][landY] = selectedTool;
+                        NetSyncBlockChange(blockX, landY, selectedTool);
                         InvalidateChunkAt(blockX, blockY);
                         InvalidateChunkAt(blockX, landY);
                         UpdateLightAt(blockX, landY);
@@ -1017,6 +1044,7 @@ void UpdatePlayerStatus(float dt)
         if (player.regenTimer >= 1.0f / HEALTH_REGEN_RATE) {
             player.regenTimer -= 1.0f / HEALTH_REGEN_RATE;
             player.health++;
+            if (!player.netControlled)
             SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
                                  player.position.y + PLAYER_HEIGHT / 2,
                                  (Color){80, 220, 80, 200});

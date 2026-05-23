@@ -7,9 +7,9 @@ WINDRES  = windres
 
 INCS     = -I./include
 CFLAGS   = $(INCS) -O2 -pipe -mwindows
-LIBS     = -L./lib -Wl,--stack,12582912 -s -lraylib -lopengl32 -lgdi32 -lwinmm -static
+LIBS     = -L./lib -Wl,--stack,12582912 -s -lraylib -lopengl32 -lgdi32 -lwinmm -lws2_32 -static
 
-SRCS     = main.c noise.c world.c player.c daynight.c rendering.c save.c game.c crafting.c sound.c mob.c light.c particles.c entities.c i18n.c weather.c
+SRCS     = main.c noise.c world.c player.c daynight.c rendering.c save.c game.c crafting.c sound.c mob.c light.c particles.c entities.c i18n.c weather.c net.c
 OBJS     = $(SRCS:.c=.o)
 RES      = MyWorld_private.res
 BIN      = MyWorld.exe
@@ -23,6 +23,9 @@ $(BIN): $(OBJS) $(RES)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 sound.o: sound.c sound.h types.h
+	$(CC) -c $< -o $@ $(CFLAGS)
+
+net.o: net.c net.h types.h
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 $(RES): MyWorld_private.rc
