@@ -129,6 +129,11 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     // Phase 1: New items
     {"Slimeball",    {120,200,80,255}, {90,170,60,255},   false, false, false},
     {"Ender Pearl",  {20,20,30,255},   {120,80,200,255},  false, false, false},
+    // Redstone blocks
+    {"Lever",            {100,100,100,255}, {60,60,60,255},     false, true,  true},
+    {"Redstone Wire",    {200,30,30,255},   {150,20,20,255},    false, true,  true},
+    {"Redstone Lamp",    {220,180,60,255},  {180,140,40,255},   true,  false, true},
+    {"Pressure Plate",   {130,130,130,255}, {100,100,100,255},  false, true,  true},
 };
 
 //----------------------------------------------------------------------------------
@@ -1588,6 +1593,92 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case BLOCK_LEVER:
+        // Stone base with a stick lever
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {80, 80, 80, 255};
+                unsigned int h = hash2D(x, y, 70);
+                if (h % 5 == 0) c = (Color){70, 70, 70, 255};
+                // Stick handle
+                if (x >= 7 && x <= 9 && y >= 2 && y <= 10) {
+                    c = (Color){160, 120, 60, 255};
+                    if (x == 8) c = (Color){180, 140, 70, 255};
+                }
+                // Lever knob
+                if (x >= 6 && x <= 10 && y >= 1 && y <= 3) {
+                    int dx = x - 8, dy = y - 2;
+                    if (dx * dx + dy * dy < 6) c = (Color){200, 160, 80, 255};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_REDSTONE_WIRE:
+        // Thin red wire pattern on transparent background
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Cross pattern wire
+                if ((y >= 7 && y <= 9) || (x >= 7 && x <= 9)) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 71);
+                    if (h % 4 == 0) c = detail;
+                    // Bright center line
+                    if ((y == 8 && (x >= 3 && x <= 13)) || (x == 8 && (y >= 3 && y <= 13)))
+                        c = (Color){240, 60, 40, 255};
+                }
+                // Connection dots at ends
+                if ((x == 8 && (y <= 2 || y >= 14)) || (y == 8 && (x <= 2 || x >= 14)))
+                    c = (Color){220, 40, 30, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_REDSTONE_LAMP:
+        // Glowing lamp block
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 72);
+                if (h % 6 == 0) c = detail;
+                // Inner glow
+                int dx = x - 8, dy = y - 8;
+                float dist = sqrtf((float)(dx * dx + dy * dy));
+                if (dist < 5.0f) {
+                    float bright = 1.0f - dist / 5.0f;
+                    c.r = (unsigned char)(c.r + (255 - c.r) * bright * 0.6f);
+                    c.g = (unsigned char)(c.g + (255 - c.g) * bright * 0.5f);
+                    c.b = (unsigned char)(c.b * (1.0f - bright * 0.3f));
+                }
+                // Border
+                if (x == 0 || x == 15 || y == 0 || y == 15)
+                    c = (Color){100, 80, 30, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_STONE_PRESSURE_PLATE:
+        // Thin stone plate on ground
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Only draw the plate area (middle portion)
+                if (y >= 4 && y <= 11 && x >= 2 && x <= 13) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 73);
+                    if (h % 5 == 0) c = detail;
+                    // Top highlight
+                    if (y == 4) c = (Color){160, 160, 160, 255};
+                    // Bottom shadow
+                    if (y == 11) c = (Color){90, 90, 90, 255};
+                    // Edge darkening
+                    if (x == 2 || x == 13) c = (Color){100, 100, 100, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     default:
         break;
     }
@@ -1660,6 +1751,176 @@ void ApplyGravityAt(int bx, int by)
         SpawnBlockParticles(bx, landY, (BlockType)above);
         PlaySoundLand();
     }
+}
+
+//----------------------------------------------------------------------------------
+// Redstone System
+//----------------------------------------------------------------------------------
+#define REDSTONE_MAX_POWER  15
+#define REDSTONE_WIRE_MAX   15
+
+static uint8_t redstonePower[WORLD_WIDTH][WORLD_HEIGHT];
+static bool leverState[WORLD_WIDTH][WORLD_HEIGHT];
+
+void InitRedstone(void)
+{
+    memset(redstonePower, 0, sizeof(redstonePower));
+    memset(leverState, 0, sizeof(leverState));
+}
+
+bool IsLeverOn(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+    return leverState[bx][by];
+}
+
+void ToggleLever(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    leverState[bx][by] = !leverState[bx][by];
+    UpdateRedstoneAt(bx, by);
+}
+
+static int GetRedstonePower(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
+    return redstonePower[bx][by];
+}
+
+static bool IsRedstoneSource(uint8_t block, int bx, int by)
+{
+    if (block == BLOCK_LEVER) return leverState[bx][by];
+    if (block == BLOCK_STONE_PRESSURE_PLATE) {
+        // Check if player is standing on it
+        float px = player.position.x;
+        float py = player.position.y;
+        float pRight = px + PLAYER_WIDTH;
+        float pBottom = py + PLAYER_HEIGHT;
+        float bLeft = bx * BLOCK_SIZE;
+        float bRight = bLeft + BLOCK_SIZE;
+        float bTop = by * BLOCK_SIZE;
+        float bBottom = bTop + BLOCK_SIZE;
+        return (pRight > bLeft && px < bRight && pBottom >= bTop && pBottom <= bBottom + 4);
+    }
+    return false;
+}
+
+static void PropagateRedstoneBFS(int startX, int startY, int power)
+{
+    // BFS queue
+    static int qx[WORLD_WIDTH * 4];
+    static int qy[WORLD_WIDTH * 4];
+    static uint8_t qp[WORLD_WIDTH * 4];
+    int head = 0, tail = 0;
+
+    redstonePower[startX][startY] = power;
+    qx[tail] = startX;
+    qy[tail] = startY;
+    qp[tail] = power;
+    tail++;
+
+    while (head != tail) {
+        int cx = qx[head];
+        int cy = qy[head];
+        int cp = qp[head];
+        head = head % (WORLD_WIDTH * 4);
+
+        // Spread to adjacent blocks
+        static const int dx[] = {1, -1, 0, 0};
+        static const int dy[] = {0, 0, 1, -1};
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + dx[d];
+            int ny = cy + dy[d];
+            if (nx < 0 || nx >= WORLD_WIDTH || ny < 0 || ny >= WORLD_HEIGHT) continue;
+
+            uint8_t nblock = world[nx][ny];
+            int newPower = cp - 1;
+            if (newPower <= 0) continue;
+
+            // Wire carries signal
+            if (nblock == BLOCK_REDSTONE_WIRE) {
+                if (newPower > redstonePower[nx][ny]) {
+                    redstonePower[nx][ny] = (uint8_t)newPower;
+                    int next = tail % (WORLD_WIDTH * 4);
+                    qx[next] = nx;
+                    qy[next] = ny;
+                    qp[next] = (uint8_t)newPower;
+                    tail++;
+                }
+            }
+            // Lamp receives signal
+            else if (nblock == BLOCK_REDSTONE_LAMP) {
+                if (newPower > redstonePower[nx][ny]) {
+                    redstonePower[nx][ny] = (uint8_t)newPower;
+                }
+            }
+        }
+    }
+}
+
+void UpdateRedstoneAt(int bx, int by)
+{
+    // Clear all power in affected area (radius 16)
+    int minX = bx - REDSTONE_MAX_POWER - 1;
+    int maxX = bx + REDSTONE_MAX_POWER + 1;
+    int minY = by - REDSTONE_MAX_POWER - 1;
+    int maxY = by + REDSTONE_MAX_POWER + 1;
+    if (minX < 0) minX = 0;
+    if (maxX >= WORLD_WIDTH) maxX = WORLD_WIDTH - 1;
+    if (minY < 0) minY = 0;
+    if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
+
+    for (int x = minX; x <= maxX; x++)
+        for (int y = minY; y <= maxY; y++)
+            redstonePower[x][y] = 0;
+
+    // Find all power sources in the affected area and propagate
+    for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+            uint8_t block = world[x][y];
+            if (IsRedstoneSource(block, x, y)) {
+                PropagateRedstoneBFS(x, y, REDSTONE_MAX_POWER);
+            }
+        }
+    }
+
+    // Update light for lamps in the area
+    for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+            if (world[x][y] == BLOCK_REDSTONE_LAMP) {
+                UpdateLightAt(x, y);
+                InvalidateChunkAt(x, y);
+            }
+        }
+    }
+}
+
+void UpdateRedstoneTick(void)
+{
+    // Update pressure plate states (player position may have changed)
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_STONE_PRESSURE_PLATE) {
+                bool wasPowered = redstonePower[x][y] > 0;
+                bool nowPowered = IsRedstoneSource(BLOCK_STONE_PRESSURE_PLATE, x, y);
+                if (wasPowered != nowPowered) {
+                    UpdateRedstoneAt(x, y);
+                }
+            }
+        }
+    }
+}
+
+int GetRedstonePowerAt(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
+    return redstonePower[bx][by];
+}
+
+bool IsRedstoneLampPowered(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+    return world[bx][by] == BLOCK_REDSTONE_LAMP && redstonePower[bx][by] > 0;
 }
 
 //----------------------------------------------------------------------------------

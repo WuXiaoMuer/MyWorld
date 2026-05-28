@@ -142,6 +142,7 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].deathTimer = 0.0f;
             mobs[i].attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
             mobs[i].fuseTimer = 0.0f;
+            mobs[i].despawnTimer = MOB_DESPAWN_TIME;
             mobs[i].active = true;
             return &mobs[i];
         }
@@ -646,6 +647,7 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
 void DamageMob(Mob *mob, int damage)
 {
     mob->health -= damage;
+    mob->despawnTimer = MOB_DESPAWN_TIME; // Reset timer on engagement
     SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
                          mob->position.y + mobHeight[mob->type] / 2.0f,
                          (Color){180, 30, 30, 255});
@@ -899,6 +901,20 @@ void UpdateMobs(float dt)
         if (dx > MOB_DESPAWN_DIST || dx < -MOB_DESPAWN_DIST) {
             mob->active = false;
             continue;
+        }
+
+        // Time-based despawn: reset when player is nearby (engaged)
+        {
+            float dist = fabsf(dx);
+            if (dist < MOB_DESPAWN_ENGAGE) {
+                mob->despawnTimer = MOB_DESPAWN_TIME;
+            } else {
+                mob->despawnTimer -= dt;
+                if (mob->despawnTimer <= 0.0f) {
+                    mob->active = false;
+                    continue;
+                }
+            }
         }
 
         // Hostile mobs burn and despawn in sunlight

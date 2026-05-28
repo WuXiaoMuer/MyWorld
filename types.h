@@ -61,6 +61,7 @@ Vector2 Win32GetMousePosition(void);
 Vector2 Win32GetMouseDelta(void);
 bool Win32IsMouseButtonPressed(int button);
 bool Win32IsMouseButtonReleased(int button);
+bool Win32IsMouseButtonDown(int button);
 bool Win32IsKeyPressed(int key);
 bool Win32IsKeyDown(int key);
 int Win32GetCharPressed(void);
@@ -193,6 +194,8 @@ void InitWin32WheelHook(void);
 #define MOB_AI_INTERVAL     0.5f
 #define MOB_CONTACT_COOLDOWN 1.0f
 #define MOB_DEATH_TIME      0.5f
+#define MOB_DESPAWN_TIME    300.0f  // 5 minutes
+#define MOB_DESPAWN_ENGAGE  200.0f  // reset timer when player within this range
 #define MOB_GRAVITY         980.0f
 #define MAX_PROJECTILES     32
 #define PROJECTILE_SPEED    200.0f
@@ -356,6 +359,11 @@ typedef enum {
     // Phase 1: New items
     ITEM_SLIMEBALL,
     ITEM_ENDER_PEARL,
+    // Redstone blocks
+    BLOCK_LEVER,
+    BLOCK_REDSTONE_WIRE,
+    BLOCK_REDSTONE_LAMP,
+    BLOCK_STONE_PRESSURE_PLATE,
     BLOCK_COUNT
 } BlockType;
 
@@ -674,6 +682,11 @@ typedef enum {
     // Phase 1: New items
     STR_ITEM_SLIMEBALL,
     STR_ITEM_ENDER_PEARL,
+    // Redstone blocks
+    STR_BLOCK_LEVER,
+    STR_BLOCK_REDSTONE_WIRE,
+    STR_BLOCK_REDSTONE_LAMP,
+    STR_BLOCK_STONE_PRESSURE_PLATE,
 
     // Recipe Names
     STR_RECIPE_WOOD_PLANKS,
@@ -739,6 +752,11 @@ typedef enum {
     STR_RECIPE_BONE_BLOCK_DECOMP,
     STR_RECIPE_BOOKSHELF,
     STR_RECIPE_LANTERN,
+    // Redstone recipes
+    STR_RECIPE_REDSTONE_WIRE,
+    STR_RECIPE_LEVER,
+    STR_RECIPE_REDSTONE_LAMP,
+    STR_RECIPE_PRESSURE_PLATE,
     // Combat message
     STR_MSG_CRIT_HIT,
     // Smelt
@@ -811,6 +829,7 @@ typedef struct {
     float burnTimer;    // sunlight damage accumulator
     float attackTimer;  // cooldown for ranged attacks / creeper fuse
     float fuseTimer;    // creeper explosion fuse countdown
+    float despawnTimer; // time-based despawn to prevent mob cap saturation
     bool active;
 } Mob;
 
@@ -1031,6 +1050,7 @@ extern int confirmDialogMode; // 0=overwrite, 1=delete
 extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 extern Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
 extern Sound sndFootstep, sndZombie, sndPig, sndSplash;
+extern Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
 extern Sound sndRain, sndCreeperFuse, sndThunder;
 extern Music bgm;
 
@@ -1100,6 +1120,15 @@ void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
 bool IsGravityBlock(uint8_t block);
 void ApplyGravityAt(int bx, int by);
+
+// Redstone system (world.c)
+void InitRedstone(void);
+bool IsLeverOn(int bx, int by);
+void ToggleLever(int bx, int by);
+void UpdateRedstoneAt(int bx, int by);
+void UpdateRedstoneTick(void);
+int GetRedstonePowerAt(int bx, int by);
+bool IsRedstoneLampPowered(int bx, int by);
 
 // light.c
 void InitLightMap(void);

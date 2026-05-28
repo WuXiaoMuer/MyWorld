@@ -741,6 +741,7 @@ void PlayerBlockInteraction(void)
                 InvalidateChunkAt(blockX, blockY);
                 if (blockX % CHUNK_SIZE == 0) InvalidateChunkAt(blockX - 1, blockY);
                 if (blockX % CHUNK_SIZE == CHUNK_SIZE - 1) InvalidateChunkAt(blockX + 1, blockY);
+                UpdateRedstoneAt(blockX, blockY);
                 miningProgress = 0.0f;
                 miningBlockX = -1;
 
@@ -812,6 +813,12 @@ void PlayerBlockInteraction(void)
                 inventoryOpen = true;
                 gamePaused = false;
                 PlaySoundCraft();
+                return;
+            }
+            // Toggle lever
+            if (world[blockX][blockY] == BLOCK_LEVER) {
+                ToggleLever(blockX, blockY);
+                PlaySoundUIClick();
                 return;
             }
         }
@@ -903,6 +910,7 @@ void PlayerBlockInteraction(void)
                     InvalidateChunkAt(blockX, blockY);
                     if (blockX % CHUNK_SIZE == 0) InvalidateChunkAt(blockX - 1, blockY);
                     if (blockX % CHUNK_SIZE == CHUNK_SIZE - 1) InvalidateChunkAt(blockX + 1, blockY);
+                    UpdateRedstoneAt(blockX, blockY);
                     // Gravity: sand/gravel falls when placed
                     if (IsGravityBlock(selectedTool)) {
                         world[blockX][blockY] = BLOCK_AIR;
@@ -964,8 +972,8 @@ void UpdatePlayerStatus(float dt)
 
     bool underwater = IsPlayerUnderwater();
 
-    // --- Underwater bubbles ---
-    if (underwater) {
+    // --- Underwater bubbles (local player only) ---
+    if (underwater && !player.netControlled) {
         static float bubbleTimer = 0.0f;
         bubbleTimer += dt;
         if (bubbleTimer >= 0.15f) {
@@ -988,9 +996,9 @@ void UpdatePlayerStatus(float dt)
                 player.drownTimer -= 1.0f / DROWN_DAMAGE_RATE;
                 player.health -= 2;
                 if (player.health < 0) player.health = 0;
-                pendingDeathCause = STR_DEATH_DROWN;
+                if (!player.netControlled) pendingDeathCause = STR_DEATH_DROWN;
                 player.damageFlashTimer = 0.3f;
-                PlaySoundHurt();
+                if (!player.netControlled) PlaySoundHurt();
             }
         }
     } else {
@@ -1014,11 +1022,13 @@ void UpdatePlayerStatus(float dt)
         player.hungerTimer -= 1.0f / hungerRate;
         if (player.hunger > 0) {
             player.hunger--;
-            // Warn when hunger gets low
-            if (player.hunger == 6) {
-                ShowMessage(S(STR_MSG_HUNGRY), (Color){220, 180, 60, 255});
-            } else if (player.hunger == 2) {
-                ShowMessage(S(STR_MSG_STARVING), (Color){240, 100, 60, 255});
+            // Warn when hunger gets low (local player only)
+            if (!player.netControlled) {
+                if (player.hunger == 6) {
+                    ShowMessage(S(STR_MSG_HUNGRY), (Color){220, 180, 60, 255});
+                } else if (player.hunger == 2) {
+                    ShowMessage(S(STR_MSG_STARVING), (Color){240, 100, 60, 255});
+                }
             }
         }
     }
@@ -1030,9 +1040,9 @@ void UpdatePlayerStatus(float dt)
             player.hungerDamageTimer -= 1.0f / HUNGER_DAMAGE_RATE;
             player.health--;
             if (player.health < 0) player.health = 0;
-            pendingDeathCause = STR_DEATH_STARVE;
+            if (!player.netControlled) pendingDeathCause = STR_DEATH_STARVE;
             player.damageFlashTimer = 0.3f;
-            PlaySoundHurt();
+            if (!player.netControlled) PlaySoundHurt();
         }
     } else {
         player.hungerDamageTimer = 0.0f;
@@ -1057,8 +1067,10 @@ void UpdatePlayerStatus(float dt)
     if (player.health <= 0 && !player.playerDead) {
         player.playerDead = true;
         player.health = 0;
-        SetDeathCause(pendingDeathCause);
-        PlaySoundDeath();
+        if (!player.netControlled) {
+            SetDeathCause(pendingDeathCause);
+            PlaySoundDeath();
+        }
     }
 }
 

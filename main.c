@@ -128,6 +128,14 @@ bool Win32IsMouseButtonReleased(int button)
     return false;
 }
 
+bool Win32IsMouseButtonDown(int button)
+{
+    if (!g_windowForeground) return false;
+    if (button == 0) return win32LMB;
+    if (button == 1) return win32RMB;
+    return false;
+}
+
 bool Win32IsKeyDown(int key)
 {
     if (!g_windowForeground) return false;
@@ -321,6 +329,7 @@ int craftRecipeCount = 0;
 Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
 Sound sndFootstep, sndZombie, sndPig, sndSplash;
+Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
 Sound sndRain, sndCreeperFuse, sndThunder;
 Music bgm = { 0 };
 

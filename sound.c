@@ -199,6 +199,86 @@ static float splashGen(float t, float freq, unsigned int *rng) {
     return (noise * 0.4f + tone + bubble) * env;
 }
 
+// Skeleton bone rattle - dry clicks with high-freq noise bursts
+static float skeletonGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 4.0f);
+    // Multiple short click bursts
+    float click1 = 0.0f, click2 = 0.0f, click3 = 0.0f;
+    if (t < 0.06f) {
+        float ce = expf(-t * 60.0f);
+        *rng = *rng * 1103515245 + 12345;
+        click1 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.6f;
+    }
+    if (t > 0.08f && t < 0.14f) {
+        float ce = expf(-(t - 0.08f) * 70.0f);
+        *rng = *rng * 1103515245 + 12345;
+        click2 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.5f;
+    }
+    if (t > 0.16f && t < 0.21f) {
+        float ce = expf(-(t - 0.16f) * 80.0f);
+        *rng = *rng * 1103515245 + 12345;
+        click3 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.4f;
+    }
+    // Sustained dry rattle undertone
+    float rattle = fast_sine(t * 1800.0f) * fast_sine(t * 3.0f) * 0.15f;
+    return (click1 + click2 + click3 + rattle) * env;
+}
+
+// Creeper hiss - sustained white noise with high-freq filter and tremolo
+static float creeperHissGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = 1.0f - t * 2.0f;
+    if (env < 0) env = 0;
+    env *= env;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float hiss = fast_sine(t * 2000.0f) * 0.35f;
+    float tremolo = 0.6f + 0.4f * fast_sine(t * 4.0f);
+    return (noise * 0.3f + hiss) * env * tremolo;
+}
+
+// Spider chittering - rapid high-freq pulses with noise
+static float spiderGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 5.0f);
+    float pulse = fast_sine(t * 800.0f) * 0.3f;
+    float rapid = 0.5f + 0.5f * fast_sine(t * 40.0f);
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    return (pulse * rapid + noise * 0.25f) * env;
+}
+
+// Slime squelch - low tone with noise and AM modulation
+static float slimeGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 6.0f);
+    float tone = fast_sine(t * 150.0f) * 0.4f;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float am = 0.5f + 0.5f * fast_sine(t * 10.0f);
+    float squelch = fast_sine(t * 250.0f * (1.0f - t * 0.3f)) * 0.2f;
+    return (tone + noise * 0.2f + squelch) * env * am;
+}
+
+// Enderman warble - extreme vibrato with teleport whoosh
+static float endermanGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = 1.0f - t * 1.5f;
+    if (env < 0) env = 0;
+    float vibrato = fast_sine(t * 20.0f) * 300.0f;
+    float tone = fast_sine(t * (600.0f + vibrato)) * 0.35f;
+    // Whoosh effect for teleport feel
+    float whoosh = 0.0f;
+    if (t > 0.1f && t < 0.35f) {
+        float wt = (t - 0.1f) / 0.25f;
+        float wEnv = fast_sine(wt * 3.14159f);
+        *rng = *rng * 1103515245 + 12345;
+        whoosh = ((float)(*rng % 1000) / 500.0f - 1.0f) * wEnv * 0.25f;
+    }
+    return (tone + whoosh) * env;
+}
+
 // Creeper fuse hiss
 static float creeperFuseGen(float t, float freq, unsigned int *rng) {
     (void)freq;
@@ -423,6 +503,26 @@ void InitSounds(void)
     sndPig = LoadSoundFromWave(w);
     UnloadWave(w);
 
+    w = GenerateWave(0.3f, sr, skeletonGen);
+    sndSkeleton = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.5f, sr, creeperHissGen);
+    sndCreeperHiss = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.15f, sr, spiderGen);
+    sndSpider = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.3f, sr, slimeGen);
+    sndSlime = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.4f, sr, endermanGen);
+    sndEnderman = LoadSoundFromWave(w);
+    UnloadWave(w);
+
     w = GenerateWave(0.4f, sr, splashGen);
     sndSplash = LoadSoundFromWave(w);
     UnloadWave(w);
@@ -475,6 +575,11 @@ void UnloadSounds(void)
     UnloadSound(sndFootstep);
     UnloadSound(sndZombie);
     UnloadSound(sndPig);
+    UnloadSound(sndSkeleton);
+    UnloadSound(sndCreeperHiss);
+    UnloadSound(sndSpider);
+    UnloadSound(sndSlime);
+    UnloadSound(sndEnderman);
     UnloadSound(sndSplash);
     UnloadSound(sndCreeperFuse);
     UnloadSound(sndRain);
@@ -576,9 +681,11 @@ void PlaySoundMob(MobType type) {
     if (!IsAudioDeviceReady()) return;
     if (type == MOB_ZOMBIE) { SetSoundVolume(sndZombie, sfxVolume); PlaySound(sndZombie); }
     else if (type == MOB_PIG) { SetSoundVolume(sndPig, sfxVolume); PlaySound(sndPig); }
-    else if (type == MOB_SKELETON) { SetSoundVolume(sndZombie, sfxVolume * 0.8f); PlaySound(sndZombie); }
-    else if (type == MOB_CREEPER) { SetSoundVolume(sndZombie, sfxVolume * 0.4f); PlaySound(sndZombie); }
-    else if (type == MOB_SPIDER) { SetSoundVolume(sndPig, sfxVolume * 0.6f); PlaySound(sndPig); }
+    else if (type == MOB_SKELETON) { SetSoundVolume(sndSkeleton, sfxVolume * 0.8f); PlaySound(sndSkeleton); }
+    else if (type == MOB_CREEPER) { SetSoundVolume(sndCreeperHiss, sfxVolume * 0.5f); PlaySound(sndCreeperHiss); }
+    else if (type == MOB_SPIDER) { SetSoundVolume(sndSpider, sfxVolume * 0.7f); PlaySound(sndSpider); }
+    else if (type == MOB_SLIME) { SetSoundVolume(sndSlime, sfxVolume * 0.6f); PlaySound(sndSlime); }
+    else if (type == MOB_ENDERMAN) { SetSoundVolume(sndEnderman, sfxVolume * 0.5f); PlaySound(sndEnderman); }
 }
 
 void PlaySoundSplash(void) {
@@ -632,9 +739,11 @@ void PlaySoundMobAt(MobType type, float mobX, float mobY) {
     Sound s;
     if (type == MOB_ZOMBIE) s = sndZombie;
     else if (type == MOB_PIG) s = sndPig;
-    else if (type == MOB_SKELETON) s = sndZombie;
-    else if (type == MOB_CREEPER) s = sndZombie;
-    else if (type == MOB_SPIDER) s = sndPig;
+    else if (type == MOB_SKELETON) s = sndSkeleton;
+    else if (type == MOB_CREEPER) s = sndCreeperHiss;
+    else if (type == MOB_SPIDER) s = sndSpider;
+    else if (type == MOB_SLIME) s = sndSlime;
+    else if (type == MOB_ENDERMAN) s = sndEnderman;
     else return;
 
     SetSoundVolume(s, vol);

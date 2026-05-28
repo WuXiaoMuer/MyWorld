@@ -97,6 +97,12 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(BLOCK_TORCH, 4, BLOCK_LANTERN, 1, STR_RECIPE_LANTERN, false);
     ADD_RECIPE(ITEM_STICK, 3, ITEM_BOW, 1, STR_RECIPE_BOW, false);
 
+    // Redstone recipes
+    ADD_RECIPE(ITEM_REDSTONE, 1, BLOCK_REDSTONE_WIRE, 1, STR_RECIPE_REDSTONE_WIRE, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 1, BLOCK_LEVER, 1, STR_RECIPE_LEVER, false);
+    ADD_RECIPE(BLOCK_STONE, 2, BLOCK_STONE_PRESSURE_PLATE, 1, STR_RECIPE_PRESSURE_PLATE, false);
+    ADD_RECIPE(ITEM_REDSTONE, 4, BLOCK_REDSTONE_LAMP, 1, STR_RECIPE_REDSTONE_LAMP, true);
+
     #undef ADD_RECIPE
 }
 
@@ -263,17 +269,28 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         } else {
             const char *name = S(craftRecipes[i].nameId);
             bool match = false;
-            for (const char *h = name; *h; h++) {
-                const char *n = craftSearchBuf;
-                const char *hay = h;
-                while (*n && *hay) {
-                    char a = *n, b = *hay;
-                    if (a >= 'a' && a <= 'z') a -= 32;
-                    if (b >= 'a' && b <= 'z') b -= 32;
-                    if (a != b) break;
-                    n++; hay++;
+            // Detect CJK search: if any byte has high bit set, use direct substring match
+            bool cjkSearch = false;
+            for (int k = 0; k < craftSearchLen; k++) {
+                if ((unsigned char)craftSearchBuf[k] > 127) { cjkSearch = true; break; }
+            }
+            if (cjkSearch) {
+                // UTF-8 substring match (CJK characters are self-synchronizing)
+                match = (strstr(name, craftSearchBuf) != NULL);
+            } else {
+                // ASCII case-insensitive substring search
+                for (const char *h = name; *h; h++) {
+                    const char *n = craftSearchBuf;
+                    const char *hay = h;
+                    while (*n && *hay) {
+                        char a = *n, b = *hay;
+                        if (a >= 'a' && a <= 'z') a -= 32;
+                        if (b >= 'a' && b <= 'z') b -= 32;
+                        if (a != b) break;
+                        n++; hay++;
+                    }
+                    if (*n == '\0') { match = true; break; }
                 }
-                if (*n == '\0') { match = true; break; }
             }
             if (match) filteredIndices[filteredCount++] = i;
         }

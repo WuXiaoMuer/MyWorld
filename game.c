@@ -56,6 +56,13 @@ static int joinIpLen = 8;
 static bool joinConnecting = false;
 static float joinConnectTimer = 0.0f;
 
+// Network state variables (reset on mode switch)
+static bool prevJump[MAX_NET_PLAYERS] = {0};
+static float attackCooldownNet[MAX_NET_PLAYERS] = {0};
+static float lastInputTime[MAX_NET_PLAYERS] = {0};
+static float netTickTimer = 0.0f;
+static float inputTickTimer = 0.0f;
+
 // Host mode flag - when true, slot select starts hosting after InitGame
 static bool pendingHostMode = false;
 
@@ -178,6 +185,11 @@ static void NetSendWorldToClient(int clientId)
 void InitGame(void)
 {
     modifiedBlockCount = 0;
+    memset(prevJump, 0, sizeof(prevJump));
+    memset(attackCooldownNet, 0, sizeof(attackCooldownNet));
+    memset(lastInputTime, 0, sizeof(lastInputTime));
+    netTickTimer = 0.0f;
+    inputTickTimer = 0.0f;
     confirmDialogActive = false;
     gamePaused = false;
     inventoryOpen = false;
@@ -194,6 +206,7 @@ void InitGame(void)
     InitProjectiles();
     InitLightMap();
     InitSmeltingRecipes();
+    InitRedstone();
 
     GetSavePath(selectedSaveSlot, currentSavePath, sizeof(currentSavePath));
 
@@ -1011,7 +1024,6 @@ void UpdateGame(float dt)
                     rp->moveInput = input->moveX;
                     rp->jumpHeld = input->jump;
                     // Jump: only on rising edge (key was just pressed, not held)
-                    static bool prevJump[MAX_NET_PLAYERS] = {0};
                     if (input->jump && !prevJump[fromId] && rp->onGround) {
                         rp->velocity.y = JUMP_VELOCITY;
                         rp->onGround = false;
@@ -1021,6 +1033,56 @@ void UpdateGame(float dt)
                     rp->selectedSlot = input->selectedSlot;
                     rp->facingRight = input->moveX >= 0;
                     remotePlayers[fromId].active = true;
+                    // Handle attack (mob damage) from remote player
+                    if (input->attack) {
+                        float cx = input->cursorX;
+                        float cy = input->cursorY;
+                        attackCooldownNet[fromId] -= dt;
+                        if (attackCooldownNet[fromId] <= 0) {
+                            for (int mi = 0; mi < MAX_MOBS; mi++) {
+                                if (!mobs[mi].active) continue;
+                                int mw = (mobs[mi].type == MOB_ZOMBIE) ? 12 : 16;
+                                int mh = (mobs[mi].type == MOB_ZOMBIE) ? 28 : 12;
+                                if (cx >= mobs[mi].position.x && cx <= mobs[mi].position.x + mw &&
+                                    cy >= mobs[mi].position.y && cy <= mobs[mi].position.y + mh) {
+                                    int dmg = 1;
+                                    BlockType tool = (BlockType)rp->inventory[rp->selectedSlot];
+                                    if (IsTool(tool)) {
+                                        if (tool == TOOL_WOOD_SWORD) dmg = 3;
+                                        else if (tool == TOOL_STONE_SWORD) dmg = 4;
+                                        else if (tool == TOOL_IRON_SWORD) dmg = 6;
+                                        else if (tool == TOOL_GOLD_SWORD) dmg = 4;
+                                        else if (tool == TOOL_DIAMOND_SWORD) dmg = 8;
+                                        else dmg = 2;
+                                    }
+                                    bool crit = rp->velocity.y > CRIT_FALL_THRESHOLD;
+                                    if (crit) dmg = (int)(dmg * CRIT_DAMAGE_MULT);
+                                    DamageMob(&mobs[mi], dmg);
+                                    attackCooldownNet[fromId] = GetAttackSpeed(tool);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    // Handle block place from remote player
+                    if (input->place) {
+                        int bx = (int)(input->cursorX / BLOCK_SIZE);
+                        int by = (int)(input->cursorY / BLOCK_SIZE);
+                        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                            BlockType tool = (BlockType)rp->inventory[rp->selectedSlot];
+                            if (tool != BLOCK_AIR && (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER)) {
+                                bool wasWater = (world[bx][by] == BLOCK_WATER);
+                                world[bx][by] = tool;
+                                rp->inventoryCount[rp->selectedSlot]--;
+                                if (rp->inventoryCount[rp->selectedSlot] <= 0) {
+                                    rp->inventory[rp->selectedSlot] = BLOCK_AIR;
+                                    rp->inventoryCount[rp->selectedSlot] = 0;
+                                }
+                                NetSyncBlockChange(bx, by, tool);
+                                InvalidateChunkAt(bx, by);
+                            }
+                        }
+                    }
                 } else if (type == PKT_BLOCK_CHANGE) {
                     const PktBlockChange *bc = (const PktBlockChange *)((const uint8_t *)data + 1);
                     if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
@@ -1059,7 +1121,6 @@ void UpdateGame(float dt)
             }
             // Timeout check for remote players
             {
-                static float lastInputTime[MAX_NET_PLAYERS] = {0};
                 float now = NetGetTime();
                 for (int i = 0; i < NetGetReceivedCount(); i++) {
                     int sz, fid;
@@ -1104,7 +1165,6 @@ void UpdateGame(float dt)
             if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
             // Broadcast state to clients
             {
-                static float netTickTimer = 0.0f;
                 netTickTimer += dt;
                 if (netTickTimer >= NET_TICK_INTERVAL) {
                     netTickTimer = 0.0f;
@@ -1157,7 +1217,6 @@ void UpdateGame(float dt)
             NetPoll();
             // Send local input to server
             {
-                static float inputTickTimer = 0.0f;
                 inputTickTimer += dt;
                 if (inputTickTimer >= NET_TICK_INTERVAL) {
                     inputTickTimer = 0.0f;
@@ -1173,11 +1232,12 @@ void UpdateGame(float dt)
                     input.moveX = moveX;
                     input.jump = jumpKey;
                     input.sprint = sprintKey;
-                    input.attack = false;
-                    input.place = false;
-                    input.use = false;
-                    input.cursorX = 0;
-                    input.cursorY = 0;
+                    input.attack = Win32IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+                    input.place = Win32IsMouseButtonPressed(MOUSE_BUTTON_RIGHT);
+                    input.use = Win32IsKeyPressed(KEY_E);
+                    Vector2 mouseWorld = GetScreenToWorld2D(Win32GetMousePosition(), camera);
+                    input.cursorX = mouseWorld.x;
+                    input.cursorY = mouseWorld.y;
                     input.selectedSlot = player.selectedSlot;
                     uint8_t buf[NET_PACKET_MAX];
                     buf[0] = PKT_INPUT;
@@ -1318,6 +1378,7 @@ void UpdateGame(float dt)
     }
     UpdateChunks();
     UpdateHotbar();
+    UpdateRedstoneTick();
 
     // Distance checks: auto-close crafting table/furnace if player moves away
     if (craftingTableOpen || furnaceOpen || chestOpen) {

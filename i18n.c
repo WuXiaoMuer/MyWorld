@@ -302,6 +302,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_PODZOL] = "Podzol",
     [STR_ITEM_SLIMEBALL] = "Slimeball",
     [STR_ITEM_ENDER_PEARL] = "Ender Pearl",
+    // Redstone blocks
+    [STR_BLOCK_LEVER] = "Lever",
+    [STR_BLOCK_REDSTONE_WIRE] = "Redstone Wire",
+    [STR_BLOCK_REDSTONE_LAMP] = "Redstone Lamp",
+    [STR_BLOCK_STONE_PRESSURE_PLATE] = "Stone Pressure Plate",
 
     // Recipe Names
     [STR_RECIPE_WOOD_PLANKS] = "Wood -> 4 Planks",
@@ -363,6 +368,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BONE_BLOCK_DECOMP] = "Bone Block -> 9 Bone",
     [STR_RECIPE_BOOKSHELF] = "6 Planks -> Bookshelf",
     [STR_RECIPE_LANTERN] = "4 Torches -> Lantern",
+    // Redstone recipes
+    [STR_RECIPE_REDSTONE_WIRE] = "Redstone -> Wire",
+    [STR_RECIPE_LEVER] = "Cobblestone -> Lever",
+    [STR_RECIPE_REDSTONE_LAMP] = "4 Redstone -> Lamp",
+    [STR_RECIPE_PRESSURE_PLATE] = "2 Stone -> Pressure Plate",
     // Smelt
     [STR_SMELT_IRON] = "Iron Ore -> Iron Ingot",
     [STR_SMELT_PORK] = "Raw Pork -> Cooked Pork",
@@ -653,6 +663,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_PODZOL] = "灰化土",
     [STR_ITEM_SLIMEBALL] = "粘液球",
     [STR_ITEM_ENDER_PEARL] = "末影珍珠",
+    // Redstone blocks
+    [STR_BLOCK_LEVER] = "拉杆",
+    [STR_BLOCK_REDSTONE_WIRE] = "红石线",
+    [STR_BLOCK_REDSTONE_LAMP] = "红石灯",
+    [STR_BLOCK_STONE_PRESSURE_PLATE] = "石质压力板",
 
     // Recipe names
     [STR_RECIPE_WOOD_PLANKS] = "木头 -> 4木板",   // 木头 -> 4木板
@@ -713,6 +728,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BONE_BLOCK_DECOMP] = "骨块 -> 9骨头",
     [STR_RECIPE_BOOKSHELF] = "6木板 -> 书架",
     [STR_RECIPE_LANTERN] = "4火把 -> 灯笼",
+    // Redstone recipes
+    [STR_RECIPE_REDSTONE_WIRE] = "红石 -> 红石线",
+    [STR_RECIPE_LEVER] = "圆石 -> 拉杆",
+    [STR_RECIPE_REDSTONE_LAMP] = "4红石 -> 红石灯",
+    [STR_RECIPE_PRESSURE_PLATE] = "2石头 -> 压力板",
     [STR_SMELT_IRON] = "铁矿 -> 铁锭",            // 铁矿 -> 铁锭
     [STR_SMELT_PORK] = "生猪肉 -> 烤猪肉", // 生猪肉 -> 烤猪肉
     [STR_SMELT_COBBLE] = "圆石 -> 石头",          // 圆石 -> 石头
@@ -1002,6 +1022,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_PODZOL] = "ポドゾル",
     [STR_ITEM_SLIMEBALL] = "スライムボール",
     [STR_ITEM_ENDER_PEARL] = "エンダーパール",
+    // Redstone blocks
+    [STR_BLOCK_LEVER] = "レバー",
+    [STR_BLOCK_REDSTONE_WIRE] = "レッドストーン線",
+    [STR_BLOCK_REDSTONE_LAMP] = "レッドストーンランプ",
+    [STR_BLOCK_STONE_PRESSURE_PLATE] = "石の感圧板",
 
     // Recipe names (Japanese)
     [STR_RECIPE_WOOD_PLANKS] = "材 -> 板×4",         // 材 -> 板×4
@@ -1062,6 +1087,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BONE_BLOCK_DECOMP] = "骨ブロック -> 骨×9",
     [STR_RECIPE_BOOKSHELF] = "板×6 -> 本棚",
     [STR_RECIPE_LANTERN] = "松明×4 -> ランタン",
+    // Redstone recipes
+    [STR_RECIPE_REDSTONE_WIRE] = "レッドストーン -> 線",
+    [STR_RECIPE_LEVER] = "丸石 -> レバー",
+    [STR_RECIPE_REDSTONE_LAMP] = "レッドストーン×4 -> ランプ",
+    [STR_RECIPE_PRESSURE_PLATE] = "石×2 -> 感圧板",
     [STR_SMELT_IRON] = "鉄鉱石 -> 鉄の地金",  // 鉄鉱石 -> 鉄の地金
     [STR_SMELT_PORK] = "生ポーク -> 焼いたポーク",
     [STR_SMELT_COBBLE] = "コブルストーン -> 石",
