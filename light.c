@@ -58,8 +58,9 @@ void PropagateLight(int startX, int startY, int level)
 
         if (cl <= 0) continue;
         if (cx < 0 || cx >= WORLD_WIDTH || cy < 0 || cy >= WORLD_HEIGHT) continue;
-
         if (lightMap[cx][cy] >= cl) continue;
+        // Don't propagate into solid blocks (except the source itself)
+        if (qHead > 1 && !IsTransparent(cx, cy)) continue;
 
         lightMap[cx][cy] = cl;
 

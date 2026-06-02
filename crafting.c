@@ -146,6 +146,22 @@ void Craft(int recipeIndex)
     if (!CanCraft(recipeIndex)) return;
     CraftingRecipe *r = &craftRecipes[recipeIndex];
 
+    // Check if output fits in inventory before consuming inputs
+    int outRemaining = r->outputCount;
+    bool nonStackable = IsTool(r->output) || IsArmor(r->output);
+    // Count available space in existing stacks and empty slots
+    for (int i = 0; i < INVENTORY_SLOTS && outRemaining > 0; i++) {
+        if (player.inventory[i] == r->output && !nonStackable && player.inventoryCount[i] < 64) {
+            outRemaining -= (64 - player.inventoryCount[i]);
+        } else if (player.inventory[i] == BLOCK_AIR) {
+            outRemaining -= nonStackable ? 1 : 64;
+        }
+    }
+    if (outRemaining > 0) {
+        ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
+        return;
+    }
+
     // Remove input (may span multiple slots)
     int toRemove = r->inputCount;
     for (int i = 0; i < INVENTORY_SLOTS && toRemove > 0; i++) {

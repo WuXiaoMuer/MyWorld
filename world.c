@@ -1762,10 +1762,53 @@ void ApplyGravityAt(int bx, int by)
 static uint8_t redstonePower[WORLD_WIDTH][WORLD_HEIGHT];
 static bool leverState[WORLD_WIDTH][WORLD_HEIGHT];
 
+// Pressure plate tracking — avoids O(524K) scan in UpdateRedstoneTick
+#define MAX_PRESSURE_PLATES 256
+static int pressurePlatesX[MAX_PRESSURE_PLATES];
+static int pressurePlatesY[MAX_PRESSURE_PLATES];
+static int pressurePlateCount;
+
 void InitRedstone(void)
 {
     memset(redstonePower, 0, sizeof(redstonePower));
     memset(leverState, 0, sizeof(leverState));
+    pressurePlateCount = 0;
+}
+
+void RegisterPressurePlate(int bx, int by)
+{
+    for (int i = 0; i < pressurePlateCount; i++) {
+        if (pressurePlatesX[i] == bx && pressurePlatesY[i] == by) return;
+    }
+    if (pressurePlateCount < MAX_PRESSURE_PLATES) {
+        pressurePlatesX[pressurePlateCount] = bx;
+        pressurePlatesY[pressurePlateCount] = by;
+        pressurePlateCount++;
+    }
+}
+
+void UnregisterPressurePlate(int bx, int by)
+{
+    for (int i = 0; i < pressurePlateCount; i++) {
+        if (pressurePlatesX[i] == bx && pressurePlatesY[i] == by) {
+            pressurePlatesX[i] = pressurePlatesX[pressurePlateCount - 1];
+            pressurePlatesY[i] = pressurePlatesY[pressurePlateCount - 1];
+            pressurePlateCount--;
+            return;
+        }
+    }
+}
+
+void RebuildPressurePlateList(void)
+{
+    pressurePlateCount = 0;
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_STONE_PRESSURE_PLATE) {
+                RegisterPressurePlate(x, y);
+            }
+        }
+    }
 }
 
 bool IsLeverOn(int bx, int by)
@@ -1823,7 +1866,7 @@ static void PropagateRedstoneBFS(int startX, int startY, int power)
         int cx = qx[head];
         int cy = qy[head];
         int cp = qp[head];
-        head = head % (WORLD_WIDTH * 4);
+        head = (head + 1) % (WORLD_WIDTH * 4);
 
         // Spread to adjacent blocks
         static const int dx[] = {1, -1, 0, 0};
@@ -1898,15 +1941,13 @@ void UpdateRedstoneAt(int bx, int by)
 void UpdateRedstoneTick(void)
 {
     // Update pressure plate states (player position may have changed)
-    for (int x = 0; x < WORLD_WIDTH; x++) {
-        for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_STONE_PRESSURE_PLATE) {
-                bool wasPowered = redstonePower[x][y] > 0;
-                bool nowPowered = IsRedstoneSource(BLOCK_STONE_PRESSURE_PLATE, x, y);
-                if (wasPowered != nowPowered) {
-                    UpdateRedstoneAt(x, y);
-                }
-            }
+    for (int i = 0; i < pressurePlateCount; i++) {
+        int x = pressurePlatesX[i];
+        int y = pressurePlatesY[i];
+        bool wasPowered = redstonePower[x][y] > 0;
+        bool nowPowered = IsRedstoneSource(BLOCK_STONE_PRESSURE_PLATE, x, y);
+        if (wasPowered != nowPowered) {
+            UpdateRedstoneAt(x, y);
         }
     }
 }
@@ -2709,6 +2750,7 @@ void InvalidateChunkAt(int worldBlockX, int worldBlockY)
     int cx = worldBlockX / CHUNK_SIZE;
     Chunk *c = GetChunk(cx);
     if (c) {
+        if (c->textureValid) UnloadTexture(c->texture);
         c->textureValid = false;
         BuildWaterCache(c);
     }
@@ -2719,12 +2761,17 @@ void UpdateChunks(void)
     int playerBlockX = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
     int playerChunkX = playerBlockX / CHUNK_SIZE;
 
-    // Unload distant chunks
+    // Unload distant chunks (collect first to avoid modifying hash table during iteration)
+    int toUnload[MAX_CHUNKS];
+    int unloadCount = 0;
     for (int i = 0; i < MAX_CHUNKS; i++) {
         if (loadedChunks[i].chunkX == CHUNK_EMPTY) continue;
         if (abs(loadedChunks[i].chunkX - playerChunkX) > CHUNKS_LOADED) {
-            UnloadChunk(loadedChunks[i].chunkX);
+            toUnload[unloadCount++] = loadedChunks[i].chunkX;
         }
+    }
+    for (int i = 0; i < unloadCount; i++) {
+        UnloadChunk(toUnload[i]);
     }
 
     // Load nearby chunks

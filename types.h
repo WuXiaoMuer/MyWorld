@@ -1129,6 +1129,9 @@ void UpdateRedstoneAt(int bx, int by);
 void UpdateRedstoneTick(void);
 int GetRedstonePowerAt(int bx, int by);
 bool IsRedstoneLampPowered(int bx, int by);
+void RegisterPressurePlate(int bx, int by);
+void UnregisterPressurePlate(int bx, int by);
+void RebuildPressurePlateList(void);
 
 // light.c
 void InitLightMap(void);
@@ -1146,10 +1149,14 @@ bool AddToInventory(BlockType item);
 int AddToInventoryCount(BlockType item, int count);
 float GetToolMiningSpeed(BlockType tool, BlockType block);
 bool IsTool(BlockType item);
+bool IsSword(BlockType tool);
+float GetToolTier(BlockType tool);
+int GetSwordDamage(BlockType tool);
 int GetToolMaxDurability(BlockType tool);
 bool IsFood(BlockType item);
 int GetFoodValue(BlockType item);
 bool IsArmor(BlockType item);
+int GetArmorSlot(BlockType item);
 int GetArmorValue(BlockType item);
 int GetArmorMaxDurability(BlockType item);
 int GetTotalArmorPoints(void);
@@ -1291,6 +1298,9 @@ float GetWeatherLightModifier(void);
 
 // Smooth hover animation
 float GetHoverAlpha(int slotId, bool hovered, float dt);
+
+// Held item helpers (rendering.c)
+void ClearHeldItem(void);
 
 // Screen transitions
 typedef enum {

@@ -74,91 +74,98 @@ bool SaveWorld(const char *path)
     FILE *f = fopen(tmpPath, "wb");
     if (!f) return false;
 
+    bool ok = true;
+
     // Header
-    fwrite(SAVE_MAGIC, 1, 4, f);
+    ok = ok && fwrite(SAVE_MAGIC, 1, 4, f) == 4;
     uint32_t version = SAVE_VERSION;
     uint32_t seed = worldSeed;
     uint32_t ww = WORLD_WIDTH;
     uint32_t wh = WORLD_HEIGHT;
-    fwrite(&version, sizeof(uint32_t), 1, f);
-    fwrite(&seed, sizeof(uint32_t), 1, f);
-    fwrite(&ww, sizeof(uint32_t), 1, f);
-    fwrite(&wh, sizeof(uint32_t), 1, f);
+    ok = ok && fwrite(&version, sizeof(uint32_t), 1, f) == 1;
+    ok = ok && fwrite(&seed, sizeof(uint32_t), 1, f) == 1;
+    ok = ok && fwrite(&ww, sizeof(uint32_t), 1, f) == 1;
+    ok = ok && fwrite(&wh, sizeof(uint32_t), 1, f) == 1;
 
     // Day/Night
-    fwrite(&dayNight.timeOfDay, sizeof(float), 1, f);
-    fwrite(&dayNight.daySpeed, sizeof(float), 1, f);
-    fwrite(&dayNight.lightLevel, sizeof(float), 1, f);
+    ok = ok && fwrite(&dayNight.timeOfDay, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&dayNight.daySpeed, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&dayNight.lightLevel, sizeof(float), 1, f) == 1;
 
     // Player
-    fwrite(&player.position.x, sizeof(float), 1, f);
-    fwrite(&player.position.y, sizeof(float), 1, f);
-    fwrite(&player.velocity.x, sizeof(float), 1, f);
-    fwrite(&player.velocity.y, sizeof(float), 1, f);
-    fwrite(&player.onGround, sizeof(bool), 1, f);
-    fwrite(&player.selectedSlot, sizeof(int), 1, f);
-    fwrite(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f);
-    fwrite(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f);
-    fwrite(player.toolDurability, sizeof(int), INVENTORY_SLOTS, f);
-    fwrite(&player.health, sizeof(int), 1, f);
-    fwrite(&player.hunger, sizeof(int), 1, f);
-    fwrite(&player.oxygen, sizeof(int), 1, f);
-    fwrite(&player.xp, sizeof(int), 1, f);
-    fwrite(&player.spawnX, sizeof(int), 1, f);
-    fwrite(&player.spawnY, sizeof(int), 1, f);
-    fwrite(player.armor, sizeof(uint8_t), 4, f);
-    fwrite(player.armorDurability, sizeof(int), 4, f);
+    ok = ok && fwrite(&player.position.x, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&player.position.y, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&player.velocity.x, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&player.velocity.y, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&player.onGround, sizeof(bool), 1, f) == 1;
+    ok = ok && fwrite(&player.selectedSlot, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
+    ok = ok && fwrite(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
+    ok = ok && fwrite(player.toolDurability, sizeof(int), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
+    ok = ok && fwrite(&player.health, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&player.hunger, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&player.oxygen, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&player.xp, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&player.spawnX, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&player.spawnY, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(player.armor, sizeof(uint8_t), 4, f) == 4;
+    ok = ok && fwrite(player.armorDurability, sizeof(int), 4, f) == 4;
 
     // Furnace state (v5+)
-    fwrite(&furnaceBlockX, sizeof(int), 1, f);
-    fwrite(&furnaceBlockY, sizeof(int), 1, f);
-    fwrite(&furnaceFuel, sizeof(uint8_t), 1, f);
-    fwrite(&furnaceFuelCount, sizeof(int), 1, f);
-    fwrite(&furnaceInput, sizeof(uint8_t), 1, f);
-    fwrite(&furnaceInputCount, sizeof(int), 1, f);
-    fwrite(&furnaceOutput, sizeof(uint8_t), 1, f);
-    fwrite(&furnaceOutputCount, sizeof(int), 1, f);
-    fwrite(&furnaceProgress, sizeof(float), 1, f);
-    fwrite(&furnaceFuelBurn, sizeof(float), 1, f);
+    ok = ok && fwrite(&furnaceBlockX, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&furnaceBlockY, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&furnaceFuel, sizeof(uint8_t), 1, f) == 1;
+    ok = ok && fwrite(&furnaceFuelCount, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&furnaceInput, sizeof(uint8_t), 1, f) == 1;
+    ok = ok && fwrite(&furnaceInputCount, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&furnaceOutput, sizeof(uint8_t), 1, f) == 1;
+    ok = ok && fwrite(&furnaceOutputCount, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&furnaceProgress, sizeof(float), 1, f) == 1;
+    ok = ok && fwrite(&furnaceFuelBurn, sizeof(float), 1, f) == 1;
 
     // Chest data (v6+)
-    fwrite(&chestCount, sizeof(int), 1, f);
-    for (int i = 0; i < chestCount; i++) {
-        fwrite(&chestData[i].x, sizeof(int), 1, f);
-        fwrite(&chestData[i].y, sizeof(int), 1, f);
-        fwrite(chestData[i].items, sizeof(uint8_t), CHEST_SLOTS, f);
-        fwrite(chestData[i].counts, sizeof(int), CHEST_SLOTS, f);
+    ok = ok && fwrite(&chestCount, sizeof(int), 1, f) == 1;
+    for (int i = 0; i < chestCount && ok; i++) {
+        ok = ok && fwrite(&chestData[i].x, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&chestData[i].y, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(chestData[i].items, sizeof(uint8_t), CHEST_SLOTS, f) == CHEST_SLOTS;
+        ok = ok && fwrite(chestData[i].counts, sizeof(int), CHEST_SLOTS, f) == CHEST_SLOTS;
     }
 
     // Weather state (v7+)
-    fwrite(&weather.type, sizeof(int), 1, f);
-    fwrite(&weather.duration, sizeof(float), 1, f);
+    ok = ok && fwrite(&weather.type, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&weather.duration, sizeof(float), 1, f) == 1;
 
     // World data - RLE per column
-    for (int x = 0; x < WORLD_WIDTH; x++) {
+    for (int x = 0; x < WORLD_WIDTH && ok; x++) {
         int y = 0;
-        while (y < WORLD_HEIGHT) {
+        while (y < WORLD_HEIGHT && ok) {
             uint8_t block = world[x][y];
             uint16_t count = 1;
             while (y + count < WORLD_HEIGHT && world[x][y + count] == block && count < 65535) {
                 count++;
             }
-            fwrite(&block, sizeof(uint8_t), 1, f);
-            fwrite(&count, sizeof(uint16_t), 1, f);
+            ok = ok && fwrite(&block, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&count, sizeof(uint16_t), 1, f) == 1;
             y += count;
         }
     }
 
     // Modified blocks for multiplayer world sync (v8+)
     uint32_t modCount = (uint32_t)modifiedBlockCount;
-    fwrite(&modCount, sizeof(uint32_t), 1, f);
-    for (uint32_t i = 0; i < modCount; i++) {
-        fwrite(&modifiedBlocks[i].x, sizeof(uint16_t), 1, f);
-        fwrite(&modifiedBlocks[i].y, sizeof(uint16_t), 1, f);
-        fwrite(&modifiedBlocks[i].blockType, sizeof(uint8_t), 1, f);
+    ok = ok && fwrite(&modCount, sizeof(uint32_t), 1, f) == 1;
+    for (uint32_t i = 0; i < modCount && ok; i++) {
+        ok = ok && fwrite(&modifiedBlocks[i].x, sizeof(uint16_t), 1, f) == 1;
+        ok = ok && fwrite(&modifiedBlocks[i].y, sizeof(uint16_t), 1, f) == 1;
+        ok = ok && fwrite(&modifiedBlocks[i].blockType, sizeof(uint8_t), 1, f) == 1;
     }
 
     fclose(f);
+
+    if (!ok) {
+        remove(tmpPath);
+        return false;
+    }
 
     // Atomic replace: remove old file, rename tmp
     remove(path);

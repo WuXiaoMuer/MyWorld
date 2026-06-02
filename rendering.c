@@ -8,7 +8,7 @@
 //----------------------------------------------------------------------------------
 // Smooth hover animation system
 //----------------------------------------------------------------------------------
-#define MAX_HOVER_SLOTS 128
+#define MAX_HOVER_SLOTS 768
 static float hoverAlphas[MAX_HOVER_SLOTS] = {0};
 
 float GetHoverAlpha(int slotId, bool hovered, float dt)
@@ -43,6 +43,11 @@ void ReturnHeldItem(void)
     }
     // No empty slot — drop as entity
     SpawnItemEntity(heldItem, heldCount, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+    ClearHeldItem();
+}
+
+void ClearHeldItem(void)
+{
     heldItem = BLOCK_AIR;
     heldCount = 0;
     heldDurability = 0;
@@ -320,7 +325,7 @@ void DrawInventoryScreen(void)
             int cy = prevY + (prevH - charH) / 2;
             Color skin = {220,180,140,255}, hair = {80,50,30,255}, shirt = {0,100,200,255}, pants_ = {60,40,20,255};
             Color hc={0,0,0,0},cc={0,0,0,0},lc={0,0,0,0},bc={0,0,0,0};
-            for (int i = 0; i < 4; i++) { if (player.armor[i] != BLOCK_AIR) { BlockType a=(BlockType)player.armor[i]; Color ac; if(a>=ARMOR_DIAMOND_HELMET) ac=(Color){80,220,230,255}; else if(a>=ARMOR_GOLD_HELMET) ac=(Color){220,180,50,255}; else if(a>=ARMOR_IRON_HELMET) ac=(Color){200,210,220,255}; else if(a>=ARMOR_STONE_HELMET) ac=(Color){140,140,140,255}; else ac=(Color){160,120,60,255}; if(i==0)hc=ac;else if(i==1)cc=ac;else if(i==2)lc=ac;else bc=ac; } }
+            for (int i = 0; i < 4; i++) { if (player.armor[i] != BLOCK_AIR) { BlockType a=(BlockType)player.armor[i]; Color ac; if(a>=ARMOR_DIAMOND_HELMET) ac=(Color){80,220,230,255}; else if(a>=ARMOR_GOLD_HELMET) ac=(Color){220,180,50,255}; else if(a>=ARMOR_IRON_HELMET) ac=(Color){200,210,220,255}; else if(a>=ARMOR_STONE_HELMET) ac=(Color){140,140,140,255}; else if(a>=ARMOR_WOOD_HELMET) ac=(Color){160,120,60,255}; else ac=(Color){160,120,60,255}; if(i==0)hc=ac;else if(i==1)cc=ac;else if(i==2)lc=ac;else bc=ac; } }
             DrawRectangle(cx+2*sc,cy,8*sc,8*sc,skin); DrawRectangle(cx+2*sc,cy,8*sc,3*sc,hair);
             if(hc.a>0){DrawRectangle(cx+1*sc,cy-1*sc,10*sc,5*sc,hc);DrawRectangle(cx+2*sc,cy+4*sc,8*sc,2*sc,hc);}
             DrawRectangle(cx+3*sc,cy+4*sc,2*sc,2*sc,(Color){40,40,40,255}); DrawRectangle(cx+7*sc,cy+4*sc,2*sc,2*sc,(Color){40,40,40,255});
@@ -359,8 +364,8 @@ void DrawInventoryScreen(void)
                         heldItem = player.armor[i]; heldCount = 1; heldDurability = player.armorDurability[i];
                         player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.armor[i] == BLOCK_AIR && IsArmor((BlockType)heldItem)) {
-                        int slotType = (heldItem - ARMOR_WOOD_HELMET) % 4;
-                        if (slotType == i) { player.armor[i] = heldItem; player.armorDurability[i] = heldDurability; heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; PlaySoundUIClick(); }
+                        int slotType = GetArmorSlot((BlockType)heldItem);
+                        if (slotType == i) { player.armor[i] = heldItem; player.armorDurability[i] = heldDurability; ClearHeldItem(); PlaySoundUIClick(); }
                     }
                 }
             }
@@ -426,6 +431,21 @@ void DrawInventoryScreen(void)
                                 else if (furnaceInput == itm) { int sp = 64 - furnaceInputCount; int ta = cnt > sp ? sp : cnt; furnaceInputCount += ta; player.inventoryCount[idx] -= ta; if (player.inventoryCount[idx] <= 0) { player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; } transferred = true; }
                             }
                             if (!transferred) {
+                                // Auto-equip armor when shift-clicking
+                                if (IsArmor((BlockType)player.inventory[idx])) {
+                                    int slot = GetArmorSlot((BlockType)player.inventory[idx]);
+                                    if (slot >= 0 && player.armor[slot] == BLOCK_AIR) {
+                                        player.armor[slot] = player.inventory[idx];
+                                        player.armorDurability[slot] = player.toolDurability[idx];
+                                        player.inventory[idx] = BLOCK_AIR;
+                                        player.inventoryCount[idx] = 0;
+                                        player.toolDurability[idx] = 0;
+                                        transferred = true;
+                                        PlaySoundUIClick();
+                                    }
+                                }
+                            }
+                            if (!transferred) {
                                 int startDest = (row == 0) ? HOTBAR_SLOTS : 0;
                                 int endDest = (row == 0) ? INVENTORY_SLOTS : HOTBAR_SLOTS;
                                 bool moved = false;
@@ -446,11 +466,11 @@ void DrawInventoryScreen(void)
                         player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.inventory[idx] == BLOCK_AIR) {
                         player.inventory[idx] = heldItem; player.inventoryCount[idx] = heldCount; player.toolDurability[idx] = heldDurability;
-                        heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; PlaySoundUIClick();
+                        ClearHeldItem(); PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.inventory[idx] == heldItem) {
                         int sp = 64 - player.inventoryCount[idx]; int ta = heldCount > sp ? sp : heldCount;
                         player.inventoryCount[idx] += ta; heldCount -= ta;
-                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; } PlaySoundUIClick();
+                        if (heldCount <= 0) { ClearHeldItem(); } PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.inventory[idx] != BLOCK_AIR) {
                         uint8_t ti = player.inventory[idx]; int tc = player.inventoryCount[idx]; int td = player.toolDurability[idx];
                         player.inventory[idx] = heldItem; player.inventoryCount[idx] = heldCount; player.toolDurability[idx] = heldDurability;
@@ -471,7 +491,7 @@ void DrawInventoryScreen(void)
                 furnaceFuel = BLOCK_AIR; furnaceFuelCount = 0;
             } else if (heldItem != BLOCK_AIR && furnaceFuel == BLOCK_AIR && heldItem == ITEM_COAL) {
                 furnaceFuel = heldItem; furnaceFuelCount = heldCount;
-                heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0;
+                ClearHeldItem();
             } else if (heldItem != BLOCK_AIR && furnaceFuel == heldItem && heldItem == ITEM_COAL) {
                 int sp = 64 - furnaceFuelCount; int ta = heldCount > sp ? sp : heldCount;
                 furnaceFuelCount += ta; heldCount -= ta;
@@ -484,7 +504,7 @@ void DrawInventoryScreen(void)
                 furnaceInput = BLOCK_AIR; furnaceInputCount = 0; furnaceProgress = 0.0f;
             } else if (heldItem != BLOCK_AIR && furnaceInput == BLOCK_AIR && FindSmeltRecipe((BlockType)heldItem) >= 0) {
                 furnaceInput = heldItem; furnaceInputCount = heldCount;
-                heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; furnaceProgress = 0.0f;
+                ClearHeldItem(); furnaceProgress = 0.0f;
             } else if (heldItem != BLOCK_AIR && furnaceInput == heldItem) {
                 int sp = 64 - furnaceInputCount; int ta = heldCount > sp ? sp : heldCount;
                 furnaceInputCount += ta; heldCount -= ta;
@@ -508,7 +528,7 @@ void DrawInventoryScreen(void)
             if (!CheckCollisionPointRec(mouse, container)) {
                 PlaySoundDrop();
                 SpawnItemEntity(heldItem, heldCount, player.position.x + PLAYER_WIDTH / 2, player.position.y);
-                heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0;
+                ClearHeldItem();
             }
         }
 
@@ -681,18 +701,18 @@ void DrawInventoryScreen(void)
                 if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && Win32IsKeyDown(KEY_LEFT_SHIFT) && chestIdx >= 0 && chestData[chestIdx].items[si] != BLOCK_AIR) {
                     uint8_t item = chestData[chestIdx].items[si];
                     int cnt = chestData[chestIdx].counts[si];
-                    bool merged = false;
-                    for (int d = 0; d < INVENTORY_SLOTS; d++) {
+                    // Try to merge into existing inventory stacks
+                    for (int d = 0; d < INVENTORY_SLOTS && cnt > 0; d++) {
                         if (player.inventory[d] == item && player.inventoryCount[d] < 64) {
                             int space = 64 - player.inventoryCount[d];
                             int add = (cnt < space) ? cnt : space;
                             player.inventoryCount[d] += add;
                             cnt -= add;
-                            if (cnt <= 0) break;
                         }
                     }
-                    if (cnt <= 0) { chestData[chestIdx].items[si] = BLOCK_AIR; chestData[chestIdx].counts[si] = 0; merged = true; }
-                    if (!merged) {
+                    chestData[chestIdx].counts[si] = cnt;
+                    if (cnt <= 0) { chestData[chestIdx].items[si] = BLOCK_AIR; }
+                    if (cnt > 0) {
                         for (int d = 0; d < INVENTORY_SLOTS; d++) {
                             if (player.inventory[d] == BLOCK_AIR) {
                                 player.inventory[d] = item;
@@ -935,6 +955,7 @@ void DrawInventoryScreen(void)
                 else if (a >= ARMOR_GOLD_HELMET) ac = (Color){220, 180, 50, 255};
                 else if (a >= ARMOR_IRON_HELMET) ac = (Color){200, 210, 220, 255};
                 else if (a >= ARMOR_STONE_HELMET) ac = (Color){140, 140, 140, 255};
+                else if (a >= ARMOR_WOOD_HELMET) ac = (Color){160, 120, 60, 255};
                 else ac = (Color){160, 120, 60, 255};
                 if (i == 0) hc = ac; else if (i == 1) cc = ac; else if (i == 2) lc = ac; else bc = ac;
             }
@@ -1060,7 +1081,7 @@ void DrawInventoryScreen(void)
                     if (player.armor[i] == BLOCK_AIR) {
                         for (int s = 0; s < INVENTORY_SLOTS; s++) {
                             if (IsArmor((BlockType)player.inventory[s])) {
-                                int slotType = (player.inventory[s] - ARMOR_WOOD_HELMET) % 4;
+                                int slotType = GetArmorSlot((BlockType)player.inventory[s]);
                                 if (slotType == i) {
                                     player.armor[i] = player.inventory[s];
                                     player.armorDurability[i] = player.toolDurability[s];
@@ -1084,7 +1105,7 @@ void DrawInventoryScreen(void)
                 } else if (heldItem != BLOCK_AIR && player.armor[i] == BLOCK_AIR) {
                     // Equip held armor
                     if (IsArmor((BlockType)heldItem)) {
-                        int slotType = (heldItem - ARMOR_WOOD_HELMET) % 4;
+                        int slotType = GetArmorSlot((BlockType)heldItem);
                         if (slotType == i) {
                             player.armor[i] = heldItem;
                             player.armorDurability[i] = heldDurability;
@@ -1097,7 +1118,7 @@ void DrawInventoryScreen(void)
                 } else if (heldItem != BLOCK_AIR && player.armor[i] != BLOCK_AIR) {
                     // Swap held armor with equipped
                     if (IsArmor((BlockType)heldItem)) {
-                        int slotType = (heldItem - ARMOR_WOOD_HELMET) % 4;
+                        int slotType = GetArmorSlot((BlockType)heldItem);
                         if (slotType == i) {
                             uint8_t tmpItem = player.armor[i];
                             int tmpDur = player.armorDurability[i];
@@ -1310,6 +1331,21 @@ void DrawInventoryScreen(void)
                             }
                         }
                         if (!transferred) {
+                            // Auto-equip armor when shift-clicking
+                            if (IsArmor((BlockType)player.inventory[idx])) {
+                                int slot = GetArmorSlot((BlockType)player.inventory[idx]);
+                                if (slot >= 0 && player.armor[slot] == BLOCK_AIR) {
+                                    player.armor[slot] = player.inventory[idx];
+                                    player.armorDurability[slot] = player.toolDurability[idx];
+                                    player.inventory[idx] = BLOCK_AIR;
+                                    player.inventoryCount[idx] = 0;
+                                    player.toolDurability[idx] = 0;
+                                    transferred = true;
+                                    PlaySoundUIClick();
+                                }
+                            }
+                        }
+                        if (!transferred) {
                             int startDest = (row == 0) ? HOTBAR_SLOTS : 0;
                             int endDest = (row == 0) ? INVENTORY_SLOTS : HOTBAR_SLOTS;
                             bool moved = false;
@@ -1364,7 +1400,7 @@ void DrawInventoryScreen(void)
                     int toAdd = heldCount > space ? space : heldCount;
                     player.inventoryCount[idx] += toAdd;
                     heldCount -= toAdd;
-                    if (heldCount <= 0) { heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; }
+                    if (heldCount <= 0) { ClearHeldItem(); }
                     PlaySoundUIClick();
                 } else if (heldItem != BLOCK_AIR && player.inventory[idx] != BLOCK_AIR) {
                     uint8_t tmpItem = player.inventory[idx];
@@ -1406,7 +1442,7 @@ void DrawInventoryScreen(void)
                     // Place one item into matching stack
                     player.inventoryCount[idx]++;
                     heldCount--;
-                    if (heldCount <= 0) { heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; }
+                    if (heldCount <= 0) { ClearHeldItem(); }
                     PlaySoundUIClick();
                 } else if (heldItem != BLOCK_AIR && player.inventory[idx] == BLOCK_AIR) {
                     // Place one item into empty slot
@@ -1414,7 +1450,7 @@ void DrawInventoryScreen(void)
                     player.inventoryCount[idx] = 1;
                     player.toolDurability[idx] = (IsTool((BlockType)heldItem) && heldDurability > 0) ? heldDurability : 0;
                     heldCount--;
-                    if (heldCount <= 0) { heldItem = BLOCK_AIR; heldCount = 0; heldDurability = 0; }
+                    if (heldCount <= 0) { ClearHeldItem(); }
                     PlaySoundUIClick();
                 }
             }
@@ -1736,28 +1772,32 @@ void DrawPlayerSprite(void)
     Color helmetColor = {0, 0, 0, 0}, chestColor = {0, 0, 0, 0}, legColor = {0, 0, 0, 0}, bootColor = {0, 0, 0, 0};
     if (player.armor[0] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[0];
-        if (a <= ARMOR_STONE_BOOTS) helmetColor = (Color){140, 140, 140, 255};
+        if (a <= ARMOR_WOOD_BOOTS) helmetColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_STONE_BOOTS) helmetColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) helmetColor = (Color){200, 210, 220, 255};
         else if (a <= ARMOR_GOLD_BOOTS) helmetColor = (Color){220, 180, 50, 255};
         else helmetColor = (Color){80, 220, 230, 255};
     }
     if (player.armor[1] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[1];
-        if (a <= ARMOR_STONE_BOOTS) chestColor = (Color){140, 140, 140, 255};
+        if (a <= ARMOR_WOOD_BOOTS) chestColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_STONE_BOOTS) chestColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) chestColor = (Color){200, 210, 220, 255};
         else if (a <= ARMOR_GOLD_BOOTS) chestColor = (Color){220, 180, 50, 255};
         else chestColor = (Color){80, 220, 230, 255};
     }
     if (player.armor[2] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[2];
-        if (a <= ARMOR_STONE_BOOTS) legColor = (Color){140, 140, 140, 255};
+        if (a <= ARMOR_WOOD_BOOTS) legColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_STONE_BOOTS) legColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) legColor = (Color){200, 210, 220, 255};
         else if (a <= ARMOR_GOLD_BOOTS) legColor = (Color){220, 180, 50, 255};
         else legColor = (Color){80, 220, 230, 255};
     }
     if (player.armor[3] != BLOCK_AIR) {
         BlockType a = (BlockType)player.armor[3];
-        if (a <= ARMOR_STONE_BOOTS) bootColor = (Color){140, 140, 140, 255};
+        if (a <= ARMOR_WOOD_BOOTS) bootColor = (Color){160, 120, 60, 255};
+        else if (a <= ARMOR_STONE_BOOTS) bootColor = (Color){140, 140, 140, 255};
         else if (a <= ARMOR_IRON_BOOTS) bootColor = (Color){200, 210, 220, 255};
         else if (a <= ARMOR_GOLD_BOOTS) bootColor = (Color){220, 180, 50, 255};
         else bootColor = (Color){80, 220, 230, 255};

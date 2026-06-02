@@ -219,6 +219,7 @@ void InitGame(void)
         InitWeather();
     }
 
+    RebuildPressurePlateList();
     RecalculateAllLight();
     InitCameraSystem();
     InitChunkTable();

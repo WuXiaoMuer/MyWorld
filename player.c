@@ -151,22 +151,28 @@ int AddToInventoryCount(BlockType item, int count)
 {
     if (count <= 0) return 0;
     int remaining = count;
-    // Try to stack in existing slots
-    for (int i = 0; i < INVENTORY_SLOTS && remaining > 0; i++) {
-        if (player.inventory[i] == item && player.inventoryCount[i] < 64) {
-            int space = 64 - player.inventoryCount[i];
-            int toAdd = remaining > space ? space : remaining;
-            player.inventoryCount[i] += toAdd;
-            remaining -= toAdd;
+    bool nonStackable = IsTool(item) || IsArmor(item);
+    int maxStack = nonStackable ? 1 : 64;
+    // Try to stack in existing slots (only for stackable items)
+    if (!nonStackable) {
+        for (int i = 0; i < INVENTORY_SLOTS && remaining > 0; i++) {
+            if (player.inventory[i] == item && player.inventoryCount[i] < maxStack) {
+                int space = maxStack - player.inventoryCount[i];
+                int toAdd = remaining > space ? space : remaining;
+                player.inventoryCount[i] += toAdd;
+                remaining -= toAdd;
+            }
         }
     }
     // Find empty slots
     for (int i = 0; i < INVENTORY_SLOTS && remaining > 0; i++) {
         if (player.inventory[i] == BLOCK_AIR) {
-            int toAdd = remaining > 64 ? 64 : remaining;
+            int toAdd = remaining > maxStack ? maxStack : remaining;
             player.inventory[i] = item;
             player.inventoryCount[i] = toAdd;
+            player.toolDurability[i] = IsTool(item) ? GetToolMaxDurability(item) : 0;
             remaining -= toAdd;
+            if (nonStackable) break; // one per slot
         }
     }
     if (remaining > 0) {
@@ -204,6 +210,34 @@ bool IsFood(BlockType item)
     return item >= FOOD_RAW_PORK && item <= FOOD_BREAD;
 }
 
+bool IsSword(BlockType tool)
+{
+    return tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD ||
+           tool == TOOL_GOLD_SWORD || tool == TOOL_DIAMOND_SWORD;
+}
+
+float GetToolTier(BlockType tool)
+{
+    if (tool == TOOL_WOOD_PICKAXE || tool == TOOL_WOOD_AXE || tool == TOOL_WOOD_SWORD || tool == TOOL_WOOD_SHOVEL) return 1.5f;
+    if (tool == TOOL_STONE_PICKAXE || tool == TOOL_STONE_AXE || tool == TOOL_STONE_SWORD || tool == TOOL_STONE_SHOVEL) return 2.5f;
+    if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) return 4.0f;
+    if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL) return 6.0f;
+    if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) return 5.0f;
+    return 1.0f;
+}
+
+int GetSwordDamage(BlockType tool)
+{
+    switch (tool) {
+        case TOOL_WOOD_SWORD: return 3;
+        case TOOL_STONE_SWORD: return 4;
+        case TOOL_IRON_SWORD: return 6;
+        case TOOL_GOLD_SWORD: return 4;
+        case TOOL_DIAMOND_SWORD: return 8;
+        default: return 1;
+    }
+}
+
 int GetFoodValue(BlockType item)
 {
     switch (item) {
@@ -225,6 +259,21 @@ bool IsArmor(BlockType item)
            (item >= ARMOR_IRON_HELMET && item <= ARMOR_IRON_BOOTS) ||
            (item >= ARMOR_GOLD_HELMET && item <= ARMOR_GOLD_BOOTS) ||
            (item >= ARMOR_DIAMOND_HELMET && item <= ARMOR_DIAMOND_BOOTS);
+}
+
+int GetArmorSlot(BlockType item)
+{
+    switch (item) {
+    case ARMOR_WOOD_HELMET: case ARMOR_STONE_HELMET: case ARMOR_IRON_HELMET:
+    case ARMOR_GOLD_HELMET: case ARMOR_DIAMOND_HELMET: return 0;
+    case ARMOR_WOOD_CHESTPLATE: case ARMOR_STONE_CHESTPLATE: case ARMOR_IRON_CHESTPLATE:
+    case ARMOR_GOLD_CHESTPLATE: case ARMOR_DIAMOND_CHESTPLATE: return 1;
+    case ARMOR_WOOD_LEGGINGS: case ARMOR_STONE_LEGGINGS: case ARMOR_IRON_LEGGINGS:
+    case ARMOR_GOLD_LEGGINGS: case ARMOR_DIAMOND_LEGGINGS: return 2;
+    case ARMOR_WOOD_BOOTS: case ARMOR_STONE_BOOTS: case ARMOR_IRON_BOOTS:
+    case ARMOR_GOLD_BOOTS: case ARMOR_DIAMOND_BOOTS: return 3;
+    default: return -1;
+    }
 }
 
 int GetArmorValue(BlockType item)
@@ -301,11 +350,10 @@ void DamageArmor(void)
 float GetAttackSpeed(BlockType tool)
 {
     if (!IsTool(tool)) return ATTACK_SPEED_BARE;
-    bool isSword = (tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD || tool == TOOL_GOLD_SWORD || tool == TOOL_DIAMOND_SWORD);
+    if (IsSword(tool)) return ATTACK_SPEED_SWORD;
     bool isAxe = (tool == TOOL_WOOD_AXE || tool == TOOL_STONE_AXE || tool == TOOL_IRON_AXE || tool == TOOL_GOLD_AXE || tool == TOOL_DIAMOND_AXE);
     bool isPick = (tool == TOOL_WOOD_PICKAXE || tool == TOOL_STONE_PICKAXE || tool == TOOL_IRON_PICKAXE || tool == TOOL_GOLD_PICKAXE || tool == TOOL_DIAMOND_PICKAXE);
     bool isShovel = (tool == TOOL_WOOD_SHOVEL || tool == TOOL_STONE_SHOVEL || tool == TOOL_IRON_SHOVEL || tool == TOOL_GOLD_SHOVEL || tool == TOOL_DIAMOND_SHOVEL);
-    if (isSword) return ATTACK_SPEED_SWORD;
     if (isAxe) return ATTACK_SPEED_AXE;
     if (isPick) return ATTACK_SPEED_PICK;
     if (isShovel) return ATTACK_SPEED_SHOVEL;
@@ -318,16 +366,9 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
 
     bool isPickaxe = (tool == TOOL_WOOD_PICKAXE || tool == TOOL_STONE_PICKAXE || tool == TOOL_IRON_PICKAXE || tool == TOOL_GOLD_PICKAXE || tool == TOOL_DIAMOND_PICKAXE);
     bool isAxe = (tool == TOOL_WOOD_AXE || tool == TOOL_STONE_AXE || tool == TOOL_IRON_AXE || tool == TOOL_GOLD_AXE || tool == TOOL_DIAMOND_AXE);
-    bool isSword = (tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD || tool == TOOL_GOLD_SWORD || tool == TOOL_DIAMOND_SWORD);
     bool isShovel = (tool == TOOL_WOOD_SHOVEL || tool == TOOL_STONE_SHOVEL || tool == TOOL_IRON_SHOVEL || tool == TOOL_GOLD_SHOVEL || tool == TOOL_DIAMOND_SHOVEL);
 
-    // Tier multiplier: wood=1.5, stone=2.5, iron=4.0, gold=6.0, diamond=5.0
-    float tier = 1.0f;
-    if (tool == TOOL_WOOD_PICKAXE || tool == TOOL_WOOD_AXE || tool == TOOL_WOOD_SWORD || tool == TOOL_WOOD_SHOVEL) tier = 1.5f;
-    if (tool == TOOL_STONE_PICKAXE || tool == TOOL_STONE_AXE || tool == TOOL_STONE_SWORD || tool == TOOL_STONE_SHOVEL) tier = 2.5f;
-    if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) tier = 4.0f;
-    if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL) tier = 6.0f;
-    if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) tier = 5.0f;
+    float tier = GetToolTier(tool);
 
     // Correct tool bonus
     if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_GOLD_ORE || block == BLOCK_DIAMOND_ORE || block == BLOCK_REDSTONE_ORE || block == BLOCK_LAPIS_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE || block == BLOCK_CHEST)) {
@@ -336,7 +377,7 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
     if (isAxe && (block == BLOCK_WOOD || block == BLOCK_PLANKS)) {
         return tier * 1.5f;
     }
-    if (isSword && (block == BLOCK_LEAVES || block == BLOCK_TALL_GRASS)) {
+    if (IsSword(tool) && (block == BLOCK_LEAVES || block == BLOCK_TALL_GRASS)) {
         return tier * 1.5f;
     }
     if (isShovel && (block == BLOCK_DIRT || block == BLOCK_SAND || block == BLOCK_GRAVEL || block == BLOCK_CLAY)) {
@@ -562,8 +603,12 @@ void PlayerPhysics(float dt)
             if (player.fallPeakVel > 300.0f) {
                 int damage = (int)((player.fallPeakVel - 300.0f) / 100.0f);
                 if (damage > 0) {
+                    float reduction = GetArmorDamageReduction();
+                    damage = (int)(damage * (1.0f - reduction));
+                    if (damage < 1) damage = 1;
                     player.health -= damage;
                     if (player.health < 0) player.health = 0;
+                    DamageArmor();
                     pendingDeathCause = STR_DEATH_FALL;
                     player.damageFlashTimer = 0.3f;
                     if (!player.netControlled) {
@@ -633,6 +678,8 @@ void PlayerBlockInteraction(void)
 
     // Hold left to mine / attack mobs
     if (win32LMB) {
+        // Decrement attack cooldown every frame
+        if (player.attackCooldown > 0) player.attackCooldown -= GetFrameTime();
         // Check mob hit first
         for (int i = 0; i < MAX_MOBS; i++) {
             if (!mobs[i].active || mobs[i].deathTimer > 0) continue;
@@ -647,17 +694,7 @@ void PlayerBlockInteraction(void)
                 if (mouseWorld.x >= mLeft && mouseWorld.x <= mRight &&
                     mouseWorld.y >= mTop && mouseWorld.y <= mBottom) {
                     // Attack mob
-                    int damage = 1;
-                    if (IsTool(selectedTool)) {
-                        // Swords deal more damage
-                        if (selectedTool == TOOL_WOOD_SWORD) damage = 3;
-                        else if (selectedTool == TOOL_STONE_SWORD) damage = 4;
-                        else if (selectedTool == TOOL_IRON_SWORD) damage = 6;
-                        else if (selectedTool == TOOL_GOLD_SWORD) damage = 4;
-                        else if (selectedTool == TOOL_DIAMOND_SWORD) damage = 8;
-                        else damage = 2; // Other tools
-                    }
-                    player.attackCooldown -= GetFrameTime();
+                    int damage = IsTool(selectedTool) ? (IsSword(selectedTool) ? GetSwordDamage(selectedTool) : 2) : 1;
                     if (player.attackCooldown <= 0) {
                         // Critical hit: falling fast enough
                         bool crit = player.velocity.y > CRIT_FALL_THRESHOLD;
@@ -727,6 +764,7 @@ void PlayerBlockInteraction(void)
                 }
                 world[blockX][blockY] = BLOCK_AIR;
                 NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
+                if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Ore drop special cases
                 uint8_t dropItem = bt;
@@ -878,7 +916,7 @@ void PlayerBlockInteraction(void)
         }
 
         if (IsTool(selectedTool) || IsFood(selectedTool) || IsArmor(selectedTool)) return; // Can't place tools, food, or armor
-        if (selectedTool >= ITEM_STICK && selectedTool <= ITEM_BOW) return; // Can't place items
+        if (selectedTool >= BLOCK_COUNT || !blockInfo[selectedTool].breakable) return; // Can't place non-block items
         if (selectedTool != BLOCK_AIR && player.inventoryCount[player.selectedSlot] > 0) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 float bLeft = blockX * BLOCK_SIZE;
@@ -895,6 +933,7 @@ void PlayerBlockInteraction(void)
                     bool wasWater = (world[blockX][blockY] == BLOCK_WATER);
                     world[blockX][blockY] = selectedTool;
                     NetSyncBlockChange(blockX, blockY, selectedTool);
+                    if (selectedTool == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(blockX, blockY);
                     player.inventoryCount[player.selectedSlot]--;
                     if (player.inventoryCount[player.selectedSlot] <= 0) {
                         player.inventory[player.selectedSlot] = BLOCK_AIR;
@@ -1089,8 +1128,8 @@ void RespawnPlayer(void)
     }
     int spawnX, spawnY;
     if (player.spawnX >= 0 && player.spawnY >= 0 &&
-        player.spawnX < WORLD_WIDTH && player.spawnY < WORLD_HEIGHT &&
-        world[player.spawnX][player.spawnY] == BLOCK_BED) {
+        player.spawnX < WORLD_WIDTH && player.spawnY + 1 < WORLD_HEIGHT &&
+        world[player.spawnX][player.spawnY + 1] == BLOCK_BED) {
         spawnX = player.spawnX;
         spawnY = player.spawnY;
     } else {

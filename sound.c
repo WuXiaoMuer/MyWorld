@@ -22,6 +22,7 @@ static Wave GenerateWave(float duration, int sampleRate, float (*generator)(floa
 {
     int frames = (int)(duration * sampleRate);
     short *samples = (short *)malloc(frames * sizeof(short));
+    if (!samples) return (Wave){0};
 
     unsigned int rng = soundSeed;
     for (int i = 0; i < frames; i++) {

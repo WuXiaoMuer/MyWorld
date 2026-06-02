@@ -77,8 +77,8 @@ void UpdateProjectiles(float dt)
             // Player projectile: check collision with mobs
             for (int m = 0; m < MAX_MOBS; m++) {
                 if (!mobs[m].active || mobs[m].deathTimer > 0) continue;
-                int mw = (mobs[m].type == MOB_ZOMBIE) ? 12 : 16;
-                int mh = (mobs[m].type == MOB_ZOMBIE) ? 28 : (mobs[m].type == MOB_SPIDER) ? 16 : 12;
+                int mw = mobWidth[mobs[m].type];
+                int mh = mobHeight[mobs[m].type];
                 if (p->position.x >= mobs[m].position.x && p->position.x <= mobs[m].position.x + mw &&
                     p->position.y >= mobs[m].position.y && p->position.y <= mobs[m].position.y + mh) {
                     DamageMob(&mobs[m], PROJECTILE_DAMAGE);
@@ -142,6 +142,7 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].deathTimer = 0.0f;
             mobs[i].attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
             mobs[i].fuseTimer = 0.0f;
+            mobs[i].burnTimer = 0.0f;
             mobs[i].despawnTimer = MOB_DESPAWN_TIME;
             mobs[i].active = true;
             return &mobs[i];
@@ -553,9 +554,10 @@ static void UpdateEndermanAI(Mob *mob, float dt)
                            (mouseWorld.y - mobCenterY) * (mouseWorld.y - mobCenterY));
     bool playerLooking = lookDist < 100.0f && dist < 400.0f;
 
-    if (playerLooking || mob->aiState == 1) {
+    if (playerLooking || (mob->aiState == 1 && dist < 500.0f)) {
         // Provoked: chase + teleport
         mob->aiState = 1;
+        if (!playerLooking && dist > 400.0f) mob->aiState = 0; // Reset if player not looking and far
         mob->facingRight = dx > 0;
         mob->velocity.x = (dx > 0 ? 1 : -1) * mobSpeed[MOB_ENDERMAN];
 
@@ -626,7 +628,17 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
         if (finalDamage < 1) finalDamage = 1;
         player.health -= finalDamage;
         if (player.health < 0) player.health = 0;
-        if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_ZOMBIE);
+        if (player.health <= 0) {
+            switch (mob->type) {
+                case MOB_ZOMBIE: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
+                case MOB_SKELETON: SetDeathCause(STR_DEATH_MOB_SKELETON); break;
+                case MOB_CREEPER: SetDeathCause(STR_DEATH_MOB_CREEPER); break;
+                case MOB_SPIDER: SetDeathCause(STR_DEATH_MOB_SPIDER); break;
+                case MOB_SLIME: SetDeathCause(STR_DEATH_MOB_SLIME); break;
+                case MOB_ENDERMAN: SetDeathCause(STR_DEATH_MOB_ENDERMAN); break;
+                default: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
+            }
+        }
         DamageArmor();
         mob->contactCooldown = MOB_CONTACT_COOLDOWN;
 
@@ -923,10 +935,14 @@ void UpdateMobs(float dt)
             int mby = (int)(mob->position.y / BLOCK_SIZE);
             uint8_t light = GetLightLevel(mbx, mby);
             if (light >= 12 && dayNight.lightLevel > 0.6f) {
-                mob->health -= (int)(20.0f * dt);
-                if (mob->health <= 0) {
-                    mob->deathTimer = MOB_DEATH_TIME;
+                mob->burnTimer += dt * 5.0f; // ~5 damage/sec
+                while (mob->burnTimer >= 1.0f) {
+                    DamageMob(mob, 1);
+                    mob->burnTimer -= 1.0f;
+                    if (mob->deathTimer > 0) break; // mob is dying
                 }
+            } else {
+                mob->burnTimer = 0.0f;
             }
         }
 
@@ -950,48 +966,6 @@ void UpdateMobs(float dt)
                 mob->active = false;
             }
             continue;
-        }
-
-        // Undead mobs burn in sunlight
-        if ((mob->type == MOB_ZOMBIE || mob->type == MOB_SKELETON) && dayNight.lightLevel > 0.8f) {
-            // Check if exposed to sky
-            int bx = (int)(mob->position.x + mobWidth[mob->type] / 2) / BLOCK_SIZE;
-            int by = (int)(mob->position.y) / BLOCK_SIZE;
-            bool exposed = true;
-            for (int y = 0; y < by; y++) {
-                if (IsBlockSolid(bx, y)) { exposed = false; break; }
-            }
-            if (exposed) {
-                mob->burnTimer += dt * 5.0f; // ~5 damage/sec
-                while (mob->burnTimer >= 1.0f) {
-                    mob->health--;
-                    mob->burnTimer -= 1.0f;
-                }
-                if (mob->health <= 0) {
-                    mob->deathTimer = MOB_DEATH_TIME;
-                    mob->velocity.x = 0;
-                    SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
-                                         mob->position.y + mobHeight[mob->type] / 2.0f,
-                                         (Color){200, 160, 60, 255});
-                    // Drop items like normal death
-                    float dropX = mob->position.x + mobWidth[mob->type] / 2;
-                    float dropY = mob->position.y;
-                    if (mob->type == MOB_SKELETON) {
-                        SpawnItemEntity(ITEM_BONE, 1 + rand() % 3, dropX, dropY);
-                        if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1, dropX, dropY);
-                    } else {
-                        if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, dropX, dropY);
-                        if (rand() % 3 == 0) SpawnItemEntity(ITEM_COAL, 1 + rand() % 2, dropX, dropY);
-                    }
-                    PlaySoundDeath();
-                    player.xp += 5;
-                    if (player.xp > MAX_XP) player.xp = MAX_XP;
-                }
-            } else {
-                mob->burnTimer = 0.0f;
-            }
-        } else if (mob->type == MOB_ZOMBIE) {
-            mob->burnTimer = 0.0f;
         }
 
         // AI
@@ -1155,7 +1129,7 @@ static void DrawCreeperSprite(Mob *mob)
     }
 
     // Flashing when about to explode
-    if (mob->attackTimer > 0.0f && mob->attackTimer < 1.5f) {
+    if (mob->fuseTimer > 0.0f && mob->fuseTimer < 1.5f) {
         if ((int)(time * 8) % 2 == 0) alpha = (unsigned char)(alpha * 0.5f);
     }
 
