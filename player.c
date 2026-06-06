@@ -1,7 +1,9 @@
 #include "types.h"
+#include "net.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static StringId pendingDeathCause = STR_DEATH_FALL;
 
@@ -58,6 +60,7 @@ void InitPlayer(void)
         player.inventory[i] = BLOCK_AIR;
         player.inventoryCount[i] = 0;
         player.toolDurability[i] = 0;
+        player.itemEnchantments[i] = 0;
     }
     player.inventory[0] = BLOCK_PLANKS;
     player.inventoryCount[0] = 16;
@@ -93,6 +96,7 @@ void InitPlayer(void)
     for (int i = 0; i < 4; i++) {
         player.armor[i] = BLOCK_AIR;
         player.armorDurability[i] = 0;
+        player.armorEnchantments[i] = 0;
     }
 }
 
@@ -186,34 +190,49 @@ int AddToInventoryCount(BlockType item, int count)
 //----------------------------------------------------------------------------------
 bool IsTool(BlockType item)
 {
-    return (item >= TOOL_WOOD_PICKAXE && item <= TOOL_WOOD_SHOVEL) ||
-           (item >= TOOL_STONE_PICKAXE && item <= TOOL_STONE_SHOVEL) ||
-           (item >= TOOL_IRON_PICKAXE && item <= TOOL_IRON_SHOVEL) ||
-           (item >= TOOL_GOLD_PICKAXE && item <= TOOL_GOLD_SHOVEL) ||
-           (item >= TOOL_DIAMOND_PICKAXE && item <= TOOL_DIAMOND_SHOVEL) ||
+    return (item >= TOOL_WOOD_PICKAXE && item <= TOOL_WOOD_HOE) ||
+           (item >= TOOL_STONE_PICKAXE && item <= TOOL_STONE_HOE) ||
+           (item >= TOOL_IRON_PICKAXE && item <= TOOL_IRON_HOE) ||
+           (item >= TOOL_GOLD_PICKAXE && item <= TOOL_GOLD_HOE) ||
+           (item >= TOOL_DIAMOND_PICKAXE && item <= TOOL_DIAMOND_HOE) ||
            item == ITEM_BOW;
 }
 
 int GetToolMaxDurability(BlockType tool)
 {
-    if (tool == TOOL_WOOD_PICKAXE || tool == TOOL_WOOD_AXE || tool == TOOL_WOOD_SWORD || tool == TOOL_WOOD_SHOVEL) return DURABILITY_WOOD;
-    if (tool == TOOL_STONE_PICKAXE || tool == TOOL_STONE_AXE || tool == TOOL_STONE_SWORD || tool == TOOL_STONE_SHOVEL) return DURABILITY_STONE;
-    if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL) return DURABILITY_IRON;
-    if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL) return DURABILITY_GOLD;
-    if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL) return DURABILITY_DIAMOND;
+    if (tool == TOOL_WOOD_PICKAXE || tool == TOOL_WOOD_AXE || tool == TOOL_WOOD_SWORD || tool == TOOL_WOOD_SHOVEL || tool == TOOL_WOOD_HOE) return DURABILITY_WOOD;
+    if (tool == TOOL_STONE_PICKAXE || tool == TOOL_STONE_AXE || tool == TOOL_STONE_SWORD || tool == TOOL_STONE_SHOVEL || tool == TOOL_STONE_HOE) return DURABILITY_STONE;
+    if (tool == TOOL_IRON_PICKAXE || tool == TOOL_IRON_AXE || tool == TOOL_IRON_SWORD || tool == TOOL_IRON_SHOVEL || tool == TOOL_IRON_HOE) return DURABILITY_IRON;
+    if (tool == TOOL_GOLD_PICKAXE || tool == TOOL_GOLD_AXE || tool == TOOL_GOLD_SWORD || tool == TOOL_GOLD_SHOVEL || tool == TOOL_GOLD_HOE) return DURABILITY_GOLD;
+    if (tool == TOOL_DIAMOND_PICKAXE || tool == TOOL_DIAMOND_AXE || tool == TOOL_DIAMOND_SWORD || tool == TOOL_DIAMOND_SHOVEL || tool == TOOL_DIAMOND_HOE) return DURABILITY_DIAMOND;
     if (tool == ITEM_BOW) return DURABILITY_BOW;
     return 0;
 }
 
 bool IsFood(BlockType item)
 {
-    return item >= FOOD_RAW_PORK && item <= FOOD_BREAD;
+    return (item >= FOOD_RAW_PORK && item <= FOOD_BREAD) ||
+           item == ITEM_RAW_BEEF || item == ITEM_COOKED_BEEF ||
+           item == ITEM_RAW_MUTTON || item == ITEM_COOKED_MUTTON ||
+           item == ITEM_RAW_CHICKEN || item == ITEM_COOKED_CHICKEN;
 }
 
 bool IsSword(BlockType tool)
 {
     return tool == TOOL_WOOD_SWORD || tool == TOOL_STONE_SWORD || tool == TOOL_IRON_SWORD ||
            tool == TOOL_GOLD_SWORD || tool == TOOL_DIAMOND_SWORD;
+}
+
+bool IsPickaxe(BlockType tool)
+{
+    return tool == TOOL_WOOD_PICKAXE || tool == TOOL_STONE_PICKAXE || tool == TOOL_IRON_PICKAXE ||
+           tool == TOOL_GOLD_PICKAXE || tool == TOOL_DIAMOND_PICKAXE;
+}
+
+bool IsHoe(BlockType tool)
+{
+    return tool == TOOL_WOOD_HOE || tool == TOOL_STONE_HOE || tool == TOOL_IRON_HOE ||
+           tool == TOOL_GOLD_HOE || tool == TOOL_DIAMOND_HOE;
 }
 
 float GetToolTier(BlockType tool)
@@ -245,6 +264,12 @@ int GetFoodValue(BlockType item)
     case FOOD_COOKED_PORK: return FOOD_COOKED_PORK_VALUE;
     case FOOD_APPLE: return FOOD_APPLE_VALUE;
     case FOOD_BREAD: return FOOD_BREAD_VALUE;
+    case ITEM_RAW_BEEF: return FOOD_RAW_BEEF_VALUE;
+    case ITEM_COOKED_BEEF: return FOOD_COOKED_BEEF_VALUE;
+    case ITEM_RAW_MUTTON: return FOOD_RAW_MUTTON_VALUE;
+    case ITEM_COOKED_MUTTON: return FOOD_COOKED_MUTTON_VALUE;
+    case ITEM_RAW_CHICKEN: return FOOD_RAW_CHICKEN_VALUE;
+    case ITEM_COOKED_CHICKEN: return FOOD_COOKED_CHICKEN_VALUE;
     default: return 0;
     }
 }
@@ -328,6 +353,12 @@ float GetArmorDamageReduction(void)
 {
     int points = GetTotalArmorPoints();
     float reduction = points * 0.04f;
+    // Protection enchantment bonus from all armor pieces
+    for (int i = 0; i < 4; i++) {
+        if (player.armor[i] != BLOCK_AIR && ENCH_TYPE(player.armorEnchantments[i]) == ENCH_PROTECTION) {
+            reduction += ENCH_LEVEL(player.armorEnchantments[i]) * 0.02f;
+        }
+    }
     if (reduction > 0.80f) reduction = 0.80f;
     return reduction;
 }
@@ -336,12 +367,20 @@ void DamageArmor(void)
 {
     for (int i = 0; i < 4; i++) {
         if (player.armor[i] != BLOCK_AIR) {
-            player.armorDurability[i]--;
-            if (player.armorDurability[i] <= 0) {
-                ShowMessage(Sf(STR_MSG_BROKE, GetBlockName(player.armor[i])),
-                           (Color){240, 80, 80, 255});
-                player.armor[i] = BLOCK_AIR;
-                player.armorDurability[i] = 0;
+            // Unbreaking check
+            bool skipDur = false;
+            if (ENCH_TYPE(player.armorEnchantments[i]) == ENCH_UNBREAKING) {
+                skipDur = (rand() % (ENCH_LEVEL(player.armorEnchantments[i]) + 1)) != 0;
+            }
+            if (!skipDur) {
+                player.armorDurability[i]--;
+                if (player.armorDurability[i] <= 0) {
+                    ShowMessage(Sf(STR_MSG_BROKE, GetBlockName(player.armor[i])),
+                               (Color){240, 80, 80, 255});
+                    player.armor[i] = BLOCK_AIR;
+                    player.armorDurability[i] = 0;
+                    player.armorEnchantments[i] = 0;
+                }
             }
         }
     }
@@ -369,22 +408,39 @@ float GetToolMiningSpeed(BlockType tool, BlockType block)
     bool isShovel = (tool == TOOL_WOOD_SHOVEL || tool == TOOL_STONE_SHOVEL || tool == TOOL_IRON_SHOVEL || tool == TOOL_GOLD_SHOVEL || tool == TOOL_DIAMOND_SHOVEL);
 
     float tier = GetToolTier(tool);
+    float speed = tier;
 
     // Correct tool bonus
-    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_GOLD_ORE || block == BLOCK_DIAMOND_ORE || block == BLOCK_REDSTONE_ORE || block == BLOCK_LAPIS_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE || block == BLOCK_CHEST)) {
-        return tier * 1.5f;
-    }
-    if (isAxe && (block == BLOCK_WOOD || block == BLOCK_PLANKS)) {
-        return tier * 1.5f;
-    }
-    if (IsSword(tool) && (block == BLOCK_LEAVES || block == BLOCK_TALL_GRASS)) {
-        return tier * 1.5f;
-    }
-    if (isShovel && (block == BLOCK_DIRT || block == BLOCK_SAND || block == BLOCK_GRAVEL || block == BLOCK_CLAY)) {
-        return tier * 1.5f;
+    if (isPickaxe && (block == BLOCK_STONE || block == BLOCK_COBBLESTONE || block == BLOCK_COAL_ORE || block == BLOCK_IRON_ORE || block == BLOCK_GOLD_ORE || block == BLOCK_DIAMOND_ORE || block == BLOCK_REDSTONE_ORE || block == BLOCK_LAPIS_ORE || block == BLOCK_FURNACE || block == BLOCK_SANDSTONE || block == BLOCK_CRAFTING_TABLE || block == BLOCK_CHEST || block == BLOCK_OBSIDIAN)) {
+        speed = tier * 1.5f;
+    } else if (isAxe && (block == BLOCK_WOOD || block == BLOCK_PLANKS)) {
+        speed = tier * 1.5f;
+    } else if (IsSword(tool) && (block == BLOCK_LEAVES || block == BLOCK_TALL_GRASS)) {
+        speed = tier * 1.5f;
+    } else if (isShovel && (block == BLOCK_DIRT || block == BLOCK_SAND || block == BLOCK_GRAVEL || block == BLOCK_CLAY)) {
+        speed = tier * 1.5f;
     }
 
-    return tier;
+    // Efficiency enchantment
+    uint16_t ench = player.itemEnchantments[player.selectedSlot];
+    if (ENCH_TYPE(ench) == ENCH_EFFICIENCY) {
+        speed *= (1.0f + ENCH_LEVEL(ench) * 0.5f);
+    }
+
+    return speed;
+}
+
+// Check if tool tier is sufficient to get drops from a block
+bool CanToolMineBlock(BlockType tool, BlockType block)
+{
+    float tier = GetToolTier(tool);
+    // Diamond-tier blocks require iron+ pickaxe
+    if ((block == BLOCK_DIAMOND_ORE || block == BLOCK_OBSIDIAN) && tier < 4.0f) return false;
+    // Gold/redstone/lapis require stone+ pickaxe
+    if ((block == BLOCK_GOLD_ORE || block == BLOCK_REDSTONE_ORE || block == BLOCK_LAPIS_ORE) && tier < 2.5f) return false;
+    // Iron ore requires stone+ pickaxe
+    if (block == BLOCK_IRON_ORE && tier < 2.5f) return false;
+    return true;
 }
 
 //----------------------------------------------------------------------------------
@@ -684,8 +740,8 @@ void PlayerBlockInteraction(void)
         for (int i = 0; i < MAX_MOBS; i++) {
             if (!mobs[i].active || mobs[i].deathTimer > 0) continue;
             if (IsPlayerNearMob(&mobs[i], BREAK_RANGE * BLOCK_SIZE)) {
-                int mw = (mobs[i].type == MOB_ZOMBIE) ? 12 : 16;
-                int mh = (mobs[i].type == MOB_ZOMBIE) ? 28 : 12;
+                int mw = GetMobWidth(mobs[i].type);
+                int mh = GetMobHeight(mobs[i].type);
                 float mLeft = mobs[i].position.x;
                 float mRight = mLeft + mw;
                 float mTop = mobs[i].position.y;
@@ -695,6 +751,11 @@ void PlayerBlockInteraction(void)
                     mouseWorld.y >= mTop && mouseWorld.y <= mBottom) {
                     // Attack mob
                     int damage = IsTool(selectedTool) ? (IsSword(selectedTool) ? GetSwordDamage(selectedTool) : 2) : 1;
+                    // Sharpness enchantment bonus
+                    uint16_t toolEnch = player.itemEnchantments[player.selectedSlot];
+                    if (ENCH_TYPE(toolEnch) == ENCH_SHARPNESS) {
+                        damage += (int)(ENCH_LEVEL(toolEnch) * 1.5f);
+                    }
                     if (player.attackCooldown <= 0) {
                         // Critical hit: falling fast enough
                         bool crit = player.velocity.y > CRIT_FALL_THRESHOLD;
@@ -708,14 +769,20 @@ void PlayerBlockInteraction(void)
                         }
                         DamageMob(&mobs[i], damage);
                         player.attackCooldown = GetAttackSpeed(selectedTool);
-                        // Consume durability
+                        // Consume durability (Unbreaking check)
                         if (IsTool(selectedTool)) {
                             int slot = player.selectedSlot;
-                            player.toolDurability[slot]--;
+                            uint16_t ench = player.itemEnchantments[slot];
+                            bool skipDur = false;
+                            if (ENCH_TYPE(ench) == ENCH_UNBREAKING) {
+                                skipDur = (rand() % (ENCH_LEVEL(ench) + 1)) != 0;
+                            }
+                            if (!skipDur) player.toolDurability[slot]--;
                             if (player.toolDurability[slot] <= 0) {
                                 player.inventory[slot] = BLOCK_AIR;
                                 player.inventoryCount[slot] = 0;
                                 player.toolDurability[slot] = 0;
+                                player.itemEnchantments[slot] = 0;
                                 ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
                             } else {
                                 int maxDur = GetToolMaxDurability(selectedTool);
@@ -766,14 +833,42 @@ void PlayerBlockInteraction(void)
                 NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                 if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
                 SpawnBlockParticles(blockX, blockY, bt);
-                // Ore drop special cases
-                uint8_t dropItem = bt;
-                if (bt == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
-                else if (bt == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
-                else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
-                else if (bt == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
-                else if (bt == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
-                SpawnItemEntity(dropItem, 1, blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
+                // Ore drop special cases (only if tool tier is sufficient)
+                if (CanToolMineBlock(selectedTool, bt) || bt == BLOCK_CROPS || bt == BLOCK_FARMLAND) {
+                    uint8_t dropItem = bt;
+                    if (bt == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
+                    else if (bt == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
+                    else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
+                    else if (bt == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
+                    else if (bt == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
+                    else if (bt == BLOCK_CROPS) { dropItem = ITEM_WHEAT; }
+                    else if (bt == BLOCK_FARMLAND) { dropItem = BLOCK_DIRT; }
+                    int dropCount = 1;
+                    // Fortune enchantment: extra drops for ores
+                    uint16_t ench = player.itemEnchantments[player.selectedSlot];
+                    if (ENCH_TYPE(ench) == ENCH_FORTUNE && dropItem != bt) {
+                        if (rand() % 100 < ENCH_LEVEL(ench) * 15) dropCount++;
+                    }
+                    // Crop drops scale with growth stage
+                    if (bt == BLOCK_CROPS) {
+                        int growth = GetCropGrowth(blockX, blockY);
+                        if (growth < 4) {
+                            dropCount = 0; // Too young, no wheat
+                        } else if (growth < 7) {
+                            dropCount = 1;
+                        } else {
+                            dropCount = 1 + rand() % 2; // 1-2 wheat when mature
+                        }
+                    }
+                    if (dropCount > 0) SpawnItemEntity(dropItem, dropCount, blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
+                    // Crops drop seeds based on growth
+                    if (bt == BLOCK_CROPS) {
+                        int growth = GetCropGrowth(blockX, blockY);
+                        int seedDrop = 1;
+                        if (growth >= 7) seedDrop = 1 + rand() % 3; // 1-3 seeds when mature
+                        SpawnItemEntity(ITEM_WHEAT_SEEDS, seedDrop, blockX * BLOCK_SIZE + 3, blockY * BLOCK_SIZE + 3);
+                    }
+                }
                 PlaySoundBreak(bt);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -791,15 +886,21 @@ void PlayerBlockInteraction(void)
                     AddToInventory(FOOD_APPLE);
                 }
 
-                // Consume tool durability
+                // Consume tool durability (Unbreaking check)
                 if (IsTool(selectedTool)) {
                     int slot = player.selectedSlot;
-                    player.toolDurability[slot]--;
+                    uint16_t ench = player.itemEnchantments[slot];
+                    bool skipDur = false;
+                    if (ENCH_TYPE(ench) == ENCH_UNBREAKING) {
+                        skipDur = (rand() % (ENCH_LEVEL(ench) + 1)) != 0;
+                    }
+                    if (!skipDur) player.toolDurability[slot]--;
                     if (player.toolDurability[slot] <= 0) {
                         // Tool breaks
                         player.inventory[slot] = BLOCK_AIR;
                         player.inventoryCount[slot] = 0;
                         player.toolDurability[slot] = 0;
+                        player.itemEnchantments[slot] = 0;
                         ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
                     } else {
                         int maxDur = GetToolMaxDurability(selectedTool);
@@ -835,6 +936,13 @@ void PlayerBlockInteraction(void)
             }
             // Interact with furnace
             if (world[blockX][blockY] == BLOCK_FURNACE) {
+                // Save current furnace state if one is open
+                if (activeFurnace >= 0) SyncActiveToFurnace(activeFurnace);
+                // Find or create furnace at this position
+                activeFurnace = GetOrCreateFurnace(blockX, blockY);
+                if (activeFurnace >= 0) {
+                    SyncFurnaceToActive(activeFurnace);
+                }
                 furnaceOpen = true;
                 furnaceBlockX = blockX;
                 furnaceBlockY = blockY;
@@ -859,6 +967,67 @@ void PlayerBlockInteraction(void)
                 PlaySoundUIClick();
                 return;
             }
+            // Enchanting table interaction
+            if (world[blockX][blockY] == BLOCK_ENCHANTING_TABLE) {
+                if (IsTool(selectedTool) || IsArmor(selectedTool)) {
+                    int slot = player.selectedSlot;
+                    // Check if already enchanted
+                    if (ENCH_TYPE(player.itemEnchantments[slot]) != ENCH_NONE) {
+                        ShowMessage(S(STR_MSG_ALREADY_ENCHANTED), (Color){240, 200, 80, 255});
+                        return;
+                    }
+                    // Count nearby bookshelves for power
+                    int bookshelfCount = 0;
+                    for (int dx = -2; dx <= 2; dx++) {
+                        for (int dy = -2; dy <= 2; dy++) {
+                            if (dx == 0 && dy == 0) continue;
+                            int nx = blockX + dx, ny = blockY + dy;
+                            if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
+                                if (world[nx][ny] == BLOCK_BOOKSHELF) bookshelfCount++;
+                            }
+                        }
+                    }
+                    // Determine enchantment level (1-5) based on bookshelves
+                    int level = 1 + bookshelfCount / 5;  // 0-4 shelves=1, 5-9=2, 10-14=3, 15-19=4, 20-24=5
+                    if (level > 5) level = 5;
+                    // XP cost scales with level
+                    int xpCost = (level * 2 + 3) * 10;  // 50-130 XP
+                    if (player.xp < xpCost) {
+                        ShowMessage(S(STR_MSG_NOT_ENOUGH_XP), (Color){240, 80, 80, 255});
+                        return;
+                    }
+                    // Pick random enchantment appropriate for item type
+                    EnchantmentType ench = ENCH_NONE;
+                    if (IsArmor(selectedTool)) {
+                        ench = ENCH_PROTECTION;
+                    } else if (IsSword(selectedTool)) {
+                        int r = rand() % 3;
+                        ench = (r == 0) ? ENCH_SHARPNESS : (r == 1) ? ENCH_UNBREAKING : ENCH_SHARPNESS;
+                    } else if (IsPickaxe(selectedTool)) {
+                        int r = rand() % 4;
+                        ench = (r == 0) ? ENCH_EFFICIENCY : (r == 1) ? ENCH_FORTUNE : (r == 2) ? ENCH_UNBREAKING : ENCH_EFFICIENCY;
+                    } else if (selectedTool == ITEM_BOW) {
+                        ench = ENCH_UNBREAKING; // Bows only get Unbreaking
+                    } else {
+                        // Axe, shovel, hoe
+                        int r = rand() % 2;
+                        ench = (r == 0) ? ENCH_EFFICIENCY : ENCH_UNBREAKING;
+                    }
+                    player.xp -= xpCost;
+                    player.itemEnchantments[slot] = ENCH_PACK(ench, level);
+                    // Restore durability as a bonus
+                    int maxDur = IsTool(selectedTool) ? GetToolMaxDurability(selectedTool) : GetArmorMaxDurability(selectedTool);
+                    player.toolDurability[slot] = maxDur;
+                    PlaySoundCraft();
+                    ShowMessage(S(STR_MSG_ENCHANTED), (Color){180, 120, 255, 255});
+                } else {
+                    inventoryOpen = true;
+                    craftingTableOpen = true;
+                    gamePaused = false;
+                    PlaySoundCraft();
+                }
+                return;
+            }
         }
 
         // Eat food
@@ -872,6 +1041,37 @@ void PlayerBlockInteraction(void)
             }
             PlaySoundEat();
             ShowMessage(Sf(STR_MSG_ATE, GetBlockName(selectedTool), foodVal), (Color){80, 220, 80, 255});
+            return;
+        }
+
+        // Use ender pearl
+        if (selectedTool == ITEM_ENDER_PEARL) {
+            float px = player.position.x + PLAYER_WIDTH / 2.0f;
+            float py = player.position.y + PLAYER_HEIGHT / 2.0f;
+            float dx = mouseWorld.x - px;
+            float dy = mouseWorld.y - py;
+            float dist = sqrtf(dx * dx + dy * dy);
+            if (dist > 1.0f) {
+                // Limit teleport distance
+                float maxDist = 400.0f;
+                if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; }
+                // Teleport
+                player.position.x += dx - PLAYER_WIDTH / 2.0f;
+                player.position.y += dy - PLAYER_HEIGHT / 2.0f;
+                player.velocity.x = 0;
+                player.velocity.y = 0;
+                // Consume pearl
+                player.inventoryCount[player.selectedSlot]--;
+                if (player.inventoryCount[player.selectedSlot] <= 0) {
+                    player.inventory[player.selectedSlot] = BLOCK_AIR;
+                }
+                // Small fall damage on landing
+                player.health -= 2;
+                if (player.health < 0) player.health = 0;
+                player.damageFlashTimer = 0.3f;
+                PlaySoundHurt();
+                ShowMessage(S(STR_MSG_ENDER_PEARL), (Color){100, 200, 255, 255});
+            }
             return;
         }
 
@@ -895,22 +1095,193 @@ void PlayerBlockInteraction(void)
                 if (dist > 1.0f) {
                     float speed = PROJECTILE_SPEED * 1.5f;
                     SpawnProjectile(px, py, (dx / dist) * speed, (dy / dist) * speed, true);
+                    // Sync projectile to network
+                    if (NetIsClient()) {
+                        uint8_t buf[64];
+                        PktProjectileSpawn ps;
+                        ps.x = px; ps.y = py;
+                        ps.vx = (dx / dist) * speed; ps.vy = (dy / dist) * speed;
+                        ps.fromPlayer = true; ps.playerId = (uint8_t)localPlayerId;
+                        buf[0] = PKT_PROJECTILE_SPAWN;
+                        memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
+                        NetSendToServer(buf, 1 + sizeof(PktProjectileSpawn), false);
+                    }
+                    PlaySoundBowFire();
                     // Consume arrow
                     player.inventoryCount[arrowSlot]--;
                     if (player.inventoryCount[arrowSlot] <= 0)
                         player.inventory[arrowSlot] = BLOCK_AIR;
-                    // Bow durability
-                    player.toolDurability[player.selectedSlot]--;
-                    if (player.toolDurability[player.selectedSlot] <= 0) {
-                        player.inventory[player.selectedSlot] = BLOCK_AIR;
-                        player.inventoryCount[player.selectedSlot] = 0;
-                        player.toolDurability[player.selectedSlot] = 0;
-                        ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
+                    // Bow durability (Unbreaking check)
+                    {
+                        uint16_t bowEnch = player.itemEnchantments[player.selectedSlot];
+                        bool skipBowDur = false;
+                        if (ENCH_TYPE(bowEnch) == ENCH_UNBREAKING) {
+                            skipBowDur = (rand() % (ENCH_LEVEL(bowEnch) + 1)) != 0;
+                        }
+                        if (!skipBowDur) player.toolDurability[player.selectedSlot]--;
+                        if (player.toolDurability[player.selectedSlot] <= 0) {
+                            player.inventory[player.selectedSlot] = BLOCK_AIR;
+                            player.inventoryCount[player.selectedSlot] = 0;
+                            player.toolDurability[player.selectedSlot] = 0;
+                            player.itemEnchantments[player.selectedSlot] = 0;
+                            ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
+                        }
                     }
                 }
                 return;
             } else {
-                ShowMessage("No arrows!", (Color){240, 80, 80, 255});
+                ShowMessage(S(STR_MSG_NO_ARROWS), (Color){240, 80, 80, 255});
+                return;
+            }
+        }
+
+        // Water bucket: place water source
+        if (selectedTool == ITEM_WATER_BUCKET) {
+            if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
+                SetWaterSource(blockX, blockY);
+                player.inventory[player.selectedSlot] = ITEM_BUCKET; // Empty bucket
+                PlaySoundPlace(BLOCK_WATER);
+                UpdateLightAt(blockX, blockY);
+                InvalidateChunkAt(blockX, blockY);
+                return;
+            }
+        }
+        // Empty bucket: collect water or lava
+        if (selectedTool == ITEM_BUCKET) {
+            if (world[blockX][blockY] == BLOCK_WATER) {
+                RemoveWaterAt(blockX, blockY);
+                player.inventory[player.selectedSlot] = ITEM_WATER_BUCKET;
+                PlaySoundPlace(BLOCK_WATER);
+                UpdateLightAt(blockX, blockY);
+                InvalidateChunkAt(blockX, blockY);
+                return;
+            }
+            if (world[blockX][blockY] == BLOCK_LAVA) {
+                RemoveLavaAt(blockX, blockY);
+                player.inventory[player.selectedSlot] = ITEM_LAVA_BUCKET;
+                PlaySoundPlace(BLOCK_LAVA);
+                UpdateLightAt(blockX, blockY);
+                InvalidateChunkAt(blockX, blockY);
+                return;
+            }
+        }
+        // Lava bucket: place lava source
+        if (selectedTool == ITEM_LAVA_BUCKET) {
+            if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
+                if (world[blockX][blockY] == BLOCK_WATER) RemoveWaterAt(blockX, blockY);
+                SetLavaSource(blockX, blockY);
+                player.inventory[player.selectedSlot] = ITEM_BUCKET;
+                PlaySoundPlace(BLOCK_LAVA);
+                UpdateLightAt(blockX, blockY);
+                InvalidateChunkAt(blockX, blockY);
+                return;
+            }
+        }
+
+        // Breeding: feed passive mobs with food
+        if (IsFood(selectedTool)) {
+            for (int i = 0; i < MAX_MOBS; i++) {
+                if (!mobs[i].active || mobs[i].isBaby) continue;
+                if (mobs[i].type != MOB_PIG && mobs[i].type != MOB_COW &&
+                    mobs[i].type != MOB_SHEEP && mobs[i].type != MOB_CHICKEN) continue;
+                if (mobs[i].loveTimer > 0) continue;
+                int mw = GetMobWidth(mobs[i].type);
+                int mh = GetMobHeight(mobs[i].type);
+                float mx = mobs[i].position.x, my = mobs[i].position.y;
+                if (mouseWorld.x >= mx && mouseWorld.x <= mx + mw &&
+                    mouseWorld.y >= my && mouseWorld.y <= my + mh) {
+                    float dx = (player.position.x + PLAYER_WIDTH / 2) - (mx + mw / 2);
+                    float dy = (player.position.y + PLAYER_HEIGHT / 2) - (my + mh / 2);
+                    if (dx * dx + dy * dy < (BREAK_RANGE * BLOCK_SIZE) * (BREAK_RANGE * BLOCK_SIZE)) {
+                        // Feed the mob
+                        mobs[i].loveTimer = 15.0f; // 15 seconds of love mode
+                        player.inventoryCount[player.selectedSlot]--;
+                        if (player.inventoryCount[player.selectedSlot] <= 0) {
+                            player.inventory[player.selectedSlot] = BLOCK_AIR;
+                        }
+                        PlaySoundEat();
+                        // Check for nearby mob of same type in love mode
+                        for (int j = 0; j < MAX_MOBS; j++) {
+                            if (j == i || !mobs[j].active) continue;
+                            if (mobs[j].type != mobs[i].type || mobs[j].loveTimer <= 0) continue;
+                            float bdx = mobs[j].position.x - mobs[i].position.x;
+                            float bdy = mobs[j].position.y - mobs[i].position.y;
+                            if (bdx * bdx + bdy * bdy < 100 * 100) {
+                                // Spawn baby
+                                float babyX = (mobs[i].position.x + mobs[j].position.x) / 2;
+                                float babyY = (mobs[i].position.y + mobs[j].position.y) / 2;
+                                Mob *baby = SpawnMob(mobs[i].type, babyX, babyY);
+                                if (baby) {
+                                    baby->isBaby = true;
+                                    baby->growTimer = 120.0f; // 2 minutes to grow
+                                    baby->health = baby->maxHealth / 2;
+                                    baby->maxHealth = baby->maxHealth / 2;
+                                }
+                                mobs[i].loveTimer = 0;
+                                mobs[j].loveTimer = 0;
+                                break;
+                            }
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Villager interaction: open trade UI
+        for (int i = 0; i < MAX_MOBS; i++) {
+            if (!mobs[i].active || mobs[i].type != MOB_VILLAGER) continue;
+            int mw = GetMobWidth(MOB_VILLAGER);
+            int mh = GetMobHeight(MOB_VILLAGER);
+            float mx = mobs[i].position.x, my = mobs[i].position.y;
+            if (mouseWorld.x >= mx && mouseWorld.x <= mx + mw &&
+                mouseWorld.y >= my && mouseWorld.y <= my + mh) {
+                float dx = (player.position.x + PLAYER_WIDTH / 2) - (mx + mw / 2);
+                float dy = (player.position.y + PLAYER_HEIGHT / 2) - (my + mh / 2);
+                if (dx * dx + dy * dy < (BREAK_RANGE * BLOCK_SIZE) * (BREAK_RANGE * BLOCK_SIZE)) {
+                    tradeOpen = true;
+                    inventoryOpen = true;
+                    gamePaused = false;
+                    PlaySoundCraft();
+                    return;
+                }
+            }
+        }
+
+        // Hoe: till dirt into farmland
+        if (IsHoe(selectedTool)) {
+            if (world[blockX][blockY] == BLOCK_DIRT || world[blockX][blockY] == BLOCK_GRASS) {
+                world[blockX][blockY] = BLOCK_FARMLAND;
+                NetSyncBlockChange(blockX, blockY, BLOCK_FARMLAND);
+                PlaySoundPlace(BLOCK_DIRT);
+                UpdateLightAt(blockX, blockY);
+                InvalidateChunkAt(blockX, blockY);
+                // Consume hoe durability
+                int slot = player.selectedSlot;
+                player.toolDurability[slot]--;
+                if (player.toolDurability[slot] <= 0) {
+                    player.inventory[slot] = BLOCK_AIR;
+                    player.inventoryCount[slot] = 0;
+                    player.toolDurability[slot] = 0;
+                    player.itemEnchantments[slot] = 0;
+                    ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
+                }
+                return;
+            }
+        }
+
+        // Seeds: plant on farmland
+        if (selectedTool == ITEM_WHEAT_SEEDS) {
+            if (world[blockX][blockY] == BLOCK_FARMLAND && world[blockX][blockY - 1] == BLOCK_AIR) {
+                world[blockX][blockY - 1] = BLOCK_CROPS;
+                NetSyncBlockChange(blockX, blockY - 1, BLOCK_CROPS);
+                PlaySoundPlace(BLOCK_TALL_GRASS);
+                UpdateLightAt(blockX, blockY - 1);
+                InvalidateChunkAt(blockX, blockY - 1);
+                player.inventoryCount[player.selectedSlot]--;
+                if (player.inventoryCount[player.selectedSlot] <= 0) {
+                    player.inventory[player.selectedSlot] = BLOCK_AIR;
+                }
                 return;
             }
         }
@@ -931,6 +1302,7 @@ void PlayerBlockInteraction(void)
 
                 if (!(pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom)) {
                     bool wasWater = (world[blockX][blockY] == BLOCK_WATER);
+                    if (wasWater) RemoveWaterAt(blockX, blockY);
                     world[blockX][blockY] = selectedTool;
                     NetSyncBlockChange(blockX, blockY, selectedTool);
                     if (selectedTool == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(blockX, blockY);
@@ -939,6 +1311,7 @@ void PlayerBlockInteraction(void)
                         player.inventory[player.selectedSlot] = BLOCK_AIR;
                     }
                     PlaySoundPlace(selectedTool);
+                    totalBlocksPlaced++;
                     if (wasWater) {
                         SpawnDamageParticles(blockX * BLOCK_SIZE + BLOCK_SIZE / 2,
                                              blockY * BLOCK_SIZE + BLOCK_SIZE / 2,
@@ -955,7 +1328,8 @@ void PlayerBlockInteraction(void)
                         world[blockX][blockY] = BLOCK_AIR;
                         NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                         int landY = blockY;
-                        while (landY > 0 && world[blockX][landY - 1] == BLOCK_AIR) landY--;
+                        // Search downward for landing spot
+                        while (landY < WORLD_HEIGHT - 1 && (world[blockX][landY + 1] == BLOCK_AIR || world[blockX][landY + 1] == BLOCK_WATER)) landY++;
                         world[blockX][landY] = selectedTool;
                         NetSyncBlockChange(blockX, landY, selectedTool);
                         InvalidateChunkAt(blockX, blockY);
@@ -1053,8 +1427,28 @@ void UpdatePlayerStatus(float dt)
         }
     }
 
+    // --- Lava damage ---
+    {
+        int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
+        int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_LAVA) {
+            player.health -= 4; // 4 hearts/sec in lava
+            if (player.health < 0) player.health = 0;
+            if (!player.netControlled) pendingDeathCause = STR_DEATH_LAVA;
+            player.damageFlashTimer = 0.3f;
+            if (!player.netControlled && player.health > 0) PlaySoundHurt();
+            // Fire particles
+            SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
+                                 player.position.y + PLAYER_HEIGHT / 2,
+                                 (Color){255, 150, 30, 255});
+        }
+    }
+
     // --- Hunger ---
     float hungerRate = HUNGER_DRAIN_RATE;
+    if (gameDifficulty == DIFFICULTY_PEACEFUL) hungerRate *= 0.25f;
+    else if (gameDifficulty == DIFFICULTY_EASY) hungerRate *= 0.5f;
+    else if (gameDifficulty == DIFFICULTY_HARD) hungerRate *= 1.5f;
     if (player.sprinting) hungerRate *= HUNGER_SPRINT_MULT;
     player.hungerTimer += dt;
     if (player.hungerTimer >= 1.0f / hungerRate) {
@@ -1088,10 +1482,14 @@ void UpdatePlayerStatus(float dt)
     }
 
     // --- Health Regen ---
-    if (player.health < MAX_HEALTH && player.hunger >= HEALTH_REGEN_HUNGER) {
+    int regenHungerThreshold = HEALTH_REGEN_HUNGER;
+    float regenRate = HEALTH_REGEN_RATE;
+    if (gameDifficulty == DIFFICULTY_PEACEFUL) { regenHungerThreshold = 0; regenRate *= 3.0f; }
+    else if (gameDifficulty == DIFFICULTY_EASY) { regenHungerThreshold = 14; }
+    if (player.health < MAX_HEALTH && player.hunger >= regenHungerThreshold) {
         player.regenTimer += dt;
-        if (player.regenTimer >= 1.0f / HEALTH_REGEN_RATE) {
-            player.regenTimer -= 1.0f / HEALTH_REGEN_RATE;
+        if (player.regenTimer >= 1.0f / regenRate) {
+            player.regenTimer -= 1.0f / regenRate;
             player.health++;
             if (!player.netControlled)
             SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
@@ -1125,6 +1523,7 @@ void RespawnPlayer(void)
     for (int i = 0; i < 4; i++) {
         player.armor[i] = BLOCK_AIR;
         player.armorDurability[i] = 0;
+        player.armorEnchantments[i] = 0;
     }
     int spawnX, spawnY;
     if (player.spawnX >= 0 && player.spawnY >= 0 &&

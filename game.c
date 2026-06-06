@@ -206,7 +206,10 @@ void InitGame(void)
     InitProjectiles();
     InitLightMap();
     InitSmeltingRecipes();
+    InitTrades();
     InitRedstone();
+    InitWater();
+    InitLava();
 
     GetSavePath(selectedSaveSlot, currentSavePath, sizeof(currentSavePath));
 
@@ -225,6 +228,81 @@ void InitGame(void)
     InitChunkTable();
     UpdateChunks();
     player.playerDead = false;
+
+    // Reset achievement tracking for new game
+    totalMobsKilled = 0;
+    totalBlocksPlaced = 0;
+
+    // Show tutorial hint for new players
+    static bool tutorialShown = false;
+    if (!tutorialShown) {
+        ShowMessage(S(STR_TUTORIAL_CONTROLS), (Color){180, 200, 220, 255});
+        tutorialShown = true;
+    }
+}
+
+static void UnlockAchievement(Achievement ach) {
+    if (!achievements[ach]) {
+        achievements[ach] = true;
+        StringId msgId = STR_NONE;
+        switch (ach) {
+            case ACH_FIRST_STEPS: msgId = STR_ACH_FIRST_STEPS; break;
+            case ACH_DEEP_DIG: msgId = STR_ACH_DEEP_DIG; break;
+            case ACH_MONSTER_HUNTER: msgId = STR_ACH_MONSTER_HUNTER; break;
+            case ACH_ARCHITECT: msgId = STR_ACH_ARCHITECT; break;
+            case ACH_REDSTONE_ENGINEER: msgId = STR_ACH_REDSTONE_ENGINEER; break;
+            case ACH_COLLECTOR: msgId = STR_ACH_COLLECTOR; break;
+            default: break;
+        }
+        if (msgId != STR_NONE) {
+            ShowMessage(S(msgId), (Color){255, 215, 0, 255});
+            PlaySoundXP();
+        }
+    }
+}
+
+static void CheckAchievements(void) {
+    // First Steps - craft a wooden pickaxe (check if player has one)
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+        if (player.inventory[i] == TOOL_WOOD_PICKAXE) { UnlockAchievement(ACH_FIRST_STEPS); break; }
+    }
+
+    // Deep Dig - reach deep underground
+    int playerBY = (int)(player.position.y + PLAYER_HEIGHT) / BLOCK_SIZE;
+    if (playerBY >= 240) UnlockAchievement(ACH_DEEP_DIG);
+
+    // Monster Hunter - kill 100 mobs
+    if (totalMobsKilled >= 100) UnlockAchievement(ACH_MONSTER_HUNTER);
+
+    // Architect - place 1000 blocks
+    if (totalBlocksPlaced >= 1000) UnlockAchievement(ACH_ARCHITECT);
+
+    // Collector - count unique item types in inventory
+    {
+        bool seen[BLOCK_COUNT] = {0};
+        int unique = 0;
+        for (int i = 0; i < INVENTORY_SLOTS; i++) {
+            if (player.inventory[i] != BLOCK_AIR && !seen[player.inventory[i]]) {
+                seen[player.inventory[i]] = true;
+                unique++;
+            }
+        }
+        if (unique >= 20) UnlockAchievement(ACH_COLLECTOR);
+    }
+
+    // Redstone Engineer - check if any redstone lamp is powered (scan nearby)
+    if (!achievements[ACH_REDSTONE_ENGINEER]) {
+        int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
+        int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
+        for (int dx = -20; dx <= 20; dx++) {
+            for (int dy = -20; dy <= 20; dy++) {
+                if (IsRedstoneLampPowered(pbx + dx, pby + dy)) {
+                    UnlockAchievement(ACH_REDSTONE_ENGINEER);
+                    dx = 21; dy = 21; // break both loops
+                }
+            }
+        }
+    }
 }
 
 int menuSelection = 0; // 0=New, 1=Load, 2=Settings, 3=Quit
@@ -621,6 +699,77 @@ static void UpdateMainMenu(float dt)
     }
 }
 
+// Pickup items and sync over network
+static void PickupAndSyncItems(float px, float py, int playerId)
+{
+    bool wasActive[MAX_ENTITIES];
+    for (int i = 0; i < MAX_ENTITIES; i++) wasActive[i] = entities[i].active;
+
+    PickupNearbyItems(px, py);
+
+    for (int i = 0; i < MAX_ENTITIES; i++) {
+        if (wasActive[i] && !entities[i].active) {
+            uint8_t buf[NET_PACKET_MAX];
+            PktEntityPickup ep;
+            ep.entityIndex = (uint16_t)i;
+            ep.playerId = (uint8_t)playerId;
+            buf[0] = PKT_ENTITY_PICKUP;
+            memcpy(buf + 1, &ep, sizeof(PktEntityPickup));
+            if (NetIsHost()) {
+                NetSendToAll(buf, 1 + sizeof(PktEntityPickup), false);
+            } else if (NetIsClient()) {
+                NetSendToServer(buf, 1 + sizeof(PktEntityPickup), false);
+            }
+        }
+    }
+}
+
+// Multi-furnace helpers
+int FindFurnace(int x, int y)
+{
+    for (int i = 0; i < furnaceCount; i++) {
+        if (furnaces[i].x == x && furnaces[i].y == y) return i;
+    }
+    return -1;
+}
+
+int GetOrCreateFurnace(int x, int y)
+{
+    int idx = FindFurnace(x, y);
+    if (idx >= 0) return idx;
+    if (furnaceCount >= MAX_FURNACES) return -1;
+    idx = furnaceCount++;
+    memset(&furnaces[idx], 0, sizeof(FurnaceData));
+    furnaces[idx].x = x;
+    furnaces[idx].y = y;
+    return idx;
+}
+
+void SyncFurnaceToActive(int idx)
+{
+    if (idx < 0 || idx >= furnaceCount) return;
+    FurnaceData *f = &furnaces[idx];
+    furnaceBlockX = f->x; furnaceBlockY = f->y;
+    furnaceFuel = f->fuel; furnaceFuelCount = f->fuelCount;
+    furnaceInput = f->input; furnaceInputCount = f->inputCount;
+    furnaceOutput = f->output; furnaceOutputCount = f->outputCount;
+    furnaceProgress = f->progress;
+    furnaceFuelBurn = f->fuelBurn;
+    furnaceFuelBurnMax = f->fuelBurnMax;
+}
+
+void SyncActiveToFurnace(int idx)
+{
+    if (idx < 0 || idx >= furnaceCount) return;
+    FurnaceData *f = &furnaces[idx];
+    f->fuel = furnaceFuel; f->fuelCount = furnaceFuelCount;
+    f->input = furnaceInput; f->inputCount = furnaceInputCount;
+    f->output = furnaceOutput; f->outputCount = furnaceOutputCount;
+    f->progress = furnaceProgress;
+    f->fuelBurn = furnaceFuelBurn;
+    f->fuelBurnMax = furnaceFuelBurnMax;
+}
+
 // Return furnace items to inventory when closing
 void ReturnFurnaceItems(void)
 {
@@ -653,6 +802,21 @@ void ReturnFurnaceItems(void)
     }
     furnaceProgress = 0.0f;
     furnaceFuelBurn = 0.0f;
+    furnaceFuelBurnMax = 0.0f;
+    // Sync cleared state back to furnace array
+    if (activeFurnace >= 0 && activeFurnace < furnaceCount) {
+        SyncActiveToFurnace(activeFurnace);
+    }
+    activeFurnace = -1;
+}
+
+float GetFuelBurnTime(uint8_t item)
+{
+    if (item == ITEM_COAL) return 80.0f;        // 8 items per coal
+    if (item == ITEM_STICK) return 5.0f;         // 0.5 items per stick
+    if (item == BLOCK_WOOD) return 15.0f;        // 1.5 items per log
+    if (item == BLOCK_PLANKS) return 15.0f;      // 1.5 items per planks
+    return 0.0f;
 }
 
 // Furnace smelting tick
@@ -666,8 +830,10 @@ static void UpdateFurnaceTick(float dt)
 
     // Need fuel
     if (furnaceFuelBurn <= 0.0f) {
-        if (furnaceFuel == ITEM_COAL && furnaceFuelCount > 0) {
-            furnaceFuelBurn = 8.0f;
+        float burnTime = GetFuelBurnTime(furnaceFuel);
+        if (burnTime > 0.0f && furnaceFuelCount > 0) {
+            furnaceFuelBurn = burnTime;
+            furnaceFuelBurnMax = burnTime;
             furnaceFuelCount--;
             if (furnaceFuelCount <= 0) furnaceFuel = BLOCK_AIR;
         } else {
@@ -690,6 +856,10 @@ static void UpdateFurnaceTick(float dt)
         } else if (furnaceOutput == (uint8_t)output) {
             furnaceOutputCount++;
         }
+    }
+    // Sync back to furnace array
+    if (activeFurnace >= 0 && activeFurnace < furnaceCount) {
+        SyncActiveToFurnace(activeFurnace);
     }
 }
 
@@ -746,7 +916,7 @@ void UpdateGame(float dt)
                 remotePlayers[fromId].interpY = players[fromId].position.y;
                 // Send modified blocks to new client
                 NetSendWorldToClient(fromId);
-                ShowMessage("Player joined!", (Color){100, 255, 100, 255});
+                ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
             }
         }
         // Enter to start game (host can start alone or with players)
@@ -1016,7 +1186,7 @@ void UpdateGame(float dt)
                     remotePlayers[fromId].interpY = players[fromId].position.y;
                     // Send modified blocks to new client
                     NetSendWorldToClient(fromId);
-                    ShowMessage("Player joined!", (Color){100, 255, 100, 255});
+                    ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
                 } else if (type == PKT_INPUT && fromId > 0 && fromId < MAX_NET_PLAYERS) {
                     const PktInput *input = (const PktInput *)((const uint8_t *)data + 1);
                     // Apply remote player input
@@ -1042,8 +1212,8 @@ void UpdateGame(float dt)
                         if (attackCooldownNet[fromId] <= 0) {
                             for (int mi = 0; mi < MAX_MOBS; mi++) {
                                 if (!mobs[mi].active) continue;
-                                int mw = (mobs[mi].type == MOB_ZOMBIE) ? 12 : 16;
-                                int mh = (mobs[mi].type == MOB_ZOMBIE) ? 28 : 12;
+                                int mw = GetMobWidth(mobs[mi].type);
+                                int mh = GetMobHeight(mobs[mi].type);
                                 if (cx >= mobs[mi].position.x && cx <= mobs[mi].position.x + mw &&
                                     cy >= mobs[mi].position.y && cy <= mobs[mi].position.y + mh) {
                                     int dmg = 1;
@@ -1084,7 +1254,7 @@ void UpdateGame(float dt)
                             }
                         }
                     }
-                } else if (type == PKT_BLOCK_CHANGE) {
+                } else if (type == PKT_BLOCK_CHANGE && size >= 1 + (int)sizeof(PktBlockChange)) {
                     const PktBlockChange *bc = (const PktBlockChange *)((const uint8_t *)data + 1);
                     if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
                         // Spawn item if block was broken (new type is AIR)
@@ -1102,6 +1272,7 @@ void UpdateGame(float dt)
                         }
                         world[bc->x][bc->y] = bc->blockType;
                         RecordBlockChange(bc->x, bc->y, bc->blockType);
+                        UpdateLightAt(bc->x, bc->y);
                         InvalidateChunkAt(bc->x, bc->y);
                         // Relay to other clients
                         uint8_t relayBuf[NET_PACKET_MAX];
@@ -1113,10 +1284,36 @@ void UpdateGame(float dt)
                             }
                         }
                     }
-                } else if (type == PKT_DAMAGE_MOB) {
+                } else if (type == PKT_DAMAGE_MOB && size >= 1 + (int)sizeof(PktDamageMob)) {
                     const PktDamageMob *dm = (const PktDamageMob *)((const uint8_t *)data + 1);
-                    if (dm->mobIndex < MAX_MOBS) {
-                        mobs[dm->mobIndex].health -= dm->damage;
+                    if (dm->mobIndex < MAX_MOBS && mobs[dm->mobIndex].active) {
+                        DamageMob(&mobs[dm->mobIndex], dm->damage);
+                    }
+                } else if (type == PKT_ENTITY_PICKUP && size >= 1 + (int)sizeof(PktEntityPickup)) {
+                    const PktEntityPickup *ep = (const PktEntityPickup *)((const uint8_t *)data + 1);
+                    if (ep->entityIndex < MAX_ENTITIES && entities[ep->entityIndex].active) {
+                        entities[ep->entityIndex].active = false;
+                        // Relay to other clients
+                        uint8_t relayBuf[NET_PACKET_MAX];
+                        relayBuf[0] = PKT_ENTITY_PICKUP;
+                        memcpy(relayBuf + 1, ep, sizeof(PktEntityPickup));
+                        for (int r = 1; r < MAX_NET_PLAYERS; r++) {
+                            if (r != fromId && players[r].netControlled) {
+                                NetSendTo(r, relayBuf, 1 + sizeof(PktEntityPickup), false);
+                            }
+                        }
+                    }
+                } else if (type == PKT_PROJECTILE_SPAWN && size >= 1 + (int)sizeof(PktProjectileSpawn)) {
+                    const PktProjectileSpawn *ps = (const PktProjectileSpawn *)((const uint8_t *)data + 1);
+                    SpawnProjectile(ps->x, ps->y, ps->vx, ps->vy, ps->fromPlayer);
+                    // Relay to other clients
+                    uint8_t relayBuf[NET_PACKET_MAX];
+                    relayBuf[0] = PKT_PROJECTILE_SPAWN;
+                    memcpy(relayBuf + 1, ps, sizeof(PktProjectileSpawn));
+                    for (int r = 1; r < MAX_NET_PLAYERS; r++) {
+                        if (r != fromId && players[r].netControlled) {
+                            NetSendTo(r, relayBuf, 1 + sizeof(PktProjectileSpawn), false);
+                        }
                     }
                 }
             }
@@ -1127,8 +1324,8 @@ void UpdateGame(float dt)
                     int sz, fid;
                     const void *d = NetGetReceived(i, &sz, &fid);
                     if (d && fid > 0 && fid < MAX_NET_PLAYERS) {
-                        uint8_t t = ((const uint8_t *)d)[0];
-                        if (t == PKT_INPUT) lastInputTime[fid] = now;
+                        // Any packet counts as keepalive
+                        lastInputTime[fid] = now;
                     }
                 }
                 for (int i = 1; i < MAX_NET_PLAYERS; i++) {
@@ -1136,7 +1333,7 @@ void UpdateGame(float dt)
                         remotePlayers[i].active = false;
                         players[i].netControlled = false;
                         memset(&players[i], 0, sizeof(Player));
-                        ShowMessage("Player disconnected", (Color){240, 200, 100, 255});
+                        ShowMessage(S(STR_NET_PLAYER_LEFT), (Color){240, 200, 100, 255});
                     }
                 }
             }
@@ -1158,11 +1355,12 @@ void UpdateGame(float dt)
             UpdateEntities(dt);
             UpdateParticles(dt);
             // Pickup items for host player only (clients pick up on their side)
-            PickupNearbyItems(player.position.x, player.position.y);
+            PickupAndSyncItems(player.position.x, player.position.y, 0);
             UpdateCameraSystem(dt);
             UpdateDayNight(dt);
             UpdateWeather(dt);
             UpdateRainAmbient();
+            UpdateAmbientSounds();
             if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
             // Broadcast state to clients
             {
@@ -1211,6 +1409,25 @@ void UpdateGame(float dt)
                     buf[0] = PKT_MOB_STATE;
                     memcpy(buf + 1, &ms, sizeof(PktMobState));
                     NetSendToAll(buf, 1 + sizeof(PktMobState), false);
+                    // Send time sync
+                    PktTimeSync ts;
+                    ts.timeOfDay = dayNight.timeOfDay;
+                    buf[0] = PKT_TIME_SYNC;
+                    memcpy(buf + 1, &ts, sizeof(PktTimeSync));
+                    NetSendToAll(buf, 1 + sizeof(PktTimeSync), false);
+                }
+                // Send weather sync less frequently (~every 5s)
+                static float weatherSyncTimer = 0.0f;
+                weatherSyncTimer += dt;
+                if (weatherSyncTimer >= 5.0f) {
+                    weatherSyncTimer = 0.0f;
+                    uint8_t wbuf[NET_PACKET_MAX];
+                    PktWeatherSync ws;
+                    ws.weatherType = (uint8_t)weather.type;
+                    ws.duration = weather.duration;
+                    wbuf[0] = PKT_WEATHER_SYNC;
+                    memcpy(wbuf + 1, &ws, sizeof(PktWeatherSync));
+                    NetSendToAll(wbuf, 1 + sizeof(PktWeatherSync), false);
                 }
             }
         } else if (NetIsClient()) {
@@ -1324,16 +1541,31 @@ void UpdateGame(float dt)
                                 }
                             }
                             world[bc->x][bc->y] = bc->blockType;
+                            UpdateLightAt(bc->x, bc->y);
                             InvalidateChunkAt(bc->x, bc->y);
                         }
                     }
-                } else if (type == PKT_ENTITY_SPAWN) {
+                } else if (type == PKT_ENTITY_SPAWN && size >= 1 + (int)sizeof(PktEntitySpawn)) {
                     const PktEntitySpawn *es = (const PktEntitySpawn *)((const uint8_t *)data + 1);
                     SpawnItemEntity((BlockType)es->itemType, es->count, es->x, es->y);
-                } else if (type == PKT_TIME_SYNC) {
+                } else if (type == PKT_ENTITY_PICKUP && size >= 1 + (int)sizeof(PktEntityPickup)) {
+                    const PktEntityPickup *ep = (const PktEntityPickup *)((const uint8_t *)data + 1);
+                    if (ep->entityIndex < MAX_ENTITIES) {
+                        entities[ep->entityIndex].active = false;
+                    }
+                } else if (type == PKT_PROJECTILE_SPAWN && size >= 1 + (int)sizeof(PktProjectileSpawn)) {
+                    const PktProjectileSpawn *ps = (const PktProjectileSpawn *)((const uint8_t *)data + 1);
+                    SpawnProjectile(ps->x, ps->y, ps->vx, ps->vy, ps->fromPlayer);
+                } else if (type == PKT_TIME_SYNC && size >= 1 + (int)sizeof(PktTimeSync)) {
                     const PktTimeSync *ts = (const PktTimeSync *)((const uint8_t *)data + 1);
                     dayNight.timeOfDay = ts->timeOfDay;
-                } else if (type == PKT_DAMAGE_PLAYER) {
+                } else if (type == PKT_WEATHER_SYNC && size >= 1 + (int)sizeof(PktWeatherSync)) {
+                    const PktWeatherSync *ws = (const PktWeatherSync *)((const uint8_t *)data + 1);
+                    weather.type = (WeatherType)ws->weatherType;
+                    weather.duration = ws->duration;
+                    weather.transitionTimer = 0;
+                    weather.rainAlpha = (weather.type == WEATHER_CLEAR) ? 0 : 1;
+                } else if (type == PKT_DAMAGE_PLAYER && size >= 1 + (int)sizeof(PktDamagePlayer)) {
                     const PktDamagePlayer *dp = (const PktDamagePlayer *)((const uint8_t *)data + 1);
                     if (dp->playerId == localPlayerId) {
                         player.health -= dp->damage;
@@ -1344,7 +1576,7 @@ void UpdateGame(float dt)
                 } else if (type == PKT_DISCONNECT) {
                     // Host disconnected, return to menu
                     NetClientDisconnect();
-                    ShowMessage("Host disconnected", (Color){240, 100, 100, 255});
+                    ShowMessage(S(STR_NET_HOST_DISCONNECTED), (Color){240, 100, 100, 255});
                     StartTransition(STATE_MENU);
                     menuSelection = 0;
                     return;
@@ -1354,7 +1586,7 @@ void UpdateGame(float dt)
             UpdatePlayer(dt);
             UpdateEntities(dt);
             UpdateParticles(dt);
-            PickupNearbyItems(player.position.x, player.position.y);
+            PickupAndSyncItems(player.position.x, player.position.y, localPlayerId);
             UpdateCameraSystem(dt);
             if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
         } else {
@@ -1369,6 +1601,7 @@ void UpdateGame(float dt)
             UpdateDayNight(dt);
             UpdateWeather(dt);
             UpdateRainAmbient();
+            UpdateAmbientSounds();
             if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
         }
     }
@@ -1380,6 +1613,8 @@ void UpdateGame(float dt)
     UpdateChunks();
     UpdateHotbar();
     UpdateRedstoneTick();
+    UpdateCrops(dt);
+    CheckAchievements();
 
     // Distance checks: auto-close crafting table/furnace if player moves away
     if (craftingTableOpen || furnaceOpen || chestOpen) {
@@ -1521,6 +1756,7 @@ void DrawGame(void)
 
     BeginMode2D(camera);
     DrawWorld();
+    DrawFireEffects(GetFrameTime());
     DrawMiningCrack();
     DrawWater();
     DrawMobs();
@@ -1575,6 +1811,7 @@ void DrawGame(void)
     DrawMessage();
 
     DrawInventoryScreen();
+    DrawTradeUI();
     DrawPauseMenu();
     DrawDeathScreen(GetFrameTime());
 
@@ -1601,6 +1838,7 @@ void UnloadGame(void)
             fprintf(f, "bgm_volume=%.2f\n", bgmVolumeSlider);
             fprintf(f, "sfx_volume=%.2f\n", sfxVolumeSlider);
             fprintf(f, "window_mode=%d\n", windowMode);
+            fprintf(f, "difficulty=%d\n", (int)gameDifficulty);
             fprintf(f, "font_custom=%d\n", useCustomFont ? 1 : 0);
             if (customFontPath[0]) fprintf(f, "font_path=%s\n", customFontPath);
             fclose(f);
@@ -1641,6 +1879,9 @@ void LoadSettings(void)
         } else if (strncmp(line, "sfx_volume=", 11) == 0) {
             float v = (float)atof(line + 11);
             if (v >= 0.0f && v <= 1.0f) sfxVolumeSlider = v;
+        } else if (strncmp(line, "difficulty=", 11) == 0) {
+            int v = atoi(line + 11);
+            if (v >= 0 && v <= DIFFICULTY_HARD) gameDifficulty = (Difficulty)v;
         } else if (strncmp(line, "window_mode=", 12) == 0) {
             int v = atoi(line + 12);
             if (v >= 0 && v <= 2) windowMode = v;

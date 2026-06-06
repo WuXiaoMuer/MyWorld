@@ -10,7 +10,7 @@ static bool IsTransparent(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return true;
     uint8_t block = world[bx][by];
-    return block == BLOCK_AIR || block == BLOCK_WATER || block == BLOCK_TORCH ||
+    return block == BLOCK_AIR || block == BLOCK_WATER || block == BLOCK_LAVA || block == BLOCK_TORCH ||
            block == BLOCK_FLOWER || block == BLOCK_TALL_GRASS || block == BLOCK_GLASS ||
            block == BLOCK_LANTERN || block == BLOCK_REDSTONE_WIRE ||
            block == BLOCK_STONE_PRESSURE_PLATE || block == BLOCK_LEVER;

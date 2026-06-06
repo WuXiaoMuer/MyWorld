@@ -170,6 +170,11 @@ typedef struct {
     char message[128];
 } PktChat;
 
+// PKT_PING
+typedef struct {
+    uint32_t timestamp;
+} PktPing;
+
 // PKT_DISCONNECT
 typedef struct {
     uint8_t playerId;

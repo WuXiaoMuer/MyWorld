@@ -328,13 +328,21 @@ int craftRecipeCount = 0;
 // Sound globals
 Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
-Sound sndFootstep, sndZombie, sndPig, sndSplash;
+Sound sndFootstep, sndZombie, sndPig, sndSplash, sndVillager;
 Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
 Sound sndRain, sndCreeperFuse, sndThunder;
+Sound sndCaveDrip, sndCaveAmbient, sndWind;
+Sound sndPickup, sndBowFire;
 Music bgm = { 0 };
 
 bool audioReady = false;
 GameState gameState = STATE_MENU;
+Difficulty gameDifficulty = DIFFICULTY_NORMAL;
+
+// Achievement tracking
+bool achievements[ACH_COUNT] = {0};
+int totalMobsKilled = 0;
+int totalBlocksPlaced = 0;
 float bgmVolumeSlider = 0.3f;
 float sfxVolumeSlider = 0.7f;
 int selectedSaveSlot = -1;
@@ -364,6 +372,12 @@ uint8_t furnaceOutput = 0;
 int furnaceOutputCount = 0;
 float furnaceProgress = 0.0f;
 float furnaceFuelBurn = 0.0f;
+float furnaceFuelBurnMax = 0.0f;
+
+// Multi-furnace support
+FurnaceData furnaces[MAX_FURNACES];
+int furnaceCount = 0;
+int activeFurnace = -1;
 
 // Crafting table state
 bool craftingTableOpen = false;
@@ -373,6 +387,12 @@ bool chestOpen = false;
 int chestBlockX = -1, chestBlockY = -1;
 ChestData chestData[MAX_CHESTS];
 int chestCount = 0;
+
+// Trading state
+Trade trades[MAX_TRADES];
+int tradeCount = 0;
+bool tradeOpen = false;
+int villagerTradeIndex = -1;
 
 // Smelting recipes
 SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];

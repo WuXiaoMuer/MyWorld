@@ -116,6 +116,26 @@ void SpawnBubble(float x, float y)
     p->active = true;
 }
 
+void SpawnFireParticle(float x, float y)
+{
+    Particle *p = FindInactive();
+    if (!p) return;
+    p->position = (Vector2){ x + (float)(rand() % 8 - 4), y };
+    p->velocity = (Vector2){
+        (float)(rand() % 16 - 8),
+        -(float)(rand() % 40 + 20)
+    };
+    // Fire colors: yellow → orange → red
+    int r = rand() % 3;
+    if (r == 0) p->color = (Color){255, 200, 50, 200};
+    else if (r == 1) p->color = (Color){255, 140, 30, 180};
+    else p->color = (Color){220, 80, 20, 160};
+    p->lifetime = 0.3f + (rand() % 100) / 300.0f;
+    p->maxLifetime = p->lifetime;
+    p->size = 1.5f + (float)(rand() % 2);
+    p->active = true;
+}
+
 void UpdateParticles(float dt)
 {
     for (int i = 0; i < MAX_PARTICLES; i++) {

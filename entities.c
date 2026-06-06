@@ -138,7 +138,7 @@ void PickupNearbyItems(float px, float py)
             if (added > 0) {
                 e->count -= added;
                 if (e->count <= 0) e->active = false;
-                PlaySoundXP();
+                PlaySoundPickup();
             }
         } else if (dist < ENTITY_PICKUP_DIST * 4 && dist > 1.0f) {
             // Magnetic pull: set velocity toward player, damped by distance

@@ -1,16 +1,21 @@
 #include "types.h"
+#include "net.h"
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 
 // Mob globals defined in main.c
 
 // Mob properties per type
-// NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER, SLIME, ENDERMAN
-static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16, 8, 40 };
-static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f, 35.0f, 60.0f };
-static const int mobWidth[] = { 0, 16, 12, 12, 12, 20, 16, 10 };
-static const int mobHeight[] = { 0, 12, 28, 24, 24, 16, 12, 32 };
-static const int mobDamage[] = { 0, 0, 4, 2, 0, 3, 2, 5 };      // contact damage
+// NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER, SLIME, ENDERMAN, COW, SHEEP, CHICKEN, VILLAGER
+static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16, 8, 40, 10, 8, 4, 20 };
+static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f, 35.0f, 60.0f, 30.0f, 25.0f, 35.0f, 20.0f };
+static const int mobWidth[] = { 0, 16, 12, 12, 12, 20, 16, 10, 20, 16, 8, 12 };
+static const int mobHeight[] = { 0, 12, 28, 24, 24, 16, 12, 32, 16, 14, 10, 28 };
+static const int mobDamage[] = { 0, 0, 4, 2, 0, 3, 2, 5, 0, 0, 0, 0 };
+
+int GetMobWidth(MobType type) { return mobWidth[type]; }
+int GetMobHeight(MobType type) { return mobHeight[type]; }
 
 void InitMobs(void)
 {
@@ -94,7 +99,10 @@ void UpdateProjectiles(float dt)
             if (p->position.x >= px && p->position.x <= px + PLAYER_WIDTH &&
                 p->position.y >= py && p->position.y <= py + PLAYER_HEIGHT) {
                 float reduction = GetArmorDamageReduction();
-                int finalDamage = (int)(PROJECTILE_DAMAGE * (1.0f - reduction));
+                int arrowDamage = PROJECTILE_DAMAGE;
+                if (gameDifficulty == DIFFICULTY_EASY) arrowDamage = arrowDamage * 3 / 4;
+                else if (gameDifficulty == DIFFICULTY_HARD) arrowDamage = arrowDamage * 3 / 2;
+                int finalDamage = (int)(arrowDamage * (1.0f - reduction));
                 if (finalDamage < 1) finalDamage = 1;
                 player.health -= finalDamage;
                 if (player.health < 0) player.health = 0;
@@ -151,26 +159,11 @@ Mob* SpawnMob(MobType type, float x, float y)
     return NULL;
 }
 
-static bool IsMobOnGround(Mob *mob)
-{
-    int bx1 = (int)(mob->position.x) / BLOCK_SIZE;
-    int bx2 = (int)(mob->position.x + mobWidth[mob->type] - 1) / BLOCK_SIZE;
-    int by = (int)(mob->position.y + mobHeight[mob->type]) / BLOCK_SIZE;
-
-    for (int bx = bx1; bx <= bx2; bx++) {
-        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-            if (IsBlockSolid(bx, by)) return true;
-        }
-    }
-    return false;
-}
-
 static bool CanMobSeePlayer(Mob *mob)
 {
     float dx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + mobWidth[mob->type] / 2);
     float dy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + mobHeight[mob->type] / 2);
-    float dist = sqrtf(dx * dx + dy * dy);
-    return dist < 400.0f;
+    return dx * dx + dy * dy < 160000.0f; // 400^2
 }
 
 static void UpdateMobPhysics(Mob *mob, float dt)
@@ -277,8 +270,22 @@ static void UpdatePigAI(Mob *mob, float dt)
     }
     switch (mob->aiState) {
         case 0: mob->velocity.x = 0; break;
-        case 1: mob->velocity.x = -mobSpeed[MOB_PIG]; mob->facingRight = false; break;
-        case 2: mob->velocity.x = mobSpeed[MOB_PIG]; mob->facingRight = true; break;
+        case 1: mob->velocity.x = -mobSpeed[MOB_PIG] * 0.5f; mob->facingRight = false; break;
+        case 2: mob->velocity.x = mobSpeed[MOB_PIG] * 0.5f; mob->facingRight = true; break;
+    }
+}
+
+static void UpdatePassiveAI(Mob *mob, float dt, MobType type)
+{
+    mob->aiTimer -= dt;
+    if (mob->aiTimer <= 0) {
+        mob->aiTimer = MOB_AI_INTERVAL * 2.0f + (float)(rand() % 100) / 100.0f * 2.0f;
+        mob->aiState = rand() % 3;
+    }
+    switch (mob->aiState) {
+        case 0: mob->velocity.x = 0; break;
+        case 1: mob->velocity.x = -mobSpeed[type] * 0.5f; mob->facingRight = false; break;
+        case 2: mob->velocity.x = mobSpeed[type] * 0.5f; mob->facingRight = true; break;
     }
 }
 
@@ -327,6 +334,17 @@ static void UpdateSkeletonAI(Mob *mob, float dt)
                 float vx = (adx / adist) * speed;
                 float vy = (ady / adist) * speed - arcComp / flightTime;
                 SpawnProjectile(arrowX, arrowY, vx, vy, false);
+                // Sync skeleton arrow to clients
+                if (NetIsHost()) {
+                    uint8_t buf[64];
+                    PktProjectileSpawn ps;
+                    ps.x = arrowX; ps.y = arrowY;
+                    ps.vx = vx; ps.vy = vy;
+                    ps.fromPlayer = false; ps.playerId = 0;
+                    buf[0] = PKT_PROJECTILE_SPAWN;
+                    memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
+                    NetSendToAll(buf, 1 + sizeof(PktProjectileSpawn), false);
+                }
             }
         }
     } else {
@@ -367,10 +385,13 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                 // Damage player
                 float pdx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + mobWidth[MOB_CREEPER] / 2);
                 float pdy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + mobHeight[MOB_CREEPER] / 2);
-                float pdist = sqrtf(pdx * pdx + pdy * pdy);
-                if (pdist < CREEPER_EXPLODE_DIST * 1.5f) {
+                float pdistSq = pdx * pdx + pdy * pdy;
+                if (pdistSq < CREEPER_EXPLODE_DIST * 1.5f * CREEPER_EXPLODE_DIST * 1.5f) {
                     float reduction = GetArmorDamageReduction();
-                    int finalDamage = (int)(CREEPER_DAMAGE * (1.0f - reduction));
+                    int creeperDmg = CREEPER_DAMAGE;
+                    if (gameDifficulty == DIFFICULTY_EASY) creeperDmg = creeperDmg * 3 / 4;
+                    else if (gameDifficulty == DIFFICULTY_HARD) creeperDmg = creeperDmg * 3 / 2;
+                    int finalDamage = (int)(creeperDmg * (1.0f - reduction));
                     if (finalDamage < 1) finalDamage = 1;
                     player.health -= finalDamage;
                     if (player.health < 0) player.health = 0;
@@ -391,7 +412,8 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                         if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
                             float bdx = (bx - cx) * BLOCK_SIZE;
                             float bdy = (by - cy) * BLOCK_SIZE;
-                            if (sqrtf(bdx * bdx + bdy * bdy) <= CREEPER_EXPLODE_RADIUS * BLOCK_SIZE) {
+                            float explodeR = CREEPER_EXPLODE_RADIUS * BLOCK_SIZE;
+                            if (bdx * bdx + bdy * bdy <= explodeR * explodeR) {
                                 BlockType bt = (BlockType)world[bx][by];
                                 if (bt != BLOCK_AIR && bt != BLOCK_BEDROCK) {
                                     SpawnBlockParticles(bx, by, bt);
@@ -411,12 +433,14 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                     }
                 }
 
-                // Explosion particles
+                // Explosion particles (radial spread)
+                float ecx = mob->position.x + mobWidth[MOB_CREEPER] / 2;
+                float ecy = mob->position.y + mobHeight[MOB_CREEPER] / 2;
                 for (int p = 0; p < 20; p++) {
                     float angle = (float)(rand() % 628) / 100.0f;
-                    float speed = 100.0f + (float)(rand() % 200);
-                    SpawnDamageParticles(mob->position.x + mobWidth[MOB_CREEPER] / 2,
-                                         mob->position.y + mobHeight[MOB_CREEPER] / 2,
+                    float dist = 5.0f + (float)(rand() % 20);
+                    SpawnDamageParticles(ecx + cosf(angle) * dist,
+                                         ecy + sinf(angle) * dist,
                                          (Color){255, 150, 50, 255});
                 }
 
@@ -532,8 +556,8 @@ static void UpdateSlimeAI(Mob *mob, float dt)
             case 1: mob->velocity.x = -mobSpeed[MOB_SLIME] * 0.5f; mob->facingRight = false; break;
             case 2: mob->velocity.x = mobSpeed[MOB_SLIME] * 0.5f; mob->facingRight = true; break;
         }
-        // Random hops while wandering
-        if (mob->onGround && (rand() % 100) < 2) {
+        // Random hops while wandering (framerate-independent: ~2% chance per frame at 60fps)
+        if (mob->onGround && (rand() % 10000) < (int)(200.0f * dt)) {
             mob->velocity.y = -180.0f;
         }
     }
@@ -545,14 +569,12 @@ static void UpdateEndermanAI(Mob *mob, float dt)
     float dist = fabsf(dx);
 
     // Check if player is looking at enderman (crosshair near mob center)
-    Vector2 mouseWorld = Win32GetMousePosition();
-    mouseWorld.x += camera.target.x - SCREEN_WIDTH / 2.0f;
-    mouseWorld.y += camera.target.y - SCREEN_HEIGHT / 2.0f;
+    Vector2 mouseScreen = Win32GetMousePosition();
+    Vector2 mouseWorld = GetScreenToWorld2D(mouseScreen, camera);
     float mobCenterX = mob->position.x + mobWidth[MOB_ENDERMAN] / 2.0f;
     float mobCenterY = mob->position.y + mobHeight[MOB_ENDERMAN] / 2.0f;
-    float lookDist = sqrtf((mouseWorld.x - mobCenterX) * (mouseWorld.x - mobCenterX) +
-                           (mouseWorld.y - mobCenterY) * (mouseWorld.y - mobCenterY));
-    bool playerLooking = lookDist < 100.0f && dist < 400.0f;
+    float lookDx = mouseWorld.x - mobCenterX, lookDy = mouseWorld.y - mobCenterY;
+    bool playerLooking = (lookDx * lookDx + lookDy * lookDy < 10000.0f) && dist < 400.0f; // 100^2
 
     if (playerLooking || (mob->aiState == 1 && dist < 500.0f)) {
         // Provoked: chase + teleport
@@ -577,6 +599,7 @@ static void UpdateEndermanAI(Mob *mob, float dt)
                     if (IsBlockSolid(bx, by) && !IsBlockSolid(bx, by - 1) && !IsBlockSolid(bx, by - 2)) {
                         mob->position.x = newX;
                         mob->position.y = (by - 2) * BLOCK_SIZE;
+                        mob->velocity = (Vector2){0, 0};
                         // Spawn particles at old and new position
                         SpawnDamageParticles(oldX + 5, oldY + 16, (Color){120, 80, 200, 255});
                         SpawnDamageParticles(mob->position.x + 5, mob->position.y + 16, (Color){120, 80, 200, 255});
@@ -623,6 +646,9 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
 
     if (pRight > mLeft && pLeft < mRight && pBottom > mTop && pTop < mBottom) {
         int rawDamage = mobDamage[mob->type];
+        // Difficulty multiplier
+        if (gameDifficulty == DIFFICULTY_EASY) rawDamage = rawDamage * 3 / 4;
+        else if (gameDifficulty == DIFFICULTY_HARD) rawDamage = rawDamage * 3 / 2;
         float reduction = GetArmorDamageReduction();
         int finalDamage = (int)(rawDamage * (1.0f - reduction));
         if (finalDamage < 1) finalDamage = 1;
@@ -636,6 +662,9 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
                 case MOB_SPIDER: SetDeathCause(STR_DEATH_MOB_SPIDER); break;
                 case MOB_SLIME: SetDeathCause(STR_DEATH_MOB_SLIME); break;
                 case MOB_ENDERMAN: SetDeathCause(STR_DEATH_MOB_ENDERMAN); break;
+                case MOB_COW: SetDeathCause(STR_DEATH_MOB_COW); break;
+                case MOB_SHEEP: SetDeathCause(STR_DEATH_MOB_SHEEP); break;
+                case MOB_CHICKEN: SetDeathCause(STR_DEATH_MOB_CHICKEN); break;
                 default: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
             }
         }
@@ -658,6 +687,7 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
 
 void DamageMob(Mob *mob, int damage)
 {
+    if (mob->deathTimer > 0) return; // Already dying, don't drop again
     mob->health -= damage;
     mob->despawnTimer = MOB_DESPAWN_TIME; // Reset timer on engagement
     SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
@@ -666,6 +696,7 @@ void DamageMob(Mob *mob, int damage)
     if (mob->health <= 0) {
         mob->deathTimer = MOB_DEATH_TIME;
         mob->velocity.x = 0;
+        totalMobsKilled++;
 
         // Death particles
         Color deathColor;
@@ -677,6 +708,10 @@ void DamageMob(Mob *mob, int damage)
             case MOB_SPIDER: deathColor = (Color){60, 40, 30, 255}; break;
             case MOB_SLIME: deathColor = (Color){80, 200, 60, 255}; break;
             case MOB_ENDERMAN: deathColor = (Color){120, 80, 200, 255}; break;
+            case MOB_COW: deathColor = (Color){100, 60, 30, 255}; break;
+            case MOB_SHEEP: deathColor = (Color){230, 230, 230, 255}; break;
+            case MOB_CHICKEN: deathColor = (Color){240, 230, 220, 255}; break;
+            case MOB_VILLAGER: deathColor = (Color){120, 80, 50, 255}; break;
             default: deathColor = (Color){180, 30, 30, 255}; break;
         }
         SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
@@ -702,18 +737,27 @@ void DamageMob(Mob *mob, int damage)
             SpawnItemEntity(ITEM_STRING, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_SLIME) {
             SpawnItemEntity(ITEM_SLIMEBALL, 1 + rand() % 3, baseDropX + (rand() % 10 - 5), baseDropY);
-            // Large slimes (fuseTimer==0) split into 2 small slimes
-            if (mob->fuseTimer == 0) {
+            // Large slimes (slimeType==0) split into 2 small slimes
+            if (mob->slimeType == 0) {
                 Mob *s1 = SpawnMob(MOB_SLIME, mob->position.x - 10, mob->position.y);
                 Mob *s2 = SpawnMob(MOB_SLIME, mob->position.x + 10, mob->position.y);
-                if (s1) { s1->fuseTimer = 1; s1->health = 4; s1->maxHealth = 4; }
-                if (s2) { s2->fuseTimer = 1; s2->health = 4; s2->maxHealth = 4; }
+                if (s1) { s1->slimeType = 1; s1->health = 4; s1->maxHealth = 4; }
+                if (s2) { s2->slimeType = 1; s2->health = 4; s2->maxHealth = 4; }
             }
         } else if (mob->type == MOB_ENDERMAN) {
             SpawnItemEntity(ITEM_ENDER_PEARL, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+        } else if (mob->type == MOB_COW) {
+            SpawnItemEntity(ITEM_RAW_BEEF, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
+            SpawnItemEntity(ITEM_LEATHER, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+        } else if (mob->type == MOB_SHEEP) {
+            SpawnItemEntity(ITEM_RAW_MUTTON, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+            SpawnItemEntity(ITEM_WOOL, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+        } else if (mob->type == MOB_CHICKEN) {
+            SpawnItemEntity(ITEM_RAW_CHICKEN, 1, baseDropX + (rand() % 10 - 5), baseDropY);
+            SpawnItemEntity(ITEM_FEATHER, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         }
         PlaySoundDeath();
-        player.xp += (mob->type == MOB_PIG) ? 3 : 5;
+        player.xp += (mob->type == MOB_PIG || mob->type == MOB_COW || mob->type == MOB_SHEEP || mob->type == MOB_CHICKEN) ? 3 : 5;
         if (player.xp > MAX_XP) player.xp = MAX_XP;
     }
 }
@@ -731,22 +775,32 @@ static void TrySpawnMobs(float dt)
 {
     mobSpawnTimer -= dt;
     if (mobSpawnTimer > 0) return;
-    mobSpawnTimer = MOB_SPAWN_INTERVAL;
+    // Difficulty affects spawn rate
+    float spawnInterval = MOB_SPAWN_INTERVAL;
+    if (gameDifficulty == DIFFICULTY_PEACEFUL) spawnInterval = 999.0f; // Effectively no hostile spawns
+    else if (gameDifficulty == DIFFICULTY_EASY) spawnInterval = MOB_SPAWN_INTERVAL * 1.5f;
+    else if (gameDifficulty == DIFFICULTY_HARD) spawnInterval = MOB_SPAWN_INTERVAL * 0.7f;
+    mobSpawnTimer = spawnInterval;
 
     // Count active mobs by category
     int hostileCount = 0, passiveCount = 0;
     for (int i = 0; i < MAX_MOBS; i++) {
         if (!mobs[i].active) continue;
-        if (mobs[i].type == MOB_PIG) passiveCount++;
+        if (mobs[i].type == MOB_PIG || mobs[i].type == MOB_COW ||
+            mobs[i].type == MOB_SHEEP || mobs[i].type == MOB_CHICKEN ||
+            mobs[i].type == MOB_VILLAGER) passiveCount++;
         else hostileCount++;
     }
     if (hostileCount + passiveCount >= MAX_MOBS - 4) return; // Leave room for spawns
+
+    // Peaceful: only passive mobs (pigs)
+    bool peaceful = (gameDifficulty == DIFFICULTY_PEACEFUL);
 
     float playerCX = player.position.x + PLAYER_WIDTH / 2;
     float playerCY = player.position.y + PLAYER_HEIGHT / 2;
 
     // Zombie spawning: dark areas (night surface or underground)
-    if (hostileCount < 12) {
+    if (!peaceful && hostileCount < 12) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -769,7 +823,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Skeleton spawning: dark areas, less frequent
-    if (hostileCount < 12 && (rand() % 3 == 0)) {
+    if (!peaceful && hostileCount < 12 && (rand() % 3 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -811,7 +865,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Creeper spawning: dark areas like zombie
-    if (hostileCount < 12 && (rand() % 4 == 0)) {
+    if (!peaceful && hostileCount < 12 && (rand() % 4 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -832,7 +886,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Spider spawning: dark areas
-    if (hostileCount < 12 && (rand() % 4 == 0)) {
+    if (!peaceful && hostileCount < 12 && (rand() % 4 == 0)) {
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -853,7 +907,7 @@ static void TrySpawnMobs(float dt)
     }
 
     // Slime: swamp/jungle biome, daytime, bright areas
-    if (hostileCount + passiveCount < MAX_MOBS - 4) {
+    if (!peaceful && hostileCount + passiveCount < MAX_MOBS - 4) {
         float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -876,8 +930,8 @@ static void TrySpawnMobs(float dt)
         }
     }
 
-    // Enderman: any biome, night, dark areas, rare
-    if (hostileCount + passiveCount < MAX_MOBS - 4 && (rand() % 4 == 0)) {
+    // Enderman: night only (or very dark areas), rare
+    if (!peaceful && hostileCount + passiveCount < MAX_MOBS - 4 && (rand() % 4 == 0) && dayNight.lightLevel < 0.5f) {
         float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
@@ -891,6 +945,31 @@ static void TrySpawnMobs(float dt)
                     if (light <= MOB_HOSTILE_LIGHT_MAX) {
                         SpawnMob(MOB_ENDERMAN, spawnX, (y - 2) * BLOCK_SIZE);
                     }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Passive mobs: spawn on grass in daylight
+    if (passiveCount < 8 && dayNight.lightLevel > 0.5f && (rand() % 3 == 0)) {
+        float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
+        float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
+        float spawnX = playerCX + cosf(angle) * dist;
+        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
+
+        int bx = (int)(spawnX / BLOCK_SIZE);
+        if (bx >= 0 && bx < WORLD_WIDTH) {
+            for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
+                if (world[bx][y] == BLOCK_GRASS && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                    int roll = rand() % 20;
+                    MobType spawnType;
+                    if (roll < 8) spawnType = MOB_PIG;
+                    else if (roll < 14) spawnType = MOB_COW;
+                    else if (roll < 18) spawnType = MOB_SHEEP;
+                    else if (roll < 19) spawnType = MOB_CHICKEN;
+                    else spawnType = MOB_VILLAGER;
+                    SpawnMob(spawnType, spawnX, (y - 2) * BLOCK_SIZE);
                     break;
                 }
             }
@@ -976,6 +1055,31 @@ void UpdateMobs(float dt)
         else if (mob->type == MOB_SPIDER) UpdateSpiderAI(mob, dt);
         else if (mob->type == MOB_SLIME) UpdateSlimeAI(mob, dt);
         else if (mob->type == MOB_ENDERMAN) UpdateEndermanAI(mob, dt);
+        else if (mob->type == MOB_COW || mob->type == MOB_SHEEP || mob->type == MOB_CHICKEN)
+            UpdatePassiveAI(mob, dt, mob->type);
+        else if (mob->type == MOB_VILLAGER) UpdatePassiveAI(mob, dt, MOB_VILLAGER);
+
+        // Love timer countdown
+        if (mob->loveTimer > 0) mob->loveTimer -= dt;
+
+        // Baby growth
+        if (mob->isBaby) {
+            mob->growTimer -= dt;
+            if (mob->growTimer <= 0) {
+                mob->isBaby = false;
+                mob->maxHealth = mobMaxHealth[mob->type];
+                mob->health = mob->maxHealth;
+            }
+        }
+
+        // Chicken egg drops (every ~30 seconds)
+        if (mob->type == MOB_CHICKEN && !mob->isBaby) {
+            mob->attackTimer -= dt;
+            if (mob->attackTimer <= 0) {
+                mob->attackTimer = 25.0f + (float)(rand() % 15);
+                SpawnItemEntity(ITEM_EGG, 1, mob->position.x + 4, mob->position.y);
+            }
+        }
 
         // Physics
         UpdateMobPhysics(mob, dt);
@@ -1062,6 +1166,123 @@ static void DrawPigSprite(Mob *mob)
     DrawRectangle((int)(x + 1), (int)(y + 10 + legSwing), 3, 4, (Color){200, 130, 120, alpha});
     DrawRectangle((int)(x + 5), (int)(y + 10 - legSwing), 3, 4, (Color){200, 130, 120, alpha});
     DrawRectangle((int)(x + 10), (int)(y + 10 + legSwing), 3, 4, (Color){200, 130, 120, alpha});
+}
+
+static void DrawCowSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float legSwing = moving ? sinf(time * 10.0f) * 2.0f : 0;
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        float dp = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * dp);
+    }
+    // Body (brown)
+    DrawRectangle((int)x, (int)(y + 3), 20, 10, (Color){100, 60, 30, alpha});
+    // Head
+    DrawRectangle((int)(x + (mob->facingRight ? 16 : -6)), (int)y, 10, 10, (Color){110, 70, 35, alpha});
+    // Eye
+    int eyeX = mob->facingRight ? (int)(x + 23) : (int)(x + 1);
+    DrawRectangle(eyeX, (int)(y + 3), 2, 2, (Color){30, 30, 30, alpha});
+    // Horns
+    int hornX = mob->facingRight ? (int)(x + 18) : (int)(x + 2);
+    DrawRectangle(hornX, (int)(y - 2), 2, 3, (Color){200, 190, 170, alpha});
+    DrawRectangle(hornX + 4, (int)(y - 2), 2, 3, (Color){200, 190, 170, alpha});
+    // Legs
+    DrawRectangle((int)(x + 2), (int)(y + 13 + legSwing), 3, 5, (Color){90, 55, 25, alpha});
+    DrawRectangle((int)(x + 7), (int)(y + 13 - legSwing), 3, 5, (Color){90, 55, 25, alpha});
+    DrawRectangle((int)(x + 12), (int)(y + 13 + legSwing), 3, 5, (Color){90, 55, 25, alpha});
+    DrawRectangle((int)(x + 17), (int)(y + 13 - legSwing), 3, 5, (Color){90, 55, 25, alpha});
+}
+
+static void DrawSheepSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float legSwing = moving ? sinf(time * 10.0f) * 2.0f : 0;
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        float dp = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * dp);
+    }
+    // Wool body (white fluffy)
+    DrawRectangle((int)x, (int)(y + 2), 16, 10, (Color){240, 240, 240, alpha});
+    DrawRectangle((int)(x + 1), (int)(y + 1), 14, 12, (Color){230, 230, 230, alpha});
+    // Head (dark)
+    DrawRectangle((int)(x + (mob->facingRight ? 12 : -4)), (int)y, 8, 8, (Color){60, 60, 60, alpha});
+    // Eye
+    int eyeX = mob->facingRight ? (int)(x + 17) : (int)(x + 1);
+    DrawRectangle(eyeX, (int)(y + 2), 2, 2, (Color){200, 200, 200, alpha});
+    // Legs
+    DrawRectangle((int)(x + 2), (int)(y + 12 + legSwing), 3, 4, (Color){50, 50, 50, alpha});
+    DrawRectangle((int)(x + 6), (int)(y + 12 - legSwing), 3, 4, (Color){50, 50, 50, alpha});
+    DrawRectangle((int)(x + 10), (int)(y + 12 + legSwing), 3, 4, (Color){50, 50, 50, alpha});
+    DrawRectangle((int)(x + 14), (int)(y + 12 - legSwing), 3, 4, (Color){50, 50, 50, alpha});
+}
+
+static void DrawChickenSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float legSwing = moving ? sinf(time * 15.0f) * 2.0f : 0;
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        float dp = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * dp);
+    }
+    // Body (white)
+    DrawRectangle((int)x, (int)(y + 2), 8, 6, (Color){240, 230, 220, alpha});
+    // Head
+    DrawRectangle((int)(x + (mob->facingRight ? 6 : -2)), (int)y, 5, 5, (Color){240, 230, 220, alpha});
+    // Beak
+    int beakX = mob->facingRight ? (int)(x + 10) : (int)(x - 2);
+    DrawRectangle(beakX, (int)(y + 2), 3, 2, (Color){230, 180, 50, alpha});
+    // Comb (red)
+    DrawRectangle((int)(x + (mob->facingRight ? 7 : 0)), (int)(y - 1), 3, 2, (Color){200, 50, 50, alpha});
+    // Eye
+    int eyeX = mob->facingRight ? (int)(x + 9) : (int)(x + 1);
+    DrawRectangle(eyeX, (int)(y + 1), 1, 1, (Color){30, 30, 30, alpha});
+    // Legs
+    DrawRectangle((int)(x + 2), (int)(y + 8 + legSwing), 2, 3, (Color){200, 150, 50, alpha});
+    DrawRectangle((int)(x + 5), (int)(y + 8 - legSwing), 2, 3, (Color){200, 150, 50, alpha});
+    // Tail
+    DrawRectangle((int)(x + (mob->facingRight ? -1 : 7)), (int)(y + 1), 2, 4, (Color){220, 210, 200, alpha});
+}
+
+static void DrawVillagerSprite(Mob *mob)
+{
+    float x = mob->position.x;
+    float y = mob->position.y;
+    float time = (float)GetTime();
+    bool moving = fabsf(mob->velocity.x) > 5.0f;
+    float legSwing = moving ? sinf(time * 8.0f) * 2.0f : 0;
+    unsigned char alpha = 255;
+    if (mob->deathTimer > 0) {
+        float dp = mob->deathTimer / MOB_DEATH_TIME;
+        alpha = (unsigned char)(255 * dp);
+    }
+    // Body (brown robe)
+    DrawRectangle((int)x, (int)(y + 8), 12, 16, (Color){120, 80, 50, alpha});
+    // Head (skin)
+    DrawRectangle((int)(x + 2), (int)y, 8, 10, (Color){200, 160, 120, alpha});
+    // Eyes
+    DrawRectangle((int)(x + 4), (int)(y + 3), 2, 2, (Color){40, 40, 40, alpha});
+    DrawRectangle((int)(x + 8), (int)(y + 3), 2, 2, (Color){40, 40, 40, alpha});
+    // Nose
+    DrawRectangle((int)(x + 6), (int)(y + 5), 2, 2, (Color){180, 140, 100, alpha});
+    // Arms
+    DrawRectangle((int)(x - 2), (int)(y + 9 + legSwing), 3, 10, (Color){110, 75, 45, alpha});
+    DrawRectangle((int)(x + 13), (int)(y + 9 - legSwing), 3, 10, (Color){110, 75, 45, alpha});
+    // Legs
+    DrawRectangle((int)(x + 2), (int)(y + 24 + legSwing), 3, 6, (Color){100, 70, 40, alpha});
+    DrawRectangle((int)(x + 7), (int)(y + 24 - legSwing), 3, 6, (Color){100, 70, 40, alpha});
 }
 
 static void DrawSkeletonSprite(Mob *mob)
@@ -1274,6 +1495,10 @@ void DrawMobs(void)
             case MOB_SPIDER: DrawSpiderSprite(mob); break;
             case MOB_SLIME: DrawSlimeSprite(mob); break;
             case MOB_ENDERMAN: DrawEndermanSprite(mob); break;
+            case MOB_COW: DrawCowSprite(mob); break;
+            case MOB_SHEEP: DrawSheepSprite(mob); break;
+            case MOB_CHICKEN: DrawChickenSprite(mob); break;
+            case MOB_VILLAGER: DrawVillagerSprite(mob); break;
             default: break;
         }
 
@@ -1291,6 +1516,16 @@ void DrawMobs(void)
             float pct = (float)mob->health / mob->maxHealth;
             DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, barAlpha});
             DrawRectangle(barX, barY, (int)(barW * pct), barH, (Color){200, 30, 30, barAlpha});
+        }
+
+        // Love mode hearts
+        if (mob->loveTimer > 0) {
+            float heartTime = (float)GetTime() * 3.0f;
+            for (int h = 0; h < 3; h++) {
+                float hx = mob->position.x + mobWidth[mob->type] / 2 + sinf(heartTime + h * 2.0f) * 8;
+                float hy = mob->position.y - 5 + cosf(heartTime * 0.7f + h * 1.5f) * 3;
+                DrawGameText("+", (int)hx, (int)hy, 10, (Color){255, 80, 120, 200});
+            }
         }
     }
 }

@@ -124,11 +124,12 @@ void InitWin32WheelHook(void);
 #define MAX_SMELT_RECIPES   20
 #define MAX_CHESTS          64
 #define CHEST_SLOTS         27
+#define MAX_FURNACES        64
 
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        8
+#define SAVE_VERSION        10
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -176,9 +177,15 @@ void InitWin32WheelHook(void);
 #define MINIMAP_RANGE       50   // blocks visible around player
 #define FOOD_APPLE_VALUE       4
 #define FOOD_BREAD_VALUE       5
+#define FOOD_RAW_BEEF_VALUE    3
+#define FOOD_COOKED_BEEF_VALUE 8
+#define FOOD_RAW_MUTTON_VALUE    3
+#define FOOD_COOKED_MUTTON_VALUE 8
+#define FOOD_RAW_CHICKEN_VALUE    2
+#define FOOD_COOKED_CHICKEN_VALUE 6
 
 // Mob system
-#define MAX_MOBS            32
+#define MAX_MOBS            64
 
 // Item entity system
 #define MAX_ENTITIES        128
@@ -270,14 +277,17 @@ typedef enum {
     TOOL_WOOD_AXE,
     TOOL_WOOD_SWORD,
     TOOL_WOOD_SHOVEL,
+    TOOL_WOOD_HOE,
     TOOL_STONE_PICKAXE,
     TOOL_STONE_AXE,
     TOOL_STONE_SWORD,
     TOOL_STONE_SHOVEL,
+    TOOL_STONE_HOE,
     TOOL_IRON_PICKAXE,
     TOOL_IRON_AXE,
     TOOL_IRON_SWORD,
     TOOL_IRON_SHOVEL,
+    TOOL_IRON_HOE,
     // Food (not placeable)
     FOOD_RAW_PORK,
     FOOD_COOKED_PORK,
@@ -315,11 +325,13 @@ typedef enum {
     TOOL_GOLD_AXE,
     TOOL_GOLD_SWORD,
     TOOL_GOLD_SHOVEL,
+    TOOL_GOLD_HOE,
     // Diamond tools
     TOOL_DIAMOND_PICKAXE,
     TOOL_DIAMOND_AXE,
     TOOL_DIAMOND_SWORD,
     TOOL_DIAMOND_SHOVEL,
+    TOOL_DIAMOND_HOE,
     // Gold armor
     ARMOR_GOLD_HELMET,
     ARMOR_GOLD_CHESTPLATE,
@@ -359,11 +371,38 @@ typedef enum {
     // Phase 1: New items
     ITEM_SLIMEBALL,
     ITEM_ENDER_PEARL,
+    // Farming
+    ITEM_WHEAT_SEEDS,
+    ITEM_WHEAT,
+    BLOCK_FARMLAND,
+    BLOCK_CROPS,        // Growing wheat (0-7 growth stages)
+    BLOCK_HAY_BALE,
+    // Animal drops
+    ITEM_RAW_BEEF,
+    ITEM_LEATHER,
+    ITEM_RAW_MUTTON,
+    ITEM_WOOL,
+    ITEM_RAW_CHICKEN,
+    ITEM_FEATHER,
+    ITEM_EGG,
+    // Cooked food
+    ITEM_COOKED_BEEF,
+    ITEM_COOKED_MUTTON,
+    ITEM_COOKED_CHICKEN,
+    // Utility items
+    ITEM_BUCKET,
+    ITEM_WATER_BUCKET,
     // Redstone blocks
     BLOCK_LEVER,
     BLOCK_REDSTONE_WIRE,
     BLOCK_REDSTONE_LAMP,
     BLOCK_STONE_PRESSURE_PLATE,
+    // Lava system
+    BLOCK_LAVA,
+    BLOCK_OBSIDIAN,
+    ITEM_LAVA_BUCKET,
+    // Enchanting
+    BLOCK_ENCHANTING_TABLE,
     BLOCK_COUNT
 } BlockType;
 
@@ -381,6 +420,16 @@ typedef struct {
     uint8_t items[CHEST_SLOTS];
     int counts[CHEST_SLOTS];
 } ChestData;
+
+typedef struct {
+    int x, y;
+    uint8_t fuel; int fuelCount;
+    uint8_t input; int inputCount;
+    uint8_t output; int outputCount;
+    float progress;
+    float fuelBurn;
+    float fuelBurnMax;
+} FurnaceData;
 
 //----------------------------------------------------------------------------------
 // Language & i18n
@@ -482,6 +531,16 @@ typedef enum {
     STR_DEATH_MOB_SPIDER,
     STR_DEATH_MOB_SLIME,
     STR_DEATH_MOB_ENDERMAN,
+    STR_DEATH_MOB_COW,
+    STR_DEATH_MOB_SHEEP,
+    STR_DEATH_MOB_CHICKEN,
+
+    // Mob names
+    STR_MOB_PIG,
+    STR_MOB_COW,
+    STR_MOB_SHEEP,
+    STR_MOB_CHICKEN,
+    STR_MOB_VILLAGER,
     STR_DEATH_VOID,
     STR_DEATH_SCORE,
 
@@ -532,6 +591,21 @@ typedef enum {
     // Font names
     STR_FONT_NAME_BUILTIN,
     STR_FONT_NAME_LXGW,
+
+    // Difficulty
+    STR_DIFFICULTY,
+    STR_DIFFICULTY_PEACEFUL,
+    STR_DIFFICULTY_EASY,
+    STR_DIFFICULTY_NORMAL,
+    STR_DIFFICULTY_HARD,
+
+    // Achievements
+    STR_ACH_FIRST_STEPS,
+    STR_ACH_DEEP_DIG,
+    STR_ACH_MONSTER_HUNTER,
+    STR_ACH_ARCHITECT,
+    STR_ACH_REDSTONE_ENGINEER,
+    STR_ACH_COLLECTOR,
 
     // Status Messages
     STR_MSG_GAME_SAVED,
@@ -599,14 +673,17 @@ typedef enum {
     STR_TOOL_WOOD_AXE,
     STR_TOOL_WOOD_SWORD,
     STR_TOOL_WOOD_SHOVEL,
+    STR_TOOL_WOOD_HOE,
     STR_TOOL_STONE_PICKAXE,
     STR_TOOL_STONE_AXE,
     STR_TOOL_STONE_SWORD,
     STR_TOOL_STONE_SHOVEL,
+    STR_TOOL_STONE_HOE,
     STR_TOOL_IRON_PICKAXE,
     STR_TOOL_IRON_AXE,
     STR_TOOL_IRON_SWORD,
     STR_TOOL_IRON_SHOVEL,
+    STR_TOOL_IRON_HOE,
     STR_FOOD_RAW_PORK,
     STR_FOOD_COOKED_PORK,
     STR_FOOD_APPLE,
@@ -639,11 +716,13 @@ typedef enum {
     STR_TOOL_GOLD_AXE,
     STR_TOOL_GOLD_SWORD,
     STR_TOOL_GOLD_SHOVEL,
+    STR_TOOL_GOLD_HOE,
     // Diamond tools
     STR_TOOL_DIAMOND_PICKAXE,
     STR_TOOL_DIAMOND_AXE,
     STR_TOOL_DIAMOND_SWORD,
     STR_TOOL_DIAMOND_SHOVEL,
+    STR_TOOL_DIAMOND_HOE,
     // Gold armor
     STR_ARMOR_GOLD_HELMET,
     STR_ARMOR_GOLD_CHESTPLATE,
@@ -682,6 +761,32 @@ typedef enum {
     // Phase 1: New items
     STR_ITEM_SLIMEBALL,
     STR_ITEM_ENDER_PEARL,
+    // Farming
+    STR_ITEM_WHEAT_SEEDS,
+    STR_ITEM_WHEAT,
+    STR_BLOCK_FARMLAND,
+    STR_BLOCK_CROPS,
+    STR_BLOCK_HAY_BALE,
+    // Animal drops
+    STR_ITEM_RAW_BEEF,
+    STR_ITEM_LEATHER,
+    STR_ITEM_RAW_MUTTON,
+    STR_ITEM_WOOL,
+    STR_ITEM_RAW_CHICKEN,
+    STR_ITEM_FEATHER,
+    STR_ITEM_EGG,
+    STR_ITEM_COOKED_BEEF,
+    STR_ITEM_COOKED_MUTTON,
+    STR_ITEM_COOKED_CHICKEN,
+    // Utility items
+    STR_ITEM_BUCKET,
+    STR_ITEM_WATER_BUCKET,
+    STR_ITEM_LAVA_BUCKET,
+    // Lava system
+    STR_BLOCK_LAVA,
+    STR_BLOCK_OBSIDIAN,
+    // Enchanting
+    STR_BLOCK_ENCHANTING_TABLE,
     // Redstone blocks
     STR_BLOCK_LEVER,
     STR_BLOCK_REDSTONE_WIRE,
@@ -752,6 +857,9 @@ typedef enum {
     STR_RECIPE_BONE_BLOCK_DECOMP,
     STR_RECIPE_BOOKSHELF,
     STR_RECIPE_LANTERN,
+    // Utility recipes
+    STR_RECIPE_BUCKET,
+    STR_RECIPE_ENCHANTING_TABLE,
     // Redstone recipes
     STR_RECIPE_REDSTONE_WIRE,
     STR_RECIPE_LEVER,
@@ -768,6 +876,10 @@ typedef enum {
     STR_SMELT_REDSTONE,
     STR_SMELT_LAPIS,
     STR_SMELT_CLAY,
+    STR_SMELT_ICE,
+    STR_SMELT_BEEF,
+    STR_SMELT_MUTTON,
+    STR_SMELT_CHICKEN,
 
     // Furnace messages
     STR_MSG_NO_FUEL,
@@ -777,6 +889,45 @@ typedef enum {
     // Additional controls
     STR_KEY_F11,
     STR_ACT_FULLSCREEN,
+
+    // Enchantment names
+    STR_ENCH_SHARPNESS,
+    STR_ENCH_EFFICIENCY,
+    STR_ENCH_PROTECTION,
+    STR_ENCH_FORTUNE,
+    STR_ENCH_UNBREAKING,
+    STR_ENCHANTED,
+
+    // Enchanting messages
+    STR_MSG_ENCHANTED,
+    STR_MSG_ALREADY_ENCHANTED,
+
+    // Tutorial and multiplayer
+    STR_TUTORIAL_CONTROLS,
+    STR_NET_PLAYER_JOINED,
+    STR_NET_PLAYER_LEFT,
+    STR_NET_HOST_DISCONNECTED,
+
+    // Missing messages
+    STR_MSG_NO_ARROWS,
+    STR_DEATH_LAVA,
+
+    // Ender pearl
+    STR_MSG_ENDER_PEARL,
+
+    // Item type labels
+    STR_TYPE_TOOL,
+    STR_TYPE_ARMOR,
+    STR_TYPE_FOOD,
+    STR_TYPE_BLOCK,
+    // New recipes
+    STR_RECIPE_SLIMEBALL_STRING,
+    STR_RECIPE_WOOD_HOE,
+    STR_RECIPE_STONE_HOE,
+    STR_RECIPE_IRON_HOE,
+    STR_RECIPE_GOLD_HOE,
+    STR_RECIPE_DIAMOND_HOE,
+    STR_RECIPE_HAY_BALE,
 
     STR_COUNT
 } StringId;
@@ -799,6 +950,16 @@ typedef struct {
     StringId nameId;
 } SmeltRecipe;
 
+// Trading system
+#define MAX_TRADES 16
+typedef struct {
+    uint8_t giveItem;       // Item the player gives
+    int giveCount;
+    uint8_t receiveItem;    // Item the player receives
+    int receiveCount;
+    StringId nameId;
+} Trade;
+
 //----------------------------------------------------------------------------------
 // Mob System
 //----------------------------------------------------------------------------------
@@ -811,6 +972,10 @@ typedef enum {
     MOB_SPIDER,
     MOB_SLIME,
     MOB_ENDERMAN,
+    MOB_COW,
+    MOB_SHEEP,
+    MOB_CHICKEN,
+    MOB_VILLAGER,
     MOB_TYPE_COUNT
 } MobType;
 
@@ -830,6 +995,10 @@ typedef struct {
     float attackTimer;  // cooldown for ranged attacks / creeper fuse
     float fuseTimer;    // creeper explosion fuse countdown
     float despawnTimer; // time-based despawn to prevent mob cap saturation
+    int slimeType;      // 0=large, 1=small (for slime splitting)
+    float loveTimer;    // >0 = in love mode, counts down
+    bool isBaby;        // true = baby mob (smaller, grows over time)
+    float growTimer;    // time until baby becomes adult
     bool active;
 } Mob;
 
@@ -852,6 +1021,7 @@ typedef struct {
     uint8_t inventory[INVENTORY_SLOTS];
     int inventoryCount[INVENTORY_SLOTS];
     int toolDurability[INVENTORY_SLOTS];
+    uint16_t itemEnchantments[INVENTORY_SLOTS];
     // Status
     int health;
     int hunger;
@@ -879,6 +1049,7 @@ typedef struct {
     // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
     uint8_t armor[4];
     int armorDurability[4];
+    uint16_t armorEnchantments[4];
     // Network control
     bool netControlled;      // true = driven by network input, not keyboard
     float moveInput;         // -1.0 to 1.0, used when netControlled
@@ -925,6 +1096,40 @@ typedef enum {
     STATE_HOST_WAITING,
     STATE_JOIN_GAME
 } GameState;
+
+typedef enum {
+    DIFFICULTY_PEACEFUL = 0,
+    DIFFICULTY_EASY,
+    DIFFICULTY_NORMAL,
+    DIFFICULTY_HARD,
+    DIFFICULTY_COUNT
+} Difficulty;
+
+typedef enum {
+    ACH_FIRST_STEPS = 0,    // Craft a wooden pickaxe
+    ACH_DEEP_DIG,           // Reach bedrock layer (y >= 240)
+    ACH_MONSTER_HUNTER,     // Kill 100 mobs
+    ACH_ARCHITECT,          // Place 1000 blocks
+    ACH_REDSTONE_ENGINEER,  // Build a working redstone circuit
+    ACH_COLLECTOR,          // Have 20 unique item types in inventory
+    ACH_COUNT
+} Achievement;
+
+// Enchantment types
+typedef enum {
+    ENCH_NONE = 0,
+    ENCH_SHARPNESS,         // +1.5 damage per level (swords)
+    ENCH_EFFICIENCY,        // +50% mining speed per level (tools)
+    ENCH_PROTECTION,        // +2% damage reduction per level (armor)
+    ENCH_FORTUNE,           // +15% chance per level for extra drop (pickaxes)
+    ENCH_UNBREAKING,        // 1/(level+1) chance to skip durability loss (all)
+    ENCH_COUNT
+} EnchantmentType;
+
+// Encode enchantment: type in low 8 bits, level (1-5) in high 4 bits
+#define ENCH_TYPE(e)        ((e) & 0xFF)
+#define ENCH_LEVEL(e)       (((e) >> 8) & 0xF)
+#define ENCH_PACK(t, l)     ((uint16_t)(((t) & 0xFF) | (((l) & 0xF) << 8)))
 
 typedef struct {
     bool exists;
@@ -1021,6 +1226,12 @@ extern float mobSpawnTimer;
 extern Particle particles[MAX_PARTICLES];
 extern ItemEntity entities[MAX_ENTITIES];
 extern GameState gameState;
+extern Difficulty gameDifficulty;
+
+// Achievement tracking
+extern bool achievements[ACH_COUNT];
+extern int totalMobsKilled;
+extern int totalBlocksPlaced;
 
 // Modified block tracking for multiplayer world sync
 #define MAX_MODIFIED_BLOCKS 16384
@@ -1049,9 +1260,11 @@ extern int confirmDialogMode; // 0=overwrite, 1=delete
 
 extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 extern Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
-extern Sound sndFootstep, sndZombie, sndPig, sndSplash;
+extern Sound sndFootstep, sndZombie, sndPig, sndSplash, sndVillager;
 extern Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
 extern Sound sndRain, sndCreeperFuse, sndThunder;
+extern Sound sndCaveDrip, sndCaveAmbient, sndWind;
+extern Sound sndPickup, sndBowFire;
 extern Music bgm;
 
 extern const BlockInfo blockInfo[BLOCK_COUNT];
@@ -1069,11 +1282,22 @@ extern uint8_t furnaceOutput;
 extern int furnaceOutputCount;
 extern float furnaceProgress;
 extern float furnaceFuelBurn;
+extern float furnaceFuelBurnMax;
+
+// Multi-furnace support
+extern FurnaceData furnaces[MAX_FURNACES];
+extern int furnaceCount;
+extern int activeFurnace;
+int FindFurnace(int x, int y);
+int GetOrCreateFurnace(int x, int y);
+void SyncFurnaceToActive(int idx);
+void SyncActiveToFurnace(int idx);
 
 // Drag-and-drop held item (shared between rendering.c and crafting.c)
 extern uint8_t heldItem;
 extern int heldCount;
 extern int heldDurability;
+extern uint16_t heldItemEnchant;
 
 // Crafting table state
 extern bool craftingTableOpen;
@@ -1087,6 +1311,12 @@ extern int chestCount;
 // Smelting recipes
 extern SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
 extern int smeltRecipeCount;
+
+// Trading
+extern Trade trades[MAX_TRADES];
+extern int tradeCount;
+extern bool tradeOpen;
+extern int villagerTradeIndex;
 
 // Weather
 extern WeatherState weather;
@@ -1121,12 +1351,27 @@ bool IsBlockSolid(int bx, int by);
 bool IsGravityBlock(uint8_t block);
 void ApplyGravityAt(int bx, int by);
 
+// Water flow system (world.c)
+void InitWater(void);
+int GetWaterLevel(int bx, int by);
+void SetWaterSource(int bx, int by);
+void RemoveWaterAt(int bx, int by);
+
+// Lava flow system (world.c)
+void InitLava(void);
+int GetLavaLevel(int bx, int by);
+void SetLavaSource(int bx, int by);
+void RemoveLavaAt(int bx, int by);
+
 // Redstone system (world.c)
 void InitRedstone(void);
 bool IsLeverOn(int bx, int by);
 void ToggleLever(int bx, int by);
 void UpdateRedstoneAt(int bx, int by);
 void UpdateRedstoneTick(void);
+void UpdateCrops(float dt);
+int GetCropGrowth(int bx, int by);
+void SetCropGrowth(int bx, int by, int stage);
 int GetRedstonePowerAt(int bx, int by);
 bool IsRedstoneLampPowered(int bx, int by);
 void RegisterPressurePlate(int bx, int by);
@@ -1148,8 +1393,11 @@ void InitPlayer(void);
 bool AddToInventory(BlockType item);
 int AddToInventoryCount(BlockType item, int count);
 float GetToolMiningSpeed(BlockType tool, BlockType block);
+bool CanToolMineBlock(BlockType tool, BlockType block);
 bool IsTool(BlockType item);
 bool IsSword(BlockType tool);
+bool IsPickaxe(BlockType tool);
+bool IsHoe(BlockType tool);
 float GetToolTier(BlockType tool);
 int GetSwordDamage(BlockType tool);
 int GetToolMaxDurability(BlockType tool);
@@ -1185,6 +1433,7 @@ Color GetSkyColor(void);
 
 // rendering.c
 void DrawWorld(void);
+void DrawFireEffects(float dt);
 void DrawWater(void);
 void DrawPlayerSprite(void);
 void DrawHotbar(void);
@@ -1224,8 +1473,11 @@ void Craft(int recipeIndex);
 void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad, bool showAdvanced);
 void InitSmeltingRecipes(void);
 int FindSmeltRecipe(BlockType input);
+void InitTrades(void);
+void DrawTradeUI(void);
 void DrawFurnaceUI(void);
 void ReturnFurnaceItems(void);
+float GetFuelBurnTime(uint8_t item);
 
 // mob.c
 void InitMobs(void);
@@ -1237,6 +1489,8 @@ void SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer);
 void UpdateProjectiles(float dt);
 void DrawProjectiles(void);
 void DamageMob(Mob *mob, int damage);
+int GetMobWidth(MobType type);
+int GetMobHeight(MobType type);
 bool IsPlayerNearMob(Mob *mob, float range);
 
 // sound.c
@@ -1259,7 +1513,10 @@ void PlaySoundSplash(void);
 void PlaySoundCreeperFuse(void);
 void PlaySoundThunder(void);
 void UpdateRainAmbient(void);
+void UpdateAmbientSounds(void);
 void PlaySoundMobAt(MobType type, float mobX, float mobY);
+void PlaySoundPickup(void);
+void PlaySoundBowFire(void);
 void SetSFXVolume(float volume);
 void UpdateBGM(void);
 void SetBGMVolume(float volume);
@@ -1271,6 +1528,7 @@ void SpawnDamageParticles(float x, float y, Color color);
 void SpawnSprintDust(float x, float y);
 void SpawnLandingDust(float x, float y, float intensity);
 void SpawnBubble(float x, float y);
+void SpawnFireParticle(float x, float y);
 void UpdateParticles(float dt);
 void DrawParticles(void);
 

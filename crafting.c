@@ -21,18 +21,21 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(BLOCK_PLANKS, 3, TOOL_WOOD_AXE, 1, STR_RECIPE_WOOD_AXE, false);
     ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SWORD, 1, STR_RECIPE_WOOD_SWORD, false);
     ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_SHOVEL, 1, STR_RECIPE_WOOD_SHOVEL, false);
+    ADD_RECIPE(BLOCK_PLANKS, 2, TOOL_WOOD_HOE, 1, STR_RECIPE_WOOD_HOE, false);
 
     // --- Stone tools ---
     ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_PICKAXE, 1, STR_RECIPE_STONE_PICK, false);
     ADD_RECIPE(BLOCK_COBBLESTONE, 3, TOOL_STONE_AXE, 1, STR_RECIPE_STONE_AXE, false);
     ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SWORD, 1, STR_RECIPE_STONE_SWORD, false);
     ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_SHOVEL, 1, STR_RECIPE_STONE_SHOVEL, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 2, TOOL_STONE_HOE, 1, STR_RECIPE_STONE_HOE, false);
 
     // --- Iron tools ---
     ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_PICKAXE, 1, STR_RECIPE_IRON_PICK, false);
     ADD_RECIPE(ITEM_IRON_INGOT, 3, TOOL_IRON_AXE, 1, STR_RECIPE_IRON_AXE, false);
     ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SWORD, 1, STR_RECIPE_IRON_SWORD, false);
     ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_SHOVEL, 1, STR_RECIPE_IRON_SHOVEL, false);
+    ADD_RECIPE(ITEM_IRON_INGOT, 2, TOOL_IRON_HOE, 1, STR_RECIPE_IRON_HOE, false);
 
     // --- Block crafting ---
     ADD_RECIPE(BLOCK_COBBLESTONE, 4, BLOCK_BRICK, 4, STR_RECIPE_BRICK, false);
@@ -44,8 +47,9 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(BLOCK_PLANKS, 8, BLOCK_CRAFTING_TABLE, 1, STR_RECIPE_CRAFTING_TABLE, false);
 
     // --- Food ---
-    ADD_RECIPE(BLOCK_PLANKS, 8, FOOD_BREAD, 1, STR_RECIPE_BREAD, false);
+    ADD_RECIPE(ITEM_WHEAT, 3, FOOD_BREAD, 1, STR_RECIPE_BREAD, false);
     ADD_RECIPE(BLOCK_LEAVES, 8, FOOD_APPLE, 1, STR_RECIPE_APPLE, false);
+    ADD_RECIPE(ITEM_WHEAT, 9, BLOCK_HAY_BALE, 1, STR_RECIPE_HAY_BALE, false);
 
     // --- Advanced recipes (require crafting table) ---
     // Wood armor
@@ -69,11 +73,13 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(ITEM_GOLD_INGOT, 3, TOOL_GOLD_AXE, 1, STR_RECIPE_GOLD_AXE, false);
     ADD_RECIPE(ITEM_GOLD_INGOT, 2, TOOL_GOLD_SWORD, 1, STR_RECIPE_GOLD_SWORD, false);
     ADD_RECIPE(ITEM_GOLD_INGOT, 2, TOOL_GOLD_SHOVEL, 1, STR_RECIPE_GOLD_SHOVEL, false);
+    ADD_RECIPE(ITEM_GOLD_INGOT, 2, TOOL_GOLD_HOE, 1, STR_RECIPE_GOLD_HOE, false);
     // --- Diamond tools ---
     ADD_RECIPE(ITEM_DIAMOND, 3, TOOL_DIAMOND_PICKAXE, 1, STR_RECIPE_DIAMOND_PICK, false);
     ADD_RECIPE(ITEM_DIAMOND, 3, TOOL_DIAMOND_AXE, 1, STR_RECIPE_DIAMOND_AXE, false);
     ADD_RECIPE(ITEM_DIAMOND, 2, TOOL_DIAMOND_SWORD, 1, STR_RECIPE_DIAMOND_SWORD, false);
     ADD_RECIPE(ITEM_DIAMOND, 2, TOOL_DIAMOND_SHOVEL, 1, STR_RECIPE_DIAMOND_SHOVEL, false);
+    ADD_RECIPE(ITEM_DIAMOND, 2, TOOL_DIAMOND_HOE, 1, STR_RECIPE_DIAMOND_HOE, false);
 
     // --- Gold armor ---
     ADD_RECIPE(ITEM_GOLD_INGOT, 5, ARMOR_GOLD_HELMET, 1, STR_RECIPE_GOLD_HELMET, true);
@@ -95,6 +101,8 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(BLOCK_BONE_BLOCK, 1, ITEM_BONE, 9, STR_RECIPE_BONE_BLOCK_DECOMP, false);
     ADD_RECIPE(BLOCK_PLANKS, 6, BLOCK_BOOKSHELF, 1, STR_RECIPE_BOOKSHELF, true);
     ADD_RECIPE(BLOCK_TORCH, 4, BLOCK_LANTERN, 1, STR_RECIPE_LANTERN, false);
+    ADD_RECIPE(ITEM_IRON_INGOT, 3, ITEM_BUCKET, 1, STR_RECIPE_BUCKET, false);
+    ADD_RECIPE(BLOCK_OBSIDIAN, 4, BLOCK_ENCHANTING_TABLE, 1, STR_RECIPE_ENCHANTING_TABLE, true);
     ADD_RECIPE(ITEM_STICK, 3, ITEM_BOW, 1, STR_RECIPE_BOW, false);
 
     // Redstone recipes
@@ -102,6 +110,9 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(BLOCK_COBBLESTONE, 1, BLOCK_LEVER, 1, STR_RECIPE_LEVER, false);
     ADD_RECIPE(BLOCK_STONE, 2, BLOCK_STONE_PRESSURE_PLATE, 1, STR_RECIPE_PRESSURE_PLATE, false);
     ADD_RECIPE(ITEM_REDSTONE, 4, BLOCK_REDSTONE_LAMP, 1, STR_RECIPE_REDSTONE_LAMP, true);
+
+    // Slimeball recipes
+    ADD_RECIPE(ITEM_SLIMEBALL, 2, ITEM_STRING, 3, STR_RECIPE_SLIMEBALL_STRING, false);
 
     #undef ADD_RECIPE
 }
@@ -117,6 +128,10 @@ void InitSmeltingRecipes(void)
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_REDSTONE_ORE, ITEM_REDSTONE, STR_SMELT_REDSTONE};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_LAPIS_ORE, ITEM_LAPIS, STR_SMELT_LAPIS};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_CLAY, BLOCK_BRICK, STR_SMELT_CLAY};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){BLOCK_ICE, BLOCK_WATER, STR_SMELT_ICE};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_BEEF, ITEM_COOKED_BEEF, STR_SMELT_BEEF};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_MUTTON, ITEM_COOKED_MUTTON, STR_SMELT_MUTTON};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_CHICKEN, ITEM_COOKED_CHICKEN, STR_SMELT_CHICKEN};
 }
 
 int FindSmeltRecipe(BlockType input)
@@ -125,6 +140,19 @@ int FindSmeltRecipe(BlockType input)
         if (smeltRecipes[i].input == input) return i;
     }
     return -1;
+}
+
+void InitTrades(void)
+{
+    tradeCount = 0;
+    trades[tradeCount++] = (Trade){ITEM_COAL, 5, ITEM_IRON_INGOT, 1, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_IRON_INGOT, 3, ITEM_DIAMOND, 1, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_WHEAT, 10, ITEM_COAL, 5, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_LEATHER, 4, ITEM_IRON_INGOT, 1, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_WOOL, 4, ITEM_STRING, 8, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_FEATHER, 4, ITEM_ARROW, 8, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_GOLD_INGOT, 1, ITEM_ENDER_PEARL, 1, STR_NONE};
+    trades[tradeCount++] = (Trade){ITEM_SLIMEBALL, 4, ITEM_REDSTONE, 4, STR_NONE};
 }
 
 bool CanCraft(int recipeIndex)
@@ -578,15 +606,15 @@ void DrawFurnaceUI(void)
             furnaceFuel = BLOCK_AIR;
             furnaceFuelCount = 0;
         } else if (heldItem != BLOCK_AIR && furnaceFuel == BLOCK_AIR) {
-            // Place fuel (only coal accepted)
-            if (heldItem == ITEM_COAL) {
+            // Place fuel
+            if (GetFuelBurnTime(heldItem) > 0.0f) {
                 furnaceFuel = heldItem;
                 furnaceFuelCount = heldCount;
                 heldItem = BLOCK_AIR;
                 heldCount = 0;
                 heldDurability = 0;
             }
-        } else if (heldItem != BLOCK_AIR && furnaceFuel == heldItem && heldItem == ITEM_COAL) {
+        } else if (heldItem != BLOCK_AIR && furnaceFuel == heldItem && GetFuelBurnTime(heldItem) > 0.0f) {
             // Stack fuel
             int space = 64 - furnaceFuelCount;
             int toAdd = heldCount > space ? space : heldCount;
@@ -641,5 +669,82 @@ void DrawFurnaceUI(void)
             furnaceOutputCount -= toAdd;
             if (furnaceOutputCount <= 0) { furnaceOutput = BLOCK_AIR; furnaceOutputCount = 0; }
         }
+    }
+}
+
+void DrawTradeUI(void)
+{
+    if (!tradeOpen) return;
+
+    int panelW = 350, panelH = 400;
+    int panelX = (SCREEN_WIDTH - panelW) / 2;
+    int panelY = (SCREEN_HEIGHT - panelH) / 2;
+
+    DrawRectangle(panelX, panelY, panelW, panelH, (Color){30, 28, 38, 240});
+    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){80, 70, 100, 200});
+
+    DrawGameText(S(STR_MOB_VILLAGER), panelX + panelW / 2 - 30, panelY + 10, 18, (Color){220, 200, 160, 255});
+
+    int slotH = 40, pad = 8;
+    int startY = panelY + 40;
+
+    for (int i = 0; i < tradeCount; i++) {
+        int ty = startY + i * (slotH + pad);
+        if (ty + slotH > panelY + panelH - 10) break;
+
+        bool hover = Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+                     GetMouseX() >= panelX + 10 && GetMouseX() <= panelX + panelW - 10 &&
+                     GetMouseY() >= ty && GetMouseY() <= ty + slotH;
+
+        Color bg = hover ? (Color){60, 55, 75, 255} : (Color){45, 42, 55, 255};
+        DrawRectangle(panelX + 10, ty, panelW - 20, slotH, bg);
+
+        // Give item
+        DrawGameText(TextFormat("%dx %s", trades[i].giveCount, GetBlockName((BlockType)trades[i].giveItem)),
+                     panelX + 20, ty + 8, 12, (Color){255, 120, 120, 255});
+
+        // Arrow
+        DrawGameText("->", panelX + panelW / 2 - 10, ty + 8, 12, (Color){200, 200, 200, 255});
+
+        // Receive item
+        DrawGameText(TextFormat("%dx %s", trades[i].receiveCount, GetBlockName((BlockType)trades[i].receiveItem)),
+                     panelX + panelW / 2 + 20, ty + 8, 12, (Color){120, 255, 120, 255});
+
+        // Execute trade on click
+        if (hover) {
+            // Check if player has enough of the give item
+            int have = 0;
+            for (int s = 0; s < INVENTORY_SLOTS; s++) {
+                if (player.inventory[s] == trades[i].giveItem) have += player.inventoryCount[s];
+            }
+            if (have >= trades[i].giveCount) {
+                // Remove give items
+                int remaining = trades[i].giveCount;
+                for (int s = 0; s < INVENTORY_SLOTS && remaining > 0; s++) {
+                    if (player.inventory[s] == trades[i].giveItem) {
+                        int take = remaining > player.inventoryCount[s] ? player.inventoryCount[s] : remaining;
+                        player.inventoryCount[s] -= take;
+                        remaining -= take;
+                        if (player.inventoryCount[s] <= 0) {
+                            player.inventory[s] = BLOCK_AIR;
+                            player.inventoryCount[s] = 0;
+                        }
+                    }
+                }
+                // Add receive items
+                AddToInventoryCount((BlockType)trades[i].receiveItem, trades[i].receiveCount);
+                PlaySoundCraft();
+                ShowMessage(Sf(STR_MSG_ATE, GetBlockName((BlockType)trades[i].receiveItem), trades[i].receiveCount), (Color){100, 255, 100, 255});
+            } else {
+                ShowMessage(S(STR_MSG_NOT_ENOUGH_XP), (Color){240, 80, 80, 255});
+            }
+        }
+    }
+
+    // Close button
+    if (Win32IsKeyPressed(KEY_ESCAPE) || Win32IsKeyPressed(KEY_E)) {
+        tradeOpen = false;
+        inventoryOpen = false;
+        gamePaused = false;
     }
 }

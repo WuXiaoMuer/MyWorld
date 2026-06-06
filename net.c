@@ -28,6 +28,7 @@ typedef struct {
     float lastSeen;         // Time of last packet from this client
     PktInput lastInput;     // Most recent input received
     struct sockaddr_in addr; // Client's address
+    uint16_t lastRecvSeq;   // Highest received sequence number
 } NetClient;
 
 //----------------------------------------------------------------------------------
@@ -53,6 +54,20 @@ typedef struct {
 
 static RecvPacket recvBuf[NET_RECV_BUF_SIZE];
 static int recvCount = 0;
+
+// Reliable packet retransmission buffer
+#define RELIABLE_BUF_SIZE 64
+typedef struct {
+    uint8_t data[NET_PACKET_MAX];
+    int size;
+    int destId;
+    uint16_t seq;
+    float sendTime;
+    bool active;
+} ReliablePacket;
+
+static ReliablePacket reliableBuf[RELIABLE_BUF_SIZE];
+static int reliableBufHead = 0;
 
 // Timing
 static double netStartTime = 0.0;
@@ -288,19 +303,32 @@ void NetSendTo(int playerId, const void *data, int size, bool reliable)
     if (netSocket == INVALID_SOCKET) return;
     if (playerId < 0 || playerId >= NET_MAX_PLAYERS) return;
     if (!netClients[playerId].active) return;
+    if (size < 1 || size > NET_PACKET_MAX - (int)sizeof(PacketHeader)) return;
 
     // Build packet with header
     uint8_t buf[NET_PACKET_MAX];
     PacketHeader *hdr = (PacketHeader *)buf;
     hdr->type = ((uint8_t *)data)[0];
     hdr->seq = reliable ? ++netSendSeq : 0;
-    hdr->ack = 0; // TODO: track received seqs for ACK
+    hdr->ack = netClients[playerId].lastRecvSeq;
     memcpy(buf + sizeof(PacketHeader), (uint8_t *)data + 1, size - 1);
 
     int totalSize = sizeof(PacketHeader) + size - 1;
     sendto(netSocket, (const char *)buf, totalSize, 0,
            (struct sockaddr *)&netClients[playerId].addr,
            sizeof(struct sockaddr_in));
+
+    // Store in retransmission buffer for reliable packets
+    if (reliable && hdr->seq > 0) {
+        ReliablePacket *rp = &reliableBuf[reliableBufHead];
+        memcpy(rp->data, buf, totalSize);
+        rp->size = totalSize;
+        rp->destId = playerId;
+        rp->seq = hdr->seq;
+        rp->sendTime = (float)GetNetTimeSeconds();
+        rp->active = true;
+        reliableBufHead = (reliableBufHead + 1) % RELIABLE_BUF_SIZE;
+    }
 }
 
 void NetSendToAll(const void *data, int size, bool reliable)
@@ -331,6 +359,7 @@ void NetPoll(void)
     socklen_t fromLen = sizeof(fromAddr);
 
     while (recvCount < NET_RECV_BUF_SIZE) {
+        fromLen = sizeof(fromAddr);
         int n = recvfrom(netSocket, (char *)buf, NET_PACKET_MAX, 0,
                          (struct sockaddr *)&fromAddr, &fromLen);
         if (n <= 0) break;
@@ -370,13 +399,40 @@ void NetPoll(void)
 
             if (fromId >= 0) {
                 netClients[fromId].lastSeen = NetGetTime();
+                // Track highest received sequence for ACK
+                if (hdr->seq > 0 && hdr->seq > netClients[fromId].lastRecvSeq) {
+                    netClients[fromId].lastRecvSeq = hdr->seq;
+                }
             }
         } else {
             // Client: packets come from server (slot 0)
             fromId = 0;
+            if (hdr->seq > 0 && hdr->seq > netClients[0].lastRecvSeq) {
+                netClients[0].lastRecvSeq = hdr->seq;
+            }
         }
 
         if (fromId < 0) continue;
+
+        // Process ACK: clear retransmission entries for acknowledged packets
+        if (hdr->ack > 0) {
+            for (int i = 0; i < RELIABLE_BUF_SIZE; i++) {
+                if (reliableBuf[i].active && reliableBuf[i].destId == fromId &&
+                    reliableBuf[i].seq <= hdr->ack) {
+                    reliableBuf[i].active = false;
+                }
+            }
+        }
+
+        // Duplicate detection: skip if we already received this sequence
+        if (hdr->seq > 0) {
+            bool duplicate = false;
+            // Check if this seq is older than or equal to what we've seen
+            if (hdr->seq <= netClients[fromId].lastRecvSeq - 32) {
+                duplicate = true; // Too old, likely duplicate
+            }
+            if (duplicate) continue;
+        }
 
         // Store in receive buffer
         recvBuf[recvCount].size = payloadSize + 1; // +1 for type byte
@@ -386,13 +442,29 @@ void NetPoll(void)
         recvCount++;
     }
 
+    // Retransmit reliable packets that haven't been ACKed
+    {
+        float now = (float)GetNetTimeSeconds();
+        for (int i = 0; i < RELIABLE_BUF_SIZE; i++) {
+            if (reliableBuf[i].active && (now - reliableBuf[i].sendTime) > 0.5f) {
+                // Resend
+                if (netClients[reliableBuf[i].destId].active) {
+                    sendto(netSocket, (const char *)reliableBuf[i].data, reliableBuf[i].size, 0,
+                           (struct sockaddr *)&netClients[reliableBuf[i].destId].addr,
+                           sizeof(struct sockaddr_in));
+                    reliableBuf[i].sendTime = now;
+                }
+            }
+        }
+    }
+
     // Timeout check for host
     if (netIsHost) {
         float now = NetGetTime();
         for (int i = 1; i < NET_MAX_PLAYERS; i++) {
             if (netClients[i].active && (now - netClients[i].lastSeen) > NET_TIMEOUT) {
                 netClients[i].active = false;
-                netClientCount--;
+                if (netClientCount > 0) netClientCount--;
             }
         }
     }

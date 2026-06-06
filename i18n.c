@@ -161,6 +161,21 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_FONT_NAME_BUILTIN] = "Built-in",
     [STR_FONT_NAME_LXGW] = "LXGW WenKai",
 
+    // Difficulty
+    [STR_DIFFICULTY] = "Difficulty",
+    [STR_DIFFICULTY_PEACEFUL] = "Peaceful",
+    [STR_DIFFICULTY_EASY] = "Easy",
+    [STR_DIFFICULTY_NORMAL] = "Normal",
+    [STR_DIFFICULTY_HARD] = "Hard",
+
+    // Achievements
+    [STR_ACH_FIRST_STEPS] = "First Steps - Craft a wooden pickaxe",
+    [STR_ACH_DEEP_DIG] = "Deep Dig - Reach the depths",
+    [STR_ACH_MONSTER_HUNTER] = "Monster Hunter - Slay 100 mobs",
+    [STR_ACH_ARCHITECT] = "Architect - Place 1000 blocks",
+    [STR_ACH_REDSTONE_ENGINEER] = "Redstone Engineer - Power a lamp",
+    [STR_ACH_COLLECTOR] = "Collector - Gather 20 item types",
+
     // Status Messages
     [STR_MSG_GAME_SAVED] = "Game Saved",
     [STR_MSG_HEALED_XP] = "Healed with XP!",
@@ -302,6 +317,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_PODZOL] = "Podzol",
     [STR_ITEM_SLIMEBALL] = "Slimeball",
     [STR_ITEM_ENDER_PEARL] = "Ender Pearl",
+    [STR_ITEM_BUCKET] = "Bucket",
+    [STR_ITEM_WATER_BUCKET] = "Water Bucket",
+    [STR_ITEM_LAVA_BUCKET] = "Lava Bucket",
+    [STR_BLOCK_LAVA] = "Lava",
+    [STR_BLOCK_OBSIDIAN] = "Obsidian",
+    [STR_BLOCK_ENCHANTING_TABLE] = "Enchanting Table",
     // Redstone blocks
     [STR_BLOCK_LEVER] = "Lever",
     [STR_BLOCK_REDSTONE_WIRE] = "Redstone Wire",
@@ -368,6 +389,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BONE_BLOCK_DECOMP] = "Bone Block -> 9 Bone",
     [STR_RECIPE_BOOKSHELF] = "6 Planks -> Bookshelf",
     [STR_RECIPE_LANTERN] = "4 Torches -> Lantern",
+    [STR_RECIPE_BUCKET] = "3 Iron Ingots -> Bucket",
+    [STR_RECIPE_ENCHANTING_TABLE] = "4 Obsidian + 2 Diamond -> Table",
     // Redstone recipes
     [STR_RECIPE_REDSTONE_WIRE] = "Redstone -> Wire",
     [STR_RECIPE_LEVER] = "Cobblestone -> Lever",
@@ -382,6 +405,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_REDSTONE] = "Redstone Ore -> Redstone",
     [STR_SMELT_LAPIS] = "Lapis Ore -> Lapis Lazuli",
     [STR_SMELT_CLAY] = "Clay -> Bricks",
+    [STR_SMELT_ICE] = "Ice -> Water",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "No fuel",
@@ -400,6 +424,84 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_JOIN_TITLE] = "Join Game",
     [STR_JOIN_IP_HINT] = "Enter host IP address:",
     [STR_JOIN_CONNECTING] = "Connecting...",
+
+    // Enchantment names
+    [STR_ENCH_SHARPNESS] = "Sharpness",
+    [STR_ENCH_EFFICIENCY] = "Efficiency",
+    [STR_ENCH_PROTECTION] = "Protection",
+    [STR_ENCH_FORTUNE] = "Fortune",
+    [STR_ENCH_UNBREAKING] = "Unbreaking",
+    [STR_ENCHANTED] = "Enchanted",
+
+    // Enchanting messages
+    [STR_MSG_ENCHANTED] = "Enchanted!",
+    [STR_MSG_ALREADY_ENCHANTED] = "Already enchanted",
+
+    // Tutorial and multiplayer
+    [STR_TUTORIAL_CONTROLS] = "WASD: Move | Space: Jump | LMB: Break | RMB: Place | E: Inventory",
+    [STR_NET_PLAYER_JOINED] = "Player joined!",
+    [STR_NET_PLAYER_LEFT] = "Player disconnected",
+    [STR_NET_HOST_DISCONNECTED] = "Host disconnected",
+
+    // Missing messages
+    [STR_MSG_NO_ARROWS] = "No arrows!",
+    [STR_DEATH_LAVA] = " tried to swim in lava",
+
+    // Ender pearl
+    [STR_MSG_ENDER_PEARL] = "Teleported!",
+    [STR_TYPE_TOOL] = "Tool",
+    [STR_TYPE_ARMOR] = "Armor",
+    [STR_TYPE_FOOD] = "Food",
+    [STR_TYPE_BLOCK] = "Block",
+    [STR_RECIPE_SLIMEBALL_STRING] = "Slimeball Fiber",
+
+    // Farming
+    [STR_TOOL_WOOD_HOE] = "Wood Hoe",
+    [STR_TOOL_STONE_HOE] = "Stone Hoe",
+    [STR_TOOL_IRON_HOE] = "Iron Hoe",
+    [STR_TOOL_GOLD_HOE] = "Gold Hoe",
+    [STR_TOOL_DIAMOND_HOE] = "Diamond Hoe",
+    [STR_ITEM_WHEAT_SEEDS] = "Wheat Seeds",
+    [STR_ITEM_WHEAT] = "Wheat",
+    [STR_BLOCK_FARMLAND] = "Farmland",
+    [STR_BLOCK_CROPS] = "Crops",
+    [STR_BLOCK_HAY_BALE] = "Hay Bale",
+    [STR_RECIPE_WOOD_HOE] = "Wood Hoe",
+    [STR_RECIPE_STONE_HOE] = "Stone Hoe",
+    [STR_RECIPE_IRON_HOE] = "Iron Hoe",
+    [STR_RECIPE_GOLD_HOE] = "Gold Hoe",
+    [STR_RECIPE_DIAMOND_HOE] = "Diamond Hoe",
+    [STR_RECIPE_BREAD] = "Bread",
+    [STR_RECIPE_HAY_BALE] = "Hay Bale",
+
+    // New mob deaths
+    [STR_DEATH_MOB_COW] = " was kicked by a cow",
+    [STR_DEATH_MOB_SHEEP] = " was rammed by a sheep",
+    [STR_DEATH_MOB_CHICKEN] = " was pecked to death",
+
+    // Mob names
+    [STR_MOB_PIG] = "Pig",
+    [STR_MOB_COW] = "Cow",
+    [STR_MOB_SHEEP] = "Sheep",
+    [STR_MOB_CHICKEN] = "Chicken",
+    [STR_MOB_VILLAGER] = "Villager",
+
+    // Animal drops
+    [STR_ITEM_RAW_BEEF] = "Raw Beef",
+    [STR_ITEM_LEATHER] = "Leather",
+    [STR_ITEM_RAW_MUTTON] = "Raw Mutton",
+    [STR_ITEM_WOOL] = "Wool",
+    [STR_ITEM_RAW_CHICKEN] = "Raw Chicken",
+    [STR_ITEM_FEATHER] = "Feather",
+    [STR_ITEM_EGG] = "Egg",
+    [STR_ITEM_COOKED_BEEF] = "Cooked Beef",
+    [STR_ITEM_COOKED_MUTTON] = "Cooked Mutton",
+    [STR_ITEM_COOKED_CHICKEN] = "Cooked Chicken",
+
+    // Smelt recipes
+    [STR_SMELT_BEEF] = "Cook Beef",
+    [STR_SMELT_MUTTON] = "Cook Mutton",
+    [STR_SMELT_CHICKEN] = "Cook Chicken",
 },
 
 // ===== SIMPLIFIED CHINESE =====
@@ -524,6 +626,21 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Font names
     [STR_FONT_NAME_BUILTIN] = "内置",
     [STR_FONT_NAME_LXGW] = "LXGW WenKai",
+
+    // Difficulty
+    [STR_DIFFICULTY] = "难度",
+    [STR_DIFFICULTY_PEACEFUL] = "和平",
+    [STR_DIFFICULTY_EASY] = "简单",
+    [STR_DIFFICULTY_NORMAL] = "普通",
+    [STR_DIFFICULTY_HARD] = "困难",
+
+    // Achievements
+    [STR_ACH_FIRST_STEPS] = "初出茅庐 - 制作木镐",
+    [STR_ACH_DEEP_DIG] = "深入地底 - 到达基岩层",
+    [STR_ACH_MONSTER_HUNTER] = "怪物猎人 - 击杀100只怪物",
+    [STR_ACH_ARCHITECT] = "建筑师 - 放置1000个方块",
+    [STR_ACH_REDSTONE_ENGINEER] = "红石工程师 - 点亮红石灯",
+    [STR_ACH_COLLECTOR] = "收藏家 - 收集20种物品",
 
     [STR_MSG_GAME_SAVED] = "游戏已保存",     // 游戏已保存
     [STR_MSG_HEALED_XP] = "用XP治疗了!",         // 用XP治疗了!
@@ -663,6 +780,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_PODZOL] = "灰化土",
     [STR_ITEM_SLIMEBALL] = "粘液球",
     [STR_ITEM_ENDER_PEARL] = "末影珍珠",
+    [STR_ITEM_BUCKET] = "铁桶",
+    [STR_ITEM_WATER_BUCKET] = "水桶",
+    [STR_ITEM_LAVA_BUCKET] = "岩浆桶",
+    [STR_BLOCK_LAVA] = "岩浆",
+    [STR_BLOCK_OBSIDIAN] = "黑曜石",
+    [STR_BLOCK_ENCHANTING_TABLE] = "附魔台",
     // Redstone blocks
     [STR_BLOCK_LEVER] = "拉杆",
     [STR_BLOCK_REDSTONE_WIRE] = "红石线",
@@ -728,6 +851,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BONE_BLOCK_DECOMP] = "骨块 -> 9骨头",
     [STR_RECIPE_BOOKSHELF] = "6木板 -> 书架",
     [STR_RECIPE_LANTERN] = "4火把 -> 灯笼",
+    [STR_RECIPE_BUCKET] = "3铁锭 -> 铁桶",
+    [STR_RECIPE_ENCHANTING_TABLE] = "4黑曜石+2钻石 -> 附魔台",
     // Redstone recipes
     [STR_RECIPE_REDSTONE_WIRE] = "红石 -> 红石线",
     [STR_RECIPE_LEVER] = "圆石 -> 拉杆",
@@ -741,6 +866,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_REDSTONE] = "红石矿 -> 红石",
     [STR_SMELT_LAPIS] = "青金石矿 -> 青金石",
     [STR_SMELT_CLAY] = "粘土 -> 砖块",
+    [STR_SMELT_ICE] = "冰 -> 水",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "没有燃料",
@@ -759,6 +885,84 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_JOIN_TITLE] = "加入游戏",
     [STR_JOIN_IP_HINT] = "输入主机IP地址:",
     [STR_JOIN_CONNECTING] = "连接中...",
+
+    // Enchantment names
+    [STR_ENCH_SHARPNESS] = "锋利",
+    [STR_ENCH_EFFICIENCY] = "效率",
+    [STR_ENCH_PROTECTION] = "保护",
+    [STR_ENCH_FORTUNE] = "时运",
+    [STR_ENCH_UNBREAKING] = "耐久",
+    [STR_ENCHANTED] = "已附魔",
+
+    // Enchanting messages
+    [STR_MSG_ENCHANTED] = "附魔成功！",
+    [STR_MSG_ALREADY_ENCHANTED] = "已经附魔过了",
+
+    // Tutorial and multiplayer
+    [STR_TUTORIAL_CONTROLS] = "WASD: 移动 | 空格: 跳跃 | 左键: 挖掘 | 右键: 放置 | E: 背包",
+    [STR_NET_PLAYER_JOINED] = "玩家加入了！",
+    [STR_NET_PLAYER_LEFT] = "玩家断开连接",
+    [STR_NET_HOST_DISCONNECTED] = "主机断开连接",
+
+    // Missing messages
+    [STR_MSG_NO_ARROWS] = "没有箭！",
+    [STR_DEATH_LAVA] = " 在岩浆中游泳了",
+
+    // Ender pearl
+    [STR_MSG_ENDER_PEARL] = "已传送！",
+    [STR_TYPE_TOOL] = "工具",
+    [STR_TYPE_ARMOR] = "盔甲",
+    [STR_TYPE_FOOD] = "食物",
+    [STR_TYPE_BLOCK] = "方块",
+    [STR_RECIPE_SLIMEBALL_STRING] = "粘液球纤维",
+
+    // Farming
+    [STR_TOOL_WOOD_HOE] = "木锄",
+    [STR_TOOL_STONE_HOE] = "石锄",
+    [STR_TOOL_IRON_HOE] = "铁锄",
+    [STR_TOOL_GOLD_HOE] = "金锄",
+    [STR_TOOL_DIAMOND_HOE] = "钻石锄",
+    [STR_ITEM_WHEAT_SEEDS] = "小麦种子",
+    [STR_ITEM_WHEAT] = "小麦",
+    [STR_BLOCK_FARMLAND] = "耕地",
+    [STR_BLOCK_CROPS] = "农作物",
+    [STR_BLOCK_HAY_BALE] = "干草块",
+    [STR_RECIPE_WOOD_HOE] = "木锄",
+    [STR_RECIPE_STONE_HOE] = "石锄",
+    [STR_RECIPE_IRON_HOE] = "铁锄",
+    [STR_RECIPE_GOLD_HOE] = "金锄",
+    [STR_RECIPE_DIAMOND_HOE] = "钻石锄",
+    [STR_RECIPE_BREAD] = "面包",
+    [STR_RECIPE_HAY_BALE] = "干草块",
+
+    // New mob deaths
+    [STR_DEATH_MOB_COW] = "被牛踢死了",
+    [STR_DEATH_MOB_SHEEP] = "被羊撞死了",
+    [STR_DEATH_MOB_CHICKEN] = "被鸡啄死了",
+
+    // Mob names
+    [STR_MOB_PIG] = "猪",
+    [STR_MOB_COW] = "牛",
+    [STR_MOB_SHEEP] = "羊",
+    [STR_MOB_CHICKEN] = "鸡",
+    [STR_MOB_VILLAGER] = "村民",
+
+    // Animal drops
+    [STR_ITEM_RAW_BEEF] = "生牛肉",
+    [STR_ITEM_LEATHER] = "皮革",
+    [STR_ITEM_RAW_MUTTON] = "生羊肉",
+    [STR_ITEM_WOOL] = "羊毛",
+    [STR_ITEM_RAW_CHICKEN] = "生鸡肉",
+    [STR_ITEM_FEATHER] = "羽毛",
+    [STR_ITEM_EGG] = "鸡蛋",
+    [STR_ITEM_COOKED_BEEF] = "熟牛肉",
+    [STR_ITEM_COOKED_MUTTON] = "熟羊肉",
+    [STR_ITEM_COOKED_CHICKEN] = "熟鸡肉",
+
+    // Smelt recipes
+    [STR_SMELT_BEEF] = "烤牛肉",
+    [STR_SMELT_MUTTON] = "烤羊肉",
+    [STR_SMELT_CHICKEN] = "烤鸡肉",
 },
 
 // ===== JAPANESE =====
@@ -883,6 +1087,21 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Font names
     [STR_FONT_NAME_BUILTIN] = "標準",
     [STR_FONT_NAME_LXGW] = "LXGW WenKai",
+
+    // Difficulty
+    [STR_DIFFICULTY] = "難易度",
+    [STR_DIFFICULTY_PEACEFUL] = "ピースフル",
+    [STR_DIFFICULTY_EASY] = "イージー",
+    [STR_DIFFICULTY_NORMAL] = "ノーマル",
+    [STR_DIFFICULTY_HARD] = "ハード",
+
+    // Achievements
+    [STR_ACH_FIRST_STEPS] = "第一歩 - 木のピッケルをクラフト",
+    [STR_ACH_DEEP_DIG] = "深掘り - 岩盤層に到達",
+    [STR_ACH_MONSTER_HUNTER] = "モンスターハンター - 100体討伐",
+    [STR_ACH_ARCHITECT] = "建築家 - 1000ブロック設置",
+    [STR_ACH_REDSTONE_ENGINEER] = "レッドストーン技師 - ランプ点灯",
+    [STR_ACH_COLLECTOR] = "コレクター - 20種類のアイテム収集",
 
     [STR_MSG_GAME_SAVED] = "セーブしました",  // セーブしました
     [STR_MSG_HEALED_XP] = "XPで治癒しました!",  // XPで治療しました!
@@ -1022,6 +1241,12 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_BLOCK_PODZOL] = "ポドゾル",
     [STR_ITEM_SLIMEBALL] = "スライムボール",
     [STR_ITEM_ENDER_PEARL] = "エンダーパール",
+    [STR_ITEM_BUCKET] = "バケツ",
+    [STR_ITEM_WATER_BUCKET] = "水入りバケツ",
+    [STR_ITEM_LAVA_BUCKET] = "溶岩入りバケツ",
+    [STR_BLOCK_LAVA] = "溶岩",
+    [STR_BLOCK_OBSIDIAN] = "黒曜石",
+    [STR_BLOCK_ENCHANTING_TABLE] = "エンチャント台",
     // Redstone blocks
     [STR_BLOCK_LEVER] = "レバー",
     [STR_BLOCK_REDSTONE_WIRE] = "レッドストーン線",
@@ -1087,6 +1312,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BONE_BLOCK_DECOMP] = "骨ブロック -> 骨×9",
     [STR_RECIPE_BOOKSHELF] = "板×6 -> 本棚",
     [STR_RECIPE_LANTERN] = "松明×4 -> ランタン",
+    [STR_RECIPE_BUCKET] = "鉄インゴット×3 -> バケツ",
+    [STR_RECIPE_ENCHANTING_TABLE] = "黒曜石×4+ダイヤ×2 -> エンチャント台",
     // Redstone recipes
     [STR_RECIPE_REDSTONE_WIRE] = "レッドストーン -> 線",
     [STR_RECIPE_LEVER] = "丸石 -> レバー",
@@ -1100,6 +1327,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_REDSTONE] = "レッドストーン鉱石 -> レッドストーン",
     [STR_SMELT_LAPIS] = "ラピスラズリ鉱石 -> ラピスラズリ",
     [STR_SMELT_CLAY] = "粘土 -> レンガ",
+    [STR_SMELT_ICE] = "氷 -> 水",
 
     // Furnace messages
     [STR_MSG_NO_FUEL] = "燃料がない",
@@ -1118,6 +1346,84 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_JOIN_TITLE] = "ゲーム参加",
     [STR_JOIN_IP_HINT] = "ホストのIPアドレスを入力:",
     [STR_JOIN_CONNECTING] = "接続中...",
+
+    // Enchantment names
+    [STR_ENCH_SHARPNESS] = "鋭さ",
+    [STR_ENCH_EFFICIENCY] = "効率",
+    [STR_ENCH_PROTECTION] = "保護",
+    [STR_ENCH_FORTUNE] = "幸運",
+    [STR_ENCH_UNBREAKING] = "耐久力",
+    [STR_ENCHANTED] = "エンチャント済み",
+
+    // Enchanting messages
+    [STR_MSG_ENCHANTED] = "エンチャント成功！",
+    [STR_MSG_ALREADY_ENCHANTED] = "既にエンチャント済み",
+
+    // Tutorial and multiplayer
+    [STR_TUTORIAL_CONTROLS] = "WASD: 移動 | スペース: ジャンプ | 左クリック: 採掘 | 右クリック: 設置 | E: インベントリ",
+    [STR_NET_PLAYER_JOINED] = "プレイヤーが参加しました！",
+    [STR_NET_PLAYER_LEFT] = "プレイヤーが切断しました",
+    [STR_NET_HOST_DISCONNECTED] = "ホストが切断しました",
+
+    // Missing messages
+    [STR_MSG_NO_ARROWS] = "矢がありません！",
+    [STR_DEATH_LAVA] = "は溶岩で泳ごうとした",
+
+    // Ender pearl
+    [STR_MSG_ENDER_PEARL] = "テレポート！",
+    [STR_TYPE_TOOL] = "道具",
+    [STR_TYPE_ARMOR] = "防具",
+    [STR_TYPE_FOOD] = "食べ物",
+    [STR_TYPE_BLOCK] = "ブロック",
+    [STR_RECIPE_SLIMEBALL_STRING] = "スライムボール繊維",
+
+    // Farming
+    [STR_TOOL_WOOD_HOE] = "木のクワ",
+    [STR_TOOL_STONE_HOE] = "石のクワ",
+    [STR_TOOL_IRON_HOE] = "鉄のクワ",
+    [STR_TOOL_GOLD_HOE] = "金のクワ",
+    [STR_TOOL_DIAMOND_HOE] = "ダイヤのクワ",
+    [STR_ITEM_WHEAT_SEEDS] = "小麦の種",
+    [STR_ITEM_WHEAT] = "小麦",
+    [STR_BLOCK_FARMLAND] = "耕地",
+    [STR_BLOCK_CROPS] = "作物",
+    [STR_BLOCK_HAY_BALE] = "干草の俵",
+    [STR_RECIPE_WOOD_HOE] = "木のクワ",
+    [STR_RECIPE_STONE_HOE] = "石のクワ",
+    [STR_RECIPE_IRON_HOE] = "鉄のクワ",
+    [STR_RECIPE_GOLD_HOE] = "金のクワ",
+    [STR_RECIPE_DIAMOND_HOE] = "ダイヤのクワ",
+    [STR_RECIPE_BREAD] = "パン",
+    [STR_RECIPE_HAY_BALE] = "干草の俵",
+
+    // New mob deaths
+    [STR_DEATH_MOB_COW] = "は牛に蹴られた",
+    [STR_DEATH_MOB_SHEEP] = "は羊に突かれた",
+    [STR_DEATH_MOB_CHICKEN] = "は鶏に突かれ死んだ",
+
+    // Mob names
+    [STR_MOB_PIG] = "豚",
+    [STR_MOB_COW] = "牛",
+    [STR_MOB_SHEEP] = "羊",
+    [STR_MOB_CHICKEN] = "鶏",
+    [STR_MOB_VILLAGER] = "村人",
+
+    // Animal drops
+    [STR_ITEM_RAW_BEEF] = "生の牛肉",
+    [STR_ITEM_LEATHER] = "革",
+    [STR_ITEM_RAW_MUTTON] = "生の羊肉",
+    [STR_ITEM_WOOL] = "羊毛",
+    [STR_ITEM_RAW_CHICKEN] = "生の鶏肉",
+    [STR_ITEM_FEATHER] = "羽",
+    [STR_ITEM_EGG] = "卵",
+    [STR_ITEM_COOKED_BEEF] = "焼いた牛肉",
+    [STR_ITEM_COOKED_MUTTON] = "焼いた羊肉",
+    [STR_ITEM_COOKED_CHICKEN] = "焼いた鶏肉",
+
+    // Smelt recipes
+    [STR_SMELT_BEEF] = "牛肉を焼く",
+    [STR_SMELT_MUTTON] = "羊肉を焼く",
+    [STR_SMELT_CHICKEN] = "鶏肉を焼く",
 },
 };
 

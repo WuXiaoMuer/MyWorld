@@ -54,6 +54,9 @@ dkms.conf
 # Compiled Resource files
 *.res
 
+# Build output
+build/
+
 # Stray Windows null redirect
 NUL
 

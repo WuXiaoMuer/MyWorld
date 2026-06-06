@@ -1,6 +1,7 @@
 #include "types.h"
 #include <math.h>
 #include <string.h>
+#include <stdlib.h>
 
 //----------------------------------------------------------------------------------
 // Block Info Table
@@ -40,14 +41,17 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Wood Axe",    {180,140,80,255},   {140,100,50,255},   false, false, false},
     {"Wood Sword",  {180,140,80,255},   {140,100,50,255},   false, false, false},
     {"Wood Shovel", {180,140,80,255},   {140,100,50,255},   false, false, false},
+    {"Wood Hoe",    {180,140,80,255},   {140,100,50,255},   false, false, false},
     {"Stone Pick",  {128,128,128,255},  {100,100,100,255},  false, false, false},
     {"Stone Axe",   {128,128,128,255},  {100,100,100,255},  false, false, false},
     {"Stone Sword", {128,128,128,255},  {100,100,100,255},  false, false, false},
     {"Stone Shovel",{128,128,128,255},  {100,100,100,255},  false, false, false},
+    {"Stone Hoe",   {128,128,128,255},  {100,100,100,255},  false, false, false},
     {"Iron Pick",   {200,180,160,255},  {170,150,130,255},  false, false, false},
     {"Iron Axe",    {200,180,160,255},  {170,150,130,255},  false, false, false},
     {"Iron Sword",  {200,180,160,255},  {170,150,130,255},  false, false, false},
     {"Iron Shovel", {200,180,160,255},  {170,150,130,255},  false, false, false},
+    {"Iron Hoe",    {200,180,160,255},  {170,150,130,255},  false, false, false},
     // Food (not placeable, not solid)
     {"Raw Pork",    {200,130,130,255},  {170,100,100,255},  false, false, false},
     {"Cooked Pork", {180,100,60,255},   {150,70,40,255},    false, false, false},
@@ -85,11 +89,13 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Gold Axe",    {220,180,50,255},  {180,140,30,255},  false, false, false},
     {"Gold Sword",  {220,180,50,255},  {180,140,30,255},  false, false, false},
     {"Gold Shovel", {220,180,50,255},  {180,140,30,255},  false, false, false},
+    {"Gold Hoe",    {220,180,50,255},  {180,140,30,255},  false, false, false},
     // Diamond tools
     {"Diamond Pick",   {80,220,230,255}, {50,180,200,255}, false, false, false},
     {"Diamond Axe",    {80,220,230,255}, {50,180,200,255}, false, false, false},
     {"Diamond Sword",  {80,220,230,255}, {50,180,200,255}, false, false, false},
     {"Diamond Shovel", {80,220,230,255}, {50,180,200,255}, false, false, false},
+    {"Diamond Hoe",    {80,220,230,255}, {50,180,200,255}, false, false, false},
     // Gold armor
     {"Gold Helmet",    {220,180,50,255},  {180,140,30,255}, false, false, false},
     {"Gold Chest",     {220,180,50,255},  {180,140,30,255}, false, false, false},
@@ -129,11 +135,37 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     // Phase 1: New items
     {"Slimeball",    {120,200,80,255}, {90,170,60,255},   false, false, false},
     {"Ender Pearl",  {20,20,30,255},   {120,80,200,255},  false, false, false},
+    // Farming
+    {"Wheat Seeds",  {180,160,80,255}, {150,130,60,255},  false, false, false},
+    {"Wheat",        {200,180,80,255}, {170,150,60,255},  false, false, false},
+    {"Farmland",     {120,85,55,255},  {100,70,45,255},   true,  false, true},
+    {"Crops",        {80,180,40,255},  {60,140,30,255},   false, true,  true},
+    {"Hay Bale",     {180,160,60,255}, {150,130,40,255},  true,  false, true},
+    // Animal drops
+    {"Raw Beef",     {180,60,60,255},  {140,40,40,255},   false, false, false},
+    {"Leather",      {160,100,60,255}, {130,80,40,255},   false, false, false},
+    {"Raw Mutton",   {180,80,80,255},  {150,60,60,255},   false, false, false},
+    {"Wool",         {220,220,220,255},{200,200,200,255}, false, false, false},
+    {"Raw Chicken",  {200,150,130,255},{170,120,100,255}, false, false, false},
+    {"Feather",      {230,230,230,255},{210,210,210,255}, false, false, false},
+    {"Egg",          {230,220,200,255},{210,200,180,255}, false, false, false},
+    {"Cooked Beef",  {140,80,40,255},  {110,60,30,255},   false, false, false},
+    {"Cooked Mutton",{140,70,50,255},  {110,50,40,255},   false, false, false},
+    {"Cooked Chkn",  {160,120,80,255}, {130,90,60,255},   false, false, false},
+    // Utility items
+    {"Bucket",       {160,160,160,255},{120,120,120,255}, false, false, false},
+    {"Water Bucket", {40,100,200,255}, {30,80,180,255},   false, false, false},
     // Redstone blocks
     {"Lever",            {100,100,100,255}, {60,60,60,255},     false, true,  true},
     {"Redstone Wire",    {200,30,30,255},   {150,20,20,255},    false, true,  true},
     {"Redstone Lamp",    {220,180,60,255},  {180,140,40,255},   true,  false, true},
     {"Pressure Plate",   {130,130,130,255}, {100,100,100,255},  false, true,  true},
+    // Lava system
+    {"Lava",          {200,80,20,200},  {240,120,30,200},  false, true,  false},
+    {"Obsidian",      {30,20,40,255},   {60,40,80,255},    true,  false, true},
+    {"Lava Bucket",   {200,80,20,255},  {240,120,30,255},  false, false, false},
+    // Enchanting
+    {"Enchant Table", {80,50,120,255},  {120,80,180,255},  true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -296,6 +328,75 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             for (int x = 0; x < 16; x++) {
                 Color c = base;
                 if ((y + (int)(sinf(x * 0.5f) * 1.5f)) % 6 == 0) c = detail;
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_LAVA:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 77);
+                if (h % 5 == 0) c = detail;
+                else if (h % 11 == 0) c = (Color){255, 200, 50, 220};
+                // Bright hot spots
+                if ((x + y) % 8 == 0 && h % 3 == 0) c = (Color){255, 180, 60, 240};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_OBSIDIAN:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 99);
+                if (h % 7 == 0) c = detail;
+                else if (h % 13 == 0) c = (Color){50, 30, 70, 255};
+                // Purple sheen
+                if ((x == 4 && y == 4) || (x == 11 && y == 10)) c = (Color){80, 50, 120, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_LAVA_BUCKET:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (y >= 4 && y <= 14 && x >= 4 && x <= 11) {
+                    c = base;
+                    if (x == 4 || x == 11) c = detail;
+                    if (y == 4 || y == 14) c = detail;
+                    if (y >= 2 && y <= 5 && x >= 6 && x <= 9) c = detail;
+                    if (y == 2 && (x == 6 || x == 9)) c = (Color){0, 0, 0, 0};
+                    // Lava inside
+                    if (y >= 6 && y <= 12 && x >= 5 && x <= 10) {
+                        c = (Color){220, 100, 20, 255};
+                        if (y == 6) c = (Color){240, 150, 40, 255};
+                    }
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_ENCHANTING_TABLE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 55);
+                // Stone base
+                if (y >= 10) {
+                    c = (Color){80, 80, 80, 255};
+                    if (h % 5 == 0) c = (Color){60, 60, 60, 255};
+                }
+                // Purple book on top
+                if (y >= 3 && y <= 9 && x >= 3 && x <= 12) {
+                    c = detail;
+                    if (x == 7 || x == 8) c = (Color){60, 30, 90, 255}; // spine
+                    // Glowing runes
+                    if ((x + y) % 4 == 0 && h % 3 == 0) c = (Color){180, 120, 255, 255};
+                }
+                // Gold corner accents
+                if ((y == 10 || y == 11) && (x == 2 || x == 13)) c = (Color){220, 180, 60, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -937,6 +1038,27 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             for (int x = 5; x < 11; x++) {
                 ImageDrawPixel(img, px + x, py + y, (y < 2) ? tc : th);
             }
+        // Grip
+        ImageDrawPixel(img, px + 7, py + 14, (Color){80, 55, 20, 255});
+        ImageDrawPixel(img, px + 8, py + 14, (Color){80, 55, 20, 255});
+        break;
+    }
+    case TOOL_WOOD_HOE:
+    case TOOL_STONE_HOE:
+    case TOOL_IRON_HOE:
+    case TOOL_GOLD_HOE:
+    case TOOL_DIAMOND_HOE: {
+        Color tc = base; Color th = detail;
+        // Handle
+        for (int y = 3; y < 14; y++) {
+            ImageDrawPixel(img, px + 7, py + y, (Color){120, 80, 30, 255});
+            ImageDrawPixel(img, px + 8, py + y, (Color){100, 65, 20, 255});
+        }
+        // Hoe blade (horizontal at top)
+        for (int x = 4; x < 12; x++) {
+            ImageDrawPixel(img, px + x, py + 2, tc);
+            ImageDrawPixel(img, px + x, py + 3, th);
+        }
         // Grip
         ImageDrawPixel(img, px + 7, py + 14, (Color){80, 55, 20, 255});
         ImageDrawPixel(img, px + 8, py + 14, (Color){80, 55, 20, 255});
@@ -1593,6 +1715,46 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case ITEM_BUCKET: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Bucket body
+                if (y >= 4 && y <= 14 && x >= 4 && x <= 11) {
+                    c = base;
+                    if (x == 4 || x == 11) c = detail;
+                    if (y == 4 || y == 14) c = detail;
+                    // Handle
+                    if (y >= 2 && y <= 5 && x >= 6 && x <= 9) c = detail;
+                    if (y == 2 && (x == 6 || x == 9)) c = (Color){0, 0, 0, 0};
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+    case ITEM_WATER_BUCKET: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Bucket body
+                if (y >= 4 && y <= 14 && x >= 4 && x <= 11) {
+                    c = base;
+                    if (x == 4 || x == 11) c = detail;
+                    if (y == 4 || y == 14) c = detail;
+                    // Handle
+                    if (y >= 2 && y <= 5 && x >= 6 && x <= 9) c = detail;
+                    if (y == 2 && (x == 6 || x == 9)) c = (Color){0, 0, 0, 0};
+                    // Water inside
+                    if (y >= 6 && y <= 12 && x >= 5 && x <= 10) {
+                        c = (Color){60, 140, 220, 255};
+                        if (y == 6) c = (Color){80, 160, 240, 255};
+                    }
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
     case BLOCK_LEVER:
         // Stone base with a stick lever
         for (int y = 0; y < 16; y++)
@@ -1679,7 +1841,211 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    // Farming blocks
+    case BLOCK_FARMLAND:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 80);
+                Color c = base;
+                if (h % 7 == 0) c = detail;
+                // Furrow lines
+                if (y % 4 == 0) c = (Color){100, 70, 45, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_CROPS:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Green crop stalks
+                if (x >= 3 && x <= 5 && y >= 4 && y <= 14) {
+                    c = (Color){80, 180, 40, 255};
+                    if (y % 3 == 0) c = (Color){60, 150, 30, 255};
+                }
+                if (x >= 10 && x <= 12 && y >= 4 && y <= 14) {
+                    c = (Color){80, 180, 40, 255};
+                    if (y % 3 == 0) c = (Color){60, 150, 30, 255};
+                }
+                // Wheat tops
+                if (y >= 2 && y <= 5 && ((x >= 2 && x <= 6) || (x >= 9 && x <= 13))) {
+                    c = (Color){200, 180, 80, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_HAY_BALE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 81);
+                Color c = base;
+                if (h % 5 == 0) c = detail;
+                // Hay strand lines
+                if (y % 3 == 0) c = (Color){160, 140, 40, 255};
+                if (x % 4 == 0) c = (Color){170, 150, 50, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    // Animal drop items (small icons)
+    case ITEM_RAW_BEEF:
+    case ITEM_COOKED_BEEF:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Steak shape
+                if ((x-8)*(x-8) + (y-8)*(y-8) <= 36) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 82);
+                    if (h % 4 == 0) c = detail;
+                    // Fat marbling
+                    if ((x + y) % 5 == 0) c = (Color){220, 200, 180, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_LEATHER:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Leather hide shape
+                if (x >= 2 && x <= 13 && y >= 3 && y <= 12) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 83);
+                    if (h % 6 == 0) c = detail;
+                    // Stitching marks
+                    if ((x == 4 || x == 11) && y % 2 == 0) c = (Color){100, 60, 30, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_RAW_MUTTON:
+    case ITEM_COOKED_MUTTON:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Chop shape
+                if ((x-8)*(x-8) + (y-8)*(y-8) <= 30) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 84);
+                    if (h % 5 == 0) c = detail;
+                    // Bone
+                    if (x >= 10 && x <= 12 && y >= 5 && y <= 11)
+                        c = (Color){230, 220, 200, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_WOOL:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x, y, 85);
+                Color c = base;
+                if (h % 4 == 0) c = detail;
+                // Fluffy texture
+                if (h % 7 == 0) c = (Color){250, 250, 250, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_RAW_CHICKEN:
+    case ITEM_COOKED_CHICKEN:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Drumstick shape
+                if ((x-8)*(x-8) + (y-8)*(y-8) <= 25) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 86);
+                    if (h % 5 == 0) c = detail;
+                }
+                // Bone
+                if (x >= 10 && x <= 12 && y >= 3 && y <= 7)
+                    c = (Color){230, 220, 200, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_FEATHER:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Feather quill
+                if (x >= 7 && x <= 8 && y >= 2 && y <= 14)
+                    c = (Color){180, 170, 160, 255};
+                // Feather barbs
+                if (y >= 4 && y <= 12) {
+                    if (x >= 4 && x <= 6) c = (Color){240, 240, 240, 200};
+                    if (x >= 9 && x <= 11) c = (Color){240, 240, 240, 200};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_EGG:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Egg shape (slightly oval)
+                float dx = (x - 8) / 5.0f, dy = (y - 8) / 6.0f;
+                if (dx*dx + dy*dy <= 1.0f) {
+                    c = base;
+                    unsigned int h = hash2D(x, y, 87);
+                    if (h % 8 == 0) c = (Color){240, 230, 210, 255};
+                    // Highlight
+                    if (x >= 5 && x <= 7 && y >= 5 && y <= 7) c = (Color){250, 245, 235, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_WHEAT_SEEDS:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Small seed dots scattered
+                unsigned int h = hash2D(x, y, 88);
+                if (h % 7 == 0 && x >= 3 && x <= 12 && y >= 4 && y <= 12) {
+                    c = (Color){160, 140, 60, 255};
+                }
+                if (h % 11 == 0 && x >= 4 && x <= 11 && y >= 5 && y <= 11) {
+                    c = (Color){140, 120, 50, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case ITEM_WHEAT:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Wheat stalk bundle
+                if (x >= 5 && x <= 10 && y >= 2 && y <= 14) {
+                    c = (Color){200, 170, 60, 255};
+                    if (x == 5 || x == 10) c = (Color){180, 150, 50, 255};
+                }
+                // Grain heads at top
+                if (y >= 1 && y <= 4 && x >= 4 && x <= 11) {
+                    unsigned int h = hash2D(x, y, 89);
+                    if (h % 3 == 0) c = (Color){220, 190, 80, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    // Generic item rendering for any remaining items
     default:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 99);
+                Color c = base;
+                if (h % 6 == 0) c = detail;
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
         break;
     }
 }
@@ -1726,6 +2092,116 @@ void GenerateBlockAtlas(void)
 }
 
 //----------------------------------------------------------------------------------
+// Forward declarations for water level (defined in Water Flow System below)
+//----------------------------------------------------------------------------------
+static uint8_t waterLevel[WORLD_WIDTH][WORLD_HEIGHT];
+
+//----------------------------------------------------------------------------------
+// Lava Flow System
+//----------------------------------------------------------------------------------
+#define LAVA_MAX_LEVEL      5
+static uint8_t lavaLevel[WORLD_WIDTH][WORLD_HEIGHT];
+
+void InitLava(void)
+{
+    memset(lavaLevel, 0, sizeof(lavaLevel));
+}
+
+int GetLavaLevel(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
+    if (world[bx][by] != BLOCK_LAVA) return 0;
+    return lavaLevel[bx][by];
+}
+
+static void PropagateLavaBFS(int startX, int startY, int level)
+{
+    if (level <= 0) return;
+    static int qx[WORLD_WIDTH * 2];
+    static int qy[WORLD_WIDTH * 2];
+    static int ql[WORLD_WIDTH * 2];
+    int head = 0, tail = 0;
+
+    lavaLevel[startX][startY] = level;
+    qx[tail] = startX; qy[tail] = startY; ql[tail] = level; tail++;
+
+    while (head != tail) {
+        int cx = qx[head], cy = qy[head], cl = ql[head];
+        head = (head + 1) % (WORLD_WIDTH * 2);
+        if (cl <= 1) continue;
+
+        // Flow down
+        if (cy + 1 < WORLD_HEIGHT) {
+            if (world[cx][cy + 1] == BLOCK_AIR) {
+                world[cx][cy + 1] = BLOCK_LAVA;
+                lavaLevel[cx][cy + 1] = LAVA_MAX_LEVEL;
+                int next = tail % (WORLD_WIDTH * 2);
+                qx[next] = cx; qy[next] = cy + 1; ql[next] = LAVA_MAX_LEVEL;
+                tail++;
+            } else if (world[cx][cy + 1] == BLOCK_WATER) {
+                // Lava + water = obsidian
+                world[cx][cy + 1] = BLOCK_OBSIDIAN;
+                waterLevel[cx][cy + 1] = 0;
+                InvalidateChunkAt(cx, cy + 1);
+            }
+        }
+
+        // Flow sideways
+        int nextL = cl - 1;
+        if (nextL > 0) {
+            static const int dx[] = {1, -1};
+            for (int d = 0; d < 2; d++) {
+                int nx = cx + dx[d];
+                if (nx < 0 || nx >= WORLD_WIDTH) continue;
+                if (world[nx][cy] == BLOCK_AIR && (cy + 1 >= WORLD_HEIGHT || world[nx][cy + 1] != BLOCK_AIR)) {
+                    world[nx][cy] = BLOCK_LAVA;
+                    lavaLevel[nx][cy] = (uint8_t)nextL;
+                    int next = tail % (WORLD_WIDTH * 2);
+                    qx[next] = nx; qy[next] = cy; ql[next] = nextL;
+                    tail++;
+                } else if (world[nx][cy] == BLOCK_WATER) {
+                    // Flowing lava + water = cobblestone
+                    world[nx][cy] = BLOCK_COBBLESTONE;
+                    waterLevel[nx][cy] = 0;
+                    InvalidateChunkAt(nx, cy);
+                }
+            }
+        }
+    }
+}
+
+void SetLavaSource(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    // Check for water contact → obsidian
+    static const int dx[] = {0, 0, 1, -1};
+    static const int dy[] = {1, -1, 0, 0};
+    for (int d = 0; d < 4; d++) {
+        int nx = bx + dx[d], ny = by + dy[d];
+        if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
+            if (world[nx][ny] == BLOCK_WATER) {
+                world[bx][by] = BLOCK_OBSIDIAN;
+                waterLevel[bx][by] = 0;
+                InvalidateChunkAt(bx, by);
+                return;
+            }
+        }
+    }
+    world[bx][by] = BLOCK_LAVA;
+    lavaLevel[bx][by] = LAVA_MAX_LEVEL;
+    PropagateLavaBFS(bx, by, LAVA_MAX_LEVEL);
+}
+
+void RemoveLavaAt(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    if (world[bx][by] != BLOCK_LAVA) return;
+    world[bx][by] = BLOCK_AIR;
+    lavaLevel[bx][by] = 0;
+    InvalidateChunkAt(bx, by);
+}
+
+//----------------------------------------------------------------------------------
 // Gravity System
 //----------------------------------------------------------------------------------
 bool IsGravityBlock(uint8_t block)
@@ -1741,7 +2217,8 @@ void ApplyGravityAt(int bx, int by)
         if (!IsGravityBlock(above)) break;
         world[bx][fy] = BLOCK_AIR;
         int landY = fy + 1;
-        while (landY < WORLD_HEIGHT && world[bx][landY] == BLOCK_AIR) landY++;
+        // Fall through air and water
+        while (landY < WORLD_HEIGHT && (world[bx][landY] == BLOCK_AIR || world[bx][landY] == BLOCK_WATER)) landY++;
         landY--;
         world[bx][landY] = above;
         InvalidateChunkAt(bx, fy);
@@ -1754,6 +2231,113 @@ void ApplyGravityAt(int bx, int by)
 }
 
 //----------------------------------------------------------------------------------
+// Water Flow System
+//----------------------------------------------------------------------------------
+#define WATER_MAX_LEVEL     7
+// waterLevel declared above (forward declaration for lava system)
+
+void InitWater(void)
+{
+    memset(waterLevel, 0, sizeof(waterLevel));
+}
+
+int GetWaterLevel(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
+    if (world[bx][by] != BLOCK_WATER) return 0;
+    return waterLevel[bx][by];
+}
+
+static void PropagateWaterBFS(int startX, int startY, int level)
+{
+    if (level <= 0) return;
+    // BFS queue
+    static int qx[WORLD_WIDTH * 2];
+    static int qy[WORLD_WIDTH * 2];
+    static int ql[WORLD_WIDTH * 2];
+    int head = 0, tail = 0;
+
+    waterLevel[startX][startY] = level;
+    qx[tail] = startX; qy[tail] = startY; ql[tail] = level; tail++;
+
+    while (head != tail) {
+        int cx = qx[head], cy = qy[head], cl = ql[head];
+        head = (head + 1) % (WORLD_WIDTH * 2);
+        if (cl <= 1) continue;
+
+        // Flow down first (full level)
+        if (cy + 1 < WORLD_HEIGHT && world[cx][cy + 1] == BLOCK_AIR) {
+            world[cx][cy + 1] = BLOCK_WATER;
+            waterLevel[cx][cy + 1] = WATER_MAX_LEVEL;
+            int next = tail % (WORLD_WIDTH * 2);
+            qx[next] = cx; qy[next] = cy + 1; ql[next] = WATER_MAX_LEVEL;
+            tail++;
+        }
+
+        // Flow sideways (level - 1)
+        int nextL = cl - 1;
+        if (nextL > 0) {
+            static const int dx[] = {1, -1};
+            for (int d = 0; d < 2; d++) {
+                int nx = cx + dx[d];
+                if (nx < 0 || nx >= WORLD_WIDTH) continue;
+                if (world[nx][cy] == BLOCK_AIR && (cy + 1 >= WORLD_HEIGHT || world[nx][cy + 1] != BLOCK_AIR)) {
+                    world[nx][cy] = BLOCK_WATER;
+                    waterLevel[nx][cy] = (uint8_t)nextL;
+                    int next = tail % (WORLD_WIDTH * 2);
+                    qx[next] = nx; qy[next] = cy; ql[next] = nextL;
+                    tail++;
+                }
+            }
+        }
+    }
+}
+
+void SetWaterSource(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    world[bx][by] = BLOCK_WATER;
+    waterLevel[bx][by] = WATER_MAX_LEVEL;
+    PropagateWaterBFS(bx, by, WATER_MAX_LEVEL);
+}
+
+void RemoveWaterAt(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    if (world[bx][by] != BLOCK_WATER) return;
+
+    // Clear this water block
+    world[bx][by] = BLOCK_AIR;
+    waterLevel[bx][by] = 0;
+    InvalidateChunkAt(bx, by);
+
+    // Recalculate water in affected area (radius = WATER_MAX_LEVEL)
+    int radius = WATER_MAX_LEVEL + 1;
+    int minX = bx - radius, maxX = bx + radius;
+    int minY = by - radius, maxY = by + radius;
+    if (minX < 0) minX = 0;
+    if (maxX >= WORLD_WIDTH) maxX = WORLD_WIDTH - 1;
+    if (minY < 0) minY = 0;
+    if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
+
+    // Clear water levels in area
+    for (int x = minX; x <= maxX; x++)
+        for (int y = minY; y <= maxY; y++)
+            if (world[x][y] == BLOCK_WATER) waterLevel[x][y] = 0;
+
+    // Re-propagate from remaining sources in area
+    for (int x = minX; x <= maxX; x++)
+        for (int y = minY; y <= maxY; y++)
+            if (world[x][y] == BLOCK_WATER && waterLevel[x][y] == 0) {
+                // Check if this is a source (water above it)
+                if (y > 0 && world[x][y - 1] == BLOCK_WATER) {
+                    waterLevel[x][y] = WATER_MAX_LEVEL;
+                    PropagateWaterBFS(x, y, WATER_MAX_LEVEL);
+                }
+            }
+}
+
+//----------------------------------------------------------------------------------
 // Redstone System
 //----------------------------------------------------------------------------------
 #define REDSTONE_MAX_POWER  15
@@ -1761,6 +2345,7 @@ void ApplyGravityAt(int bx, int by)
 
 static uint8_t redstonePower[WORLD_WIDTH][WORLD_HEIGHT];
 static bool leverState[WORLD_WIDTH][WORLD_HEIGHT];
+static uint8_t cropGrowth[WORLD_WIDTH][WORLD_HEIGHT]; // 0-7 growth stage for crops
 
 // Pressure plate tracking — avoids O(524K) scan in UpdateRedstoneTick
 #define MAX_PRESSURE_PLATES 256
@@ -1772,6 +2357,7 @@ void InitRedstone(void)
 {
     memset(redstonePower, 0, sizeof(redstonePower));
     memset(leverState, 0, sizeof(leverState));
+    memset(cropGrowth, 0, sizeof(cropGrowth));
     pressurePlateCount = 0;
 }
 
@@ -1962,6 +2548,65 @@ bool IsRedstoneLampPowered(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
     return world[bx][by] == BLOCK_REDSTONE_LAMP && redstonePower[bx][by] > 0;
+}
+
+//----------------------------------------------------------------------------------
+// Crop Growth System
+//----------------------------------------------------------------------------------
+static float cropGrowTimer = 0.0f;
+
+void UpdateCrops(float dt)
+{
+    cropGrowTimer += dt;
+    if (cropGrowTimer < 5.0f) return; // Grow every 5 seconds
+    cropGrowTimer = 0.0f;
+
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
+            if (world[x][y] != BLOCK_CROPS) continue;
+            if (cropGrowth[x][y] >= 7) continue; // Already mature
+
+            // Check if on farmland
+            if (world[x][y - 1] != BLOCK_FARMLAND) continue;
+
+            // Check for water nearby (within 4 blocks)
+            bool hasWater = false;
+            for (int dx = -4; dx <= 4 && !hasWater; dx++) {
+                for (int dy = -4; dy <= 4 && !hasWater; dy++) {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
+                        if (world[nx][ny] == BLOCK_WATER) hasWater = true;
+                    }
+                }
+            }
+
+            // Check for light above
+            uint8_t light = GetLightLevel(x, y - 1);
+            if (light < 8) continue;
+
+            // Growth chance: base 30%, +30% if near water
+            int chance = 30;
+            if (hasWater) chance += 30;
+
+            if (rand() % 100 < chance) {
+                cropGrowth[x][y]++;
+                // Update visual - crops get taller with growth
+                // (handled in rendering)
+            }
+        }
+    }
+}
+
+int GetCropGrowth(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
+    return cropGrowth[bx][by];
+}
+
+void SetCropGrowth(int bx, int by, int stage)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    cropGrowth[bx][by] = (uint8_t)stage;
 }
 
 //----------------------------------------------------------------------------------
@@ -2630,6 +3275,308 @@ void GenerateWorld(unsigned int seed)
                     if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
                     else if (h % 8 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
                     break;
+            }
+        }
+    }
+
+    // ============================================================
+    // Pass 13: Villages
+    // ============================================================
+    #define VILLAGE_SPACING 400
+    #define MAX_VILLAGE_BUILDINGS 6
+
+    for (int v = 0; v < WORLD_WIDTH / VILLAGE_SPACING; v++) {
+        // Determine village X position
+        int vx = (int)(hash2D(v, 0, seed + 20000) % (WORLD_WIDTH - 60)) + 30;
+
+        // Check biome at village center
+        float biomeNoise = fbm(vx * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
+        int biome = 0;
+        if (biomeNoise > 0.55f) biome = 1;
+        else if (biomeNoise > 0.35f) biome = 6;
+        else if (biomeNoise > 0.15f) biome = 0;
+        else if (biomeNoise > -0.05f) biome = 4;
+        else if (biomeNoise > -0.25f) biome = 2;
+        else if (biomeNoise > -0.45f) biome = 5;
+        else biome = 3;
+
+        // Only place villages in plains or forest
+        if (biome != 0 && biome != 2 && biome != 6) continue;
+
+        // Find surface at village center
+        int surfaceY = -1;
+        for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
+            if (world[vx][y] == BLOCK_GRASS || world[vx][y] == BLOCK_SNOWY_GRASS) {
+                surfaceY = y;
+                break;
+            }
+        }
+        if (surfaceY < 10 || surfaceY >= SEA_LEVEL) continue;
+
+        // Check flatness: scan ±20 blocks for consistent surface
+        bool flat = true;
+        for (int dx = -20; dx <= 20; dx += 4) {
+            int cx = vx + dx;
+            if (cx < 0 || cx >= WORLD_WIDTH) { flat = false; break; }
+            for (int y = surfaceY - 5; y <= surfaceY + 5; y++) {
+                if (y >= 0 && y < WORLD_HEIGHT && (world[cx][y] == BLOCK_GRASS || world[cx][y] == BLOCK_SNOWY_GRASS)) {
+                    if (abs(y - surfaceY) > 3) { flat = false; break; }
+                    break;
+                }
+            }
+            if (!flat) break;
+        }
+        if (!flat) continue;
+
+        // Check no water in village area
+        bool hasWater = false;
+        for (int dx = -20; dx <= 20 && !hasWater; dx++) {
+            for (int dy = -3; dy <= 0 && !hasWater; dy++) {
+                int cx = vx + dx, cy = surfaceY + dy;
+                if (cx >= 0 && cx < WORLD_WIDTH && cy >= 0 && cy < WORLD_HEIGHT) {
+                    if (world[cx][cy] == BLOCK_WATER) hasWater = true;
+                }
+            }
+        }
+        if (hasWater) continue;
+
+        // Place buildings
+        int numBuildings = 3 + (int)(hash2D(v, 1, seed + 20100) % 4);
+        int buildX = vx - (numBuildings * 10) / 2;
+        int villagerSpawnCount = 0;
+
+        for (int b = 0; b < numBuildings && b < MAX_VILLAGE_BUILDINGS; b++) {
+            int bx = buildX + b * 10 + (int)(hash2D(v, b + 10, seed + 20200) % 3);
+            int by = surfaceY;
+
+            // Find surface at this building position
+            int buildSurface = -1;
+            for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
+                if (world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) {
+                    buildSurface = y;
+                    break;
+                }
+            }
+            if (buildSurface < 5) continue;
+
+            int btype = (int)(hash2D(v, b, seed + 20300) % 4);
+
+            if (btype == 0 || btype == 3) {
+                // House (type 0) or Blacksmith (type 3)
+                int w = (btype == 3) ? 8 : 7;
+                int h = 6;
+                uint8_t wallBlock = (btype == 3) ? BLOCK_COBBLESTONE : BLOCK_PLANKS;
+                uint8_t floorBlock = (btype == 3) ? BLOCK_STONE : BLOCK_COBBLESTONE;
+
+                // Clear interior and build walls
+                for (int dx = 0; dx < w; dx++) {
+                    for (int dy = 0; dy < h; dy++) {
+                        int wx = bx + dx, wy = buildSurface - dy;
+                        if (wx < 0 || wx >= WORLD_WIDTH || wy < 0 || wy >= WORLD_HEIGHT) continue;
+                        if (dy == 0) {
+                            // Floor
+                            world[wx][wy] = floorBlock;
+                        } else if (dy == h - 1 || dx == 0 || dx == w - 1) {
+                            // Walls and roof
+                            world[wx][wy] = wallBlock;
+                        } else {
+                            // Interior air
+                            world[wx][wy] = BLOCK_AIR;
+                        }
+                    }
+                }
+
+                // Door opening (2 blocks high in front wall)
+                int doorX = bx + w / 2;
+                if (doorX >= 0 && doorX < WORLD_WIDTH) {
+                    if (buildSurface - 1 >= 0) world[doorX][buildSurface - 1] = BLOCK_AIR;
+                    if (buildSurface - 2 >= 0) world[doorX][buildSurface - 2] = BLOCK_AIR;
+                }
+
+                // Windows (glass)
+                if (btype == 0) {
+                    // Side windows
+                    int winY = buildSurface - 3;
+                    if (winY >= 0 && winY < WORLD_HEIGHT) {
+                        if (bx + 1 >= 0 && bx + 1 < WORLD_WIDTH) world[bx + 1][winY] = BLOCK_GLASS;
+                        if (bx + w - 2 >= 0 && bx + w - 2 < WORLD_WIDTH) world[bx + w - 2][winY] = BLOCK_GLASS;
+                    }
+                }
+
+                // Torch inside
+                int torchX = bx + w / 2;
+                int torchY = buildSurface - 4;
+                if (torchX >= 0 && torchX < WORLD_WIDTH && torchY >= 0 && torchY < WORLD_HEIGHT) {
+                    world[torchX][torchY] = BLOCK_TORCH;
+                }
+
+                // Furnace and crafting table in blacksmith
+                if (btype == 3) {
+                    int furnX = bx + 1;
+                    int furnY = buildSurface - 1;
+                    if (furnX >= 0 && furnX < WORLD_WIDTH && furnY >= 0 && furnY < WORLD_HEIGHT) {
+                        world[furnX][furnY] = BLOCK_FURNACE;
+                    }
+                    int craftX = bx + w - 2;
+                    int craftY = buildSurface - 1;
+                    if (craftX >= 0 && craftX < WORLD_WIDTH && craftY >= 0 && craftY < WORLD_HEIGHT) {
+                        world[craftX][craftY] = BLOCK_CRAFTING_TABLE;
+                    }
+                }
+
+                // Bed in house
+                if (btype == 0) {
+                    int bedX = bx + 1;
+                    int bedY = buildSurface - 1;
+                    if (bedX >= 0 && bedX < WORLD_WIDTH && bedY >= 0 && bedY < WORLD_HEIGHT) {
+                        world[bedX][bedY] = BLOCK_BED;
+                    }
+                }
+
+                // Place chest
+                if (chestCount < MAX_CHESTS) {
+                    int chestX = bx + ((btype == 3) ? w - 2 : w - 2);
+                    int chestY = buildSurface - 1;
+                    if (chestX >= 0 && chestX < WORLD_WIDTH && chestY >= 0 && chestY < WORLD_HEIGHT) {
+                        world[chestX][chestY] = BLOCK_CHEST;
+                        ChestData *c = &chestData[chestCount];
+                        c->x = chestX;
+                        c->y = chestY;
+                        memset(c->items, 0, sizeof(c->items));
+                        memset(c->counts, 0, sizeof(c->counts));
+
+                        typedef struct { uint8_t item; int minCount; int maxCount; int weight; } LootEntry;
+                        LootEntry loot[] = {
+                            {FOOD_BREAD, 2, 5, 25},
+                            {ITEM_WHEAT_SEEDS, 4, 8, 20},
+                            {FOOD_APPLE, 1, 3, 15},
+                            {ITEM_COAL, 2, 6, 20},
+                            {ITEM_IRON_INGOT, 1, 3, (btype == 3) ? 25 : 10},
+                            {ITEM_DIAMOND, 1, 1, (btype == 3) ? 8 : 0},
+                            {ITEM_GOLD_INGOT, 1, 2, (btype == 3) ? 15 : 5},
+                            {BLOCK_TORCH, 3, 6, 15},
+                            {ITEM_LEATHER, 2, 4, 10},
+                        };
+                        int lootCount = sizeof(loot) / sizeof(loot[0]);
+
+                        int slots = 3 + (int)(hash2D(chestX, chestY, seed + 20400) % 3);
+                        for (int s = 0; s < slots && s < CHEST_SLOTS; s++) {
+                            // Skip items with weight 0
+                            int totalWeight = 0;
+                            for (int l = 0; l < lootCount; l++) totalWeight += loot[l].weight;
+                            if (totalWeight <= 0) break;
+                            int roll = (int)(hash2D(chestX + s, chestY, seed + 20500 + s) % totalWeight);
+                            int chosen = 0;
+                            for (int l = 0; l < lootCount; l++) {
+                                roll -= loot[l].weight;
+                                if (roll < 0) { chosen = l; break; }
+                            }
+                            c->items[s] = loot[chosen].item;
+                            int range = loot[chosen].maxCount - loot[chosen].minCount + 1;
+                            c->counts[s] = loot[chosen].minCount + (int)(hash2D(chestX, chestY + s, seed + 20600 + s) % range);
+                        }
+                        chestCount++;
+                    }
+                }
+
+            } else if (btype == 1) {
+                // Farm: 9x4 area with farmland, crops, and water
+                int fw = 9, fh = 4;
+                for (int dx = 0; dx < fw; dx++) {
+                    for (int dy = 0; dy < fh; dy++) {
+                        int fx = bx + dx, fy = buildSurface - dy;
+                        if (fx < 0 || fx >= WORLD_WIDTH || fy < 0 || fy >= WORLD_HEIGHT) continue;
+                        if (dy == 0) {
+                            // Bottom row: farmland with water in center
+                            if (dx == fw / 2) {
+                                world[fx][fy] = BLOCK_WATER;
+                            } else {
+                                world[fx][fy] = BLOCK_FARMLAND;
+                            }
+                        } else if (dy == 1) {
+                            // Crops on farmland
+                            if (dx != fw / 2) {
+                                world[fx][fy] = BLOCK_CROPS;
+                            } else {
+                                world[fx][fy] = BLOCK_AIR;
+                            }
+                        } else if (dy == fh - 1) {
+                            // Fence posts (use cobblestone as fence substitute)
+                            if (dx == 0 || dx == fw - 1) {
+                                world[fx][fy] = BLOCK_COBBLESTONE;
+                            } else {
+                                world[fx][fy] = BLOCK_AIR;
+                            }
+                        } else {
+                            world[fx][fy] = BLOCK_AIR;
+                        }
+                    }
+                }
+
+            } else if (btype == 2) {
+                // Well: 5x5 cobblestone with water center
+                int ww = 5;
+                for (int dx = 0; dx < ww; dx++) {
+                    for (int dy = 0; dy < 4; dy++) {
+                        int wx = bx + dx, wy = buildSurface - dy;
+                        if (wx < 0 || wx >= WORLD_WIDTH || wy < 0 || wy >= WORLD_HEIGHT) continue;
+                        if (dy == 0) {
+                            world[wx][wy] = BLOCK_COBBLESTONE;
+                        } else if (dy <= 2 && (dx == 0 || dx == ww - 1)) {
+                            // Walls (2 high)
+                            world[wx][wy] = BLOCK_COBBLESTONE;
+                        } else if (dy == 3) {
+                            // Roof edge
+                            world[wx][wy] = BLOCK_COBBLESTONE;
+                        } else if (dx == ww / 2 && dy == 1) {
+                            // Water in center
+                            world[wx][wy] = BLOCK_WATER;
+                        } else {
+                            world[wx][wy] = BLOCK_AIR;
+                        }
+                    }
+                }
+            }
+
+            // Place dirt path between buildings
+            if (b < numBuildings - 1) {
+                int nextBx = buildX + (b + 1) * 10 + (int)(hash2D(v, b + 11, seed + 20200) % 3);
+                int pathStart = bx + ((btype == 3) ? 8 : 7);
+                int pathEnd = nextBx;
+                for (int px = pathStart; px < pathEnd && px < WORLD_WIDTH; px++) {
+                    if (px >= 0) {
+                        // Find surface at path position
+                        for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
+                            if (world[px][y] == BLOCK_GRASS || world[px][y] == BLOCK_SNOWY_GRASS) {
+                                world[px][y] = BLOCK_DIRT;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Spawn villagers near houses (after all buildings placed)
+        for (int b = 0; b < numBuildings; b++) {
+            int btype = (int)(hash2D(v, b, seed + 20300) % 4);
+            if (btype != 0 && btype != 3) continue; // Only houses and blacksmiths
+            int bx = buildX + b * 10 + (int)(hash2D(v, b + 10, seed + 20200) % 3);
+            int buildSurface = -1;
+            for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
+                if (world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) {
+                    buildSurface = y;
+                    break;
+                }
+            }
+            if (buildSurface < 5) continue;
+            // Spawn 1-2 villagers outside the building
+            int numVillagers = 1 + (int)(hash2D(v, b + 20, seed + 20700) % 2);
+            for (int vi = 0; vi < numVillagers; vi++) {
+                int spawnX = bx + 3 + vi * 2;
+                if (spawnX >= 0 && spawnX < WORLD_WIDTH) {
+                    SpawnMob(MOB_VILLAGER, spawnX * BLOCK_SIZE, (buildSurface - 2) * BLOCK_SIZE);
+                }
             }
         }
     }

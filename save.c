@@ -5,13 +5,18 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format v3:
+// Save File Format v9:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
 //                + uint8 inventory[36] + int inventoryCount[36] + int toolDurability[36]
 //                + int health + int hunger + int oxygen + int xp
+//   Furnace:     10 fields (v5+)
+//   Chests:      count + per-chest data (v6+)
+//   Weather:     type + duration (v7+)
+//   Achievements: bool[ACH_COUNT] + totalMobsKilled + totalBlocksPlaced (v9+)
 //   World:       RLE per column: (uint8 block, uint16 count) pairs
+//   Modified:    count + per-block x,y,type (v8+)
 //----------------------------------------------------------------------------------
 
 bool SaveExists(const char *path)
@@ -102,6 +107,7 @@ bool SaveWorld(const char *path)
     ok = ok && fwrite(player.inventory, sizeof(uint8_t), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
     ok = ok && fwrite(player.inventoryCount, sizeof(int), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
     ok = ok && fwrite(player.toolDurability, sizeof(int), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
+    ok = ok && fwrite(player.itemEnchantments, sizeof(uint16_t), INVENTORY_SLOTS, f) == INVENTORY_SLOTS;
     ok = ok && fwrite(&player.health, sizeof(int), 1, f) == 1;
     ok = ok && fwrite(&player.hunger, sizeof(int), 1, f) == 1;
     ok = ok && fwrite(&player.oxygen, sizeof(int), 1, f) == 1;
@@ -110,18 +116,58 @@ bool SaveWorld(const char *path)
     ok = ok && fwrite(&player.spawnY, sizeof(int), 1, f) == 1;
     ok = ok && fwrite(player.armor, sizeof(uint8_t), 4, f) == 4;
     ok = ok && fwrite(player.armorDurability, sizeof(int), 4, f) == 4;
+    ok = ok && fwrite(player.armorEnchantments, sizeof(uint16_t), 4, f) == 4;
 
-    // Furnace state (v5+)
-    ok = ok && fwrite(&furnaceBlockX, sizeof(int), 1, f) == 1;
-    ok = ok && fwrite(&furnaceBlockY, sizeof(int), 1, f) == 1;
-    ok = ok && fwrite(&furnaceFuel, sizeof(uint8_t), 1, f) == 1;
-    ok = ok && fwrite(&furnaceFuelCount, sizeof(int), 1, f) == 1;
-    ok = ok && fwrite(&furnaceInput, sizeof(uint8_t), 1, f) == 1;
-    ok = ok && fwrite(&furnaceInputCount, sizeof(int), 1, f) == 1;
-    ok = ok && fwrite(&furnaceOutput, sizeof(uint8_t), 1, f) == 1;
-    ok = ok && fwrite(&furnaceOutputCount, sizeof(int), 1, f) == 1;
-    ok = ok && fwrite(&furnaceProgress, sizeof(float), 1, f) == 1;
-    ok = ok && fwrite(&furnaceFuelBurn, sizeof(float), 1, f) == 1;
+    // Furnace state (v9+: multi-furnace array, v5-v8: single furnace)
+    // Sync active furnace before saving
+    if (activeFurnace >= 0 && activeFurnace < furnaceCount) SyncActiveToFurnace(activeFurnace);
+    // Write legacy single-furnace fields for v5-v8 compat (first furnace or active)
+    if (furnaceCount > 0) {
+        FurnaceData *fd = &furnaces[0];
+        ok = ok && fwrite(&fd->x, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&fd->y, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&fd->fuel, sizeof(uint8_t), 1, f) == 1;
+        ok = ok && fwrite(&fd->fuelCount, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&fd->input, sizeof(uint8_t), 1, f) == 1;
+        ok = ok && fwrite(&fd->inputCount, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&fd->output, sizeof(uint8_t), 1, f) == 1;
+        ok = ok && fwrite(&fd->outputCount, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&fd->progress, sizeof(float), 1, f) == 1;
+        ok = ok && fwrite(&fd->fuelBurn, sizeof(float), 1, f) == 1;
+        ok = ok && fwrite(&fd->fuelBurnMax, sizeof(float), 1, f) == 1;
+    } else {
+        int zero = 0; float zerof = 0.0f; uint8_t zerob = 0;
+        ok = ok && fwrite(&zero, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&zero, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&zerob, sizeof(uint8_t), 1, f) == 1;
+        ok = ok && fwrite(&zero, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&zerob, sizeof(uint8_t), 1, f) == 1;
+        ok = ok && fwrite(&zero, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&zerob, sizeof(uint8_t), 1, f) == 1;
+        ok = ok && fwrite(&zero, sizeof(int), 1, f) == 1;
+        ok = ok && fwrite(&zerof, sizeof(float), 1, f) == 1;
+        ok = ok && fwrite(&zerof, sizeof(float), 1, f) == 1;
+        ok = ok && fwrite(&zerof, sizeof(float), 1, f) == 1;
+    }
+    // v9+: additional furnaces
+    {
+        int extraFurnaces = furnaceCount > 1 ? furnaceCount - 1 : 0;
+        ok = ok && fwrite(&extraFurnaces, sizeof(int), 1, f) == 1;
+        for (int i = 1; i < furnaceCount && ok; i++) {
+            FurnaceData *fd = &furnaces[i];
+            ok = ok && fwrite(&fd->x, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&fd->y, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&fd->fuel, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&fd->fuelCount, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&fd->input, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&fd->inputCount, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&fd->output, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&fd->outputCount, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&fd->progress, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&fd->fuelBurn, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&fd->fuelBurnMax, sizeof(float), 1, f) == 1;
+        }
+    }
 
     // Chest data (v6+)
     ok = ok && fwrite(&chestCount, sizeof(int), 1, f) == 1;
@@ -135,6 +181,32 @@ bool SaveWorld(const char *path)
     // Weather state (v7+)
     ok = ok && fwrite(&weather.type, sizeof(int), 1, f) == 1;
     ok = ok && fwrite(&weather.duration, sizeof(float), 1, f) == 1;
+
+    // Achievements (v9+)
+    ok = ok && fwrite(achievements, sizeof(bool), ACH_COUNT, f) == ACH_COUNT;
+    ok = ok && fwrite(&totalMobsKilled, sizeof(int), 1, f) == 1;
+    ok = ok && fwrite(&totalBlocksPlaced, sizeof(int), 1, f) == 1;
+
+    // Mob data (v10+)
+    {
+        int activeMobs = 0;
+        for (int i = 0; i < MAX_MOBS; i++) {
+            if (mobs[i].active) activeMobs++;
+        }
+        ok = ok && fwrite(&activeMobs, sizeof(int), 1, f) == 1;
+        for (int i = 0; i < MAX_MOBS && ok; i++) {
+            if (!mobs[i].active) continue;
+            ok = ok && fwrite(&mobs[i].type, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].position.x, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].position.y, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].health, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].maxHealth, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].facingRight, sizeof(bool), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].isBaby, sizeof(bool), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].growTimer, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&mobs[i].slimeType, sizeof(int), 1, f) == 1;
+        }
+    }
 
     // World data - RLE per column
     for (int x = 0; x < WORLD_WIDTH && ok; x++) {
@@ -196,6 +268,10 @@ bool LoadWorld(const char *path)
         fclose(f);
         return false;
     }
+    if (version > SAVE_VERSION) {
+        fclose(f);
+        return false;
+    }
 
     worldSeed = seed;
 
@@ -229,32 +305,91 @@ bool LoadWorld(const char *path)
     if (version >= 3) {
         // v3: tool durability + player status
         if (fread(player.toolDurability, sizeof(int), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
+        // v9+: item enchantments
+        if (version >= 9) {
+            if (fread(player.itemEnchantments, sizeof(uint16_t), INVENTORY_SLOTS, f) != INVENTORY_SLOTS) { fclose(f); return false; }
+        } else {
+            for (int i = 0; i < INVENTORY_SLOTS; i++) player.itemEnchantments[i] = 0;
+        }
         if (fread(&player.health, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         if (fread(&player.hunger, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         if (fread(&player.oxygen, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         if (fread(&player.xp, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         // v3+: bed spawn point (optional - may not exist in older v2 saves)
-        if (fread(&player.spawnX, sizeof(int), 1, f) != 1) { player.spawnX = -1; player.spawnY = -1; }
-        else if (fread(&player.spawnY, sizeof(int), 1, f) != 1) { player.spawnY = -1; }
+        if (fread(&player.spawnX, sizeof(int), 1, f) != 1 || fread(&player.spawnY, sizeof(int), 1, f) != 1) {
+            player.spawnX = -1; player.spawnY = -1;
+        }
         // v4+: armor slots (optional - may not exist in older saves)
         if (version >= 4) {
-            if (fread(player.armor, sizeof(uint8_t), 4, f) != 4) { for (int i = 0; i < 4; i++) player.armor[i] = BLOCK_AIR; }
-            if (fread(player.armorDurability, sizeof(int), 4, f) != 4) { for (int i = 0; i < 4; i++) player.armorDurability[i] = 0; }
+            if (fread(player.armor, sizeof(uint8_t), 4, f) != 4 || fread(player.armorDurability, sizeof(int), 4, f) != 4) {
+                for (int i = 0; i < 4; i++) { player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; }
+            }
+            // v9+: armor enchantments
+            if (version >= 9) {
+                if (fread(player.armorEnchantments, sizeof(uint16_t), 4, f) != 4) {
+                    for (int i = 0; i < 4; i++) player.armorEnchantments[i] = 0;
+                }
+            } else {
+                for (int i = 0; i < 4; i++) player.armorEnchantments[i] = 0;
+            }
         } else {
-            for (int i = 0; i < 4; i++) { player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; }
+            for (int i = 0; i < 4; i++) { player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; player.armorEnchantments[i] = 0; }
         }
-        // v5+: furnace state
+        // v5+: furnace state (legacy single furnace)
+        furnaceCount = 0;
+        activeFurnace = -1;
         if (version >= 5) {
-            if (fread(&furnaceBlockX, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceBlockY, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceFuel, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceFuelCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceInput, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceInputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceOutput, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceOutputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceProgress, sizeof(float), 1, f) != 1) { fclose(f); return false; }
-            if (fread(&furnaceFuelBurn, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            FurnaceData fd;
+            memset(&fd, 0, sizeof(FurnaceData));
+            if (fread(&fd.x, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.fuel, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.fuelCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.input, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.inputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.output, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.outputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.progress, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&fd.fuelBurn, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            if (version >= 9) {
+                if (fread(&fd.fuelBurnMax, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            }
+            // Add to furnace array if valid
+            if (fd.x >= 0) {
+                furnaces[furnaceCount++] = fd;
+            }
+            // v9+: additional furnaces
+            if (version >= 9) {
+                int extraFurnaces = 0;
+                if (fread(&extraFurnaces, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                for (int i = 0; i < extraFurnaces && furnaceCount < MAX_FURNACES; i++) {
+                    FurnaceData efd;
+                    memset(&efd, 0, sizeof(FurnaceData));
+                    if (fread(&efd.x, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.fuel, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.fuelCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.input, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.inputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.output, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.outputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.progress, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.fuelBurn, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&efd.fuelBurnMax, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+                    furnaces[furnaceCount++] = efd;
+                }
+            }
+            // Load first furnace into globals for backward compat
+            if (furnaceCount > 0) {
+                SyncFurnaceToActive(0);
+            } else {
+                furnaceFuel = BLOCK_AIR; furnaceFuelCount = 0;
+                furnaceInput = BLOCK_AIR; furnaceInputCount = 0;
+                furnaceOutput = BLOCK_AIR; furnaceOutputCount = 0;
+                furnaceProgress = 0.0f; furnaceFuelBurn = 0.0f;
+                furnaceFuelBurnMax = 0.0f;
+                furnaceBlockX = -1; furnaceBlockY = -1;
+            }
         } else {
             furnaceFuel = BLOCK_AIR; furnaceFuelCount = 0;
             furnaceInput = BLOCK_AIR; furnaceInputCount = 0;
@@ -284,6 +419,39 @@ bool LoadWorld(const char *path)
             weather.rainAlpha = (weather.type == WEATHER_CLEAR) ? 0 : 1;
         } else {
             InitWeather();
+        }
+        // v9+: achievements
+        if (version >= 9) {
+            if (fread(achievements, sizeof(bool), ACH_COUNT, f) != ACH_COUNT) { fclose(f); return false; }
+            if (fread(&totalMobsKilled, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&totalBlocksPlaced, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+        } else {
+            for (int i = 0; i < ACH_COUNT; i++) achievements[i] = false;
+            totalMobsKilled = 0;
+            totalBlocksPlaced = 0;
+        }
+        // v10+: mob data
+        if (version >= 10) {
+            int activeMobs = 0;
+            if (fread(&activeMobs, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            InitMobs();
+            for (int i = 0; i < activeMobs && i < MAX_MOBS; i++) {
+                int type;
+                if (fread(&type, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                Mob *mob = SpawnMob((MobType)type, 0, 0);
+                if (mob) {
+                    if (fread(&mob->position.x, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->position.y, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->health, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->maxHealth, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->facingRight, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->isBaby, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->growTimer, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+                    if (fread(&mob->slimeType, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                }
+            }
+        } else {
+            InitMobs();
         }
     } else {
         // v2 compat: default values

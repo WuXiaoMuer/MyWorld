@@ -26,6 +26,7 @@ float GetHoverAlpha(int slotId, bool hovered, float dt)
 uint8_t heldItem = BLOCK_AIR;
 int heldCount = 0;
 int heldDurability = 0;
+uint16_t heldItemEnchant = 0;
 
 void ReturnHeldItem(void)
 {
@@ -35,9 +36,11 @@ void ReturnHeldItem(void)
             player.inventory[i] = heldItem;
             player.inventoryCount[i] = heldCount;
             player.toolDurability[i] = heldDurability;
+            player.itemEnchantments[i] = heldItemEnchant;
             heldItem = BLOCK_AIR;
             heldCount = 0;
             heldDurability = 0;
+            heldItemEnchant = 0;
             return;
         }
     }
@@ -51,6 +54,7 @@ void ClearHeldItem(void)
     heldItem = BLOCK_AIR;
     heldCount = 0;
     heldDurability = 0;
+    heldItemEnchant = 0;
 }
 
 // Crafting scroll state
@@ -285,7 +289,7 @@ void DrawInventoryScreen(void)
         DrawGameText(TextFormat("%s:", S(STR_FUEL)), fuelX, flameY, 10, (Color){180, 175, 190, 200});
         if (furnaceFuelBurn > 0.0f) {
             int flameW = 60;
-            float fuelPct = furnaceFuelBurn / 8.0f;
+            float fuelPct = furnaceFuelBurnMax > 0 ? furnaceFuelBurn / furnaceFuelBurnMax : 0;
             DrawRectangle(fuelX, flameY + 14, flameW, 8, (Color){40, 38, 48, 200});
             DrawRectangle(fuelX, flameY + 14, (int)(flameW * fuelPct), 8, (Color){220, 120, 40, 255});
         } else {
@@ -361,11 +365,11 @@ void DrawInventoryScreen(void)
                 // Armor click handling
                 if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     if (heldItem == BLOCK_AIR && player.armor[i] != BLOCK_AIR) {
-                        heldItem = player.armor[i]; heldCount = 1; heldDurability = player.armorDurability[i];
-                        player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; PlaySoundUIClick();
+                        heldItem = player.armor[i]; heldCount = 1; heldDurability = player.armorDurability[i]; heldItemEnchant = player.armorEnchantments[i];
+                        player.armor[i] = BLOCK_AIR; player.armorDurability[i] = 0; player.armorEnchantments[i] = 0; PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.armor[i] == BLOCK_AIR && IsArmor((BlockType)heldItem)) {
                         int slotType = GetArmorSlot((BlockType)heldItem);
-                        if (slotType == i) { player.armor[i] = heldItem; player.armorDurability[i] = heldDurability; ClearHeldItem(); PlaySoundUIClick(); }
+                        if (slotType == i) { player.armor[i] = heldItem; player.armorDurability[i] = heldDurability; player.armorEnchantments[i] = heldItemEnchant; ClearHeldItem(); PlaySoundUIClick(); }
                     }
                 }
             }
@@ -423,9 +427,9 @@ void DrawInventoryScreen(void)
                         if (player.inventory[idx] != BLOCK_AIR) {
                             bool transferred = false;
                             uint8_t itm = player.inventory[idx]; int cnt = player.inventoryCount[idx];
-                            if (itm == ITEM_COAL) {
-                                if (furnaceFuel == BLOCK_AIR) { furnaceFuel = ITEM_COAL; furnaceFuelCount = cnt; player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; transferred = true; }
-                                else if (furnaceFuel == ITEM_COAL) { int sp = 64 - furnaceFuelCount; int ta = cnt > sp ? sp : cnt; furnaceFuelCount += ta; player.inventoryCount[idx] -= ta; if (player.inventoryCount[idx] <= 0) { player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; } transferred = true; }
+                            if (GetFuelBurnTime(itm) > 0.0f) {
+                                if (furnaceFuel == BLOCK_AIR) { furnaceFuel = itm; furnaceFuelCount = cnt; player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; transferred = true; }
+                                else if (furnaceFuel == itm) { int sp = 64 - furnaceFuelCount; int ta = cnt > sp ? sp : cnt; furnaceFuelCount += ta; player.inventoryCount[idx] -= ta; if (player.inventoryCount[idx] <= 0) { player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; } transferred = true; }
                             } else if (FindSmeltRecipe((BlockType)itm) >= 0) {
                                 if (furnaceInput == BLOCK_AIR) { furnaceInput = itm; furnaceInputCount = cnt; player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; transferred = true; }
                                 else if (furnaceInput == itm) { int sp = 64 - furnaceInputCount; int ta = cnt > sp ? sp : cnt; furnaceInputCount += ta; player.inventoryCount[idx] -= ta; if (player.inventoryCount[idx] <= 0) { player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; } transferred = true; }
@@ -437,9 +441,11 @@ void DrawInventoryScreen(void)
                                     if (slot >= 0 && player.armor[slot] == BLOCK_AIR) {
                                         player.armor[slot] = player.inventory[idx];
                                         player.armorDurability[slot] = player.toolDurability[idx];
+                                        player.armorEnchantments[slot] = player.itemEnchantments[idx];
                                         player.inventory[idx] = BLOCK_AIR;
                                         player.inventoryCount[idx] = 0;
                                         player.toolDurability[idx] = 0;
+                                        player.itemEnchantments[idx] = 0;
                                         transferred = true;
                                         PlaySoundUIClick();
                                     }
@@ -462,24 +468,24 @@ void DrawInventoryScreen(void)
                             PlaySoundUIClick();
                         }
                     } else if (heldItem == BLOCK_AIR && player.inventory[idx] != BLOCK_AIR) {
-                        heldItem = player.inventory[idx]; heldCount = player.inventoryCount[idx]; heldDurability = player.toolDurability[idx];
-                        player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; PlaySoundUIClick();
+                        heldItem = player.inventory[idx]; heldCount = player.inventoryCount[idx]; heldDurability = player.toolDurability[idx]; heldItemEnchant = player.itemEnchantments[idx];
+                        player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; player.itemEnchantments[idx] = 0; PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.inventory[idx] == BLOCK_AIR) {
-                        player.inventory[idx] = heldItem; player.inventoryCount[idx] = heldCount; player.toolDurability[idx] = heldDurability;
+                        player.inventory[idx] = heldItem; player.inventoryCount[idx] = heldCount; player.toolDurability[idx] = heldDurability; player.itemEnchantments[idx] = heldItemEnchant;
                         ClearHeldItem(); PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.inventory[idx] == heldItem) {
                         int sp = 64 - player.inventoryCount[idx]; int ta = heldCount > sp ? sp : heldCount;
                         player.inventoryCount[idx] += ta; heldCount -= ta;
                         if (heldCount <= 0) { ClearHeldItem(); } PlaySoundUIClick();
                     } else if (heldItem != BLOCK_AIR && player.inventory[idx] != BLOCK_AIR) {
-                        uint8_t ti = player.inventory[idx]; int tc = player.inventoryCount[idx]; int td = player.toolDurability[idx];
-                        player.inventory[idx] = heldItem; player.inventoryCount[idx] = heldCount; player.toolDurability[idx] = heldDurability;
-                        heldItem = ti; heldCount = tc; heldDurability = td; PlaySoundUIClick();
+                        uint8_t ti = player.inventory[idx]; int tc = player.inventoryCount[idx]; int td = player.toolDurability[idx]; uint16_t te = player.itemEnchantments[idx];
+                        player.inventory[idx] = heldItem; player.inventoryCount[idx] = heldCount; player.toolDurability[idx] = heldDurability; player.itemEnchantments[idx] = heldItemEnchant;
+                        heldItem = ti; heldCount = tc; heldDurability = td; heldItemEnchant = te; PlaySoundUIClick();
                     }
                 }
                 if (hover && Win32IsKeyPressed(KEY_Q) && player.inventory[idx] != BLOCK_AIR) {
                     PlaySoundDrop(); player.inventoryCount[idx]--;
-                    if (player.inventoryCount[idx] <= 0) { player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; }
+                    if (player.inventoryCount[idx] <= 0) { player.inventory[idx] = BLOCK_AIR; player.inventoryCount[idx] = 0; player.toolDurability[idx] = 0; player.itemEnchantments[idx] = 0; }
                 }
             }
         }
@@ -489,10 +495,10 @@ void DrawInventoryScreen(void)
             if (heldItem == BLOCK_AIR && furnaceFuel != BLOCK_AIR) {
                 heldItem = furnaceFuel; heldCount = furnaceFuelCount; heldDurability = 0;
                 furnaceFuel = BLOCK_AIR; furnaceFuelCount = 0;
-            } else if (heldItem != BLOCK_AIR && furnaceFuel == BLOCK_AIR && heldItem == ITEM_COAL) {
+            } else if (heldItem != BLOCK_AIR && furnaceFuel == BLOCK_AIR && GetFuelBurnTime(heldItem) > 0.0f) {
                 furnaceFuel = heldItem; furnaceFuelCount = heldCount;
                 ClearHeldItem();
-            } else if (heldItem != BLOCK_AIR && furnaceFuel == heldItem && heldItem == ITEM_COAL) {
+            } else if (heldItem != BLOCK_AIR && furnaceFuel == heldItem && GetFuelBurnTime(heldItem) > 0.0f) {
                 int sp = 64 - furnaceFuelCount; int ta = heldCount > sp ? sp : heldCount;
                 furnaceFuelCount += ta; heldCount -= ta;
                 if (heldCount <= 0) { heldItem = BLOCK_AIR; heldCount = 0; }
@@ -548,10 +554,10 @@ void DrawInventoryScreen(void)
                         if (tx + tw + 8 > SCREEN_WIDTH) tx = (int)mouse.x - tw - 14;
                         if (ty < 4) ty = (int)mouse.y + 14;
                         const char *typeLabel = NULL; Color typeColor = {180,180,190,200};
-                        if (IsTool(bt)) { typeLabel = "Tool"; typeColor = (Color){100,160,220,255}; }
-                        else if (IsArmor(bt)) { typeLabel = "Armor"; typeColor = (Color){180,100,220,255}; }
-                        else if (IsFood(bt)) { typeLabel = "Food"; typeColor = (Color){100,200,100,255}; }
-                        else { typeLabel = "Block"; typeColor = (Color){180,175,190,200}; }
+                        if (IsTool(bt)) { typeLabel = S(STR_TYPE_TOOL); typeColor = (Color){100,160,220,255}; }
+                        else if (IsArmor(bt)) { typeLabel = S(STR_TYPE_ARMOR); typeColor = (Color){180,100,220,255}; }
+                        else if (IsFood(bt)) { typeLabel = S(STR_TYPE_FOOD); typeColor = (Color){100,200,100,255}; }
+                        else { typeLabel = S(STR_TYPE_BLOCK); typeColor = (Color){180,175,190,200}; }
                         int typeW = MeasureGameTextWidth(typeLabel, 11); int maxW = tw > typeW ? tw : typeW;
                         char info[64] = {0};
                         if (IsFood(bt)) snprintf(info, sizeof(info), S(STR_TOOLTIP_HUNGER), GetFoodValue(bt));
@@ -643,6 +649,7 @@ void DrawInventoryScreen(void)
         int chestGridX = contX + 14;
         int tooltipId = -1;
         const char *tooltipText = NULL;
+        uint16_t tooltipEnchant = 0;
         int tooltipX = 0, tooltipY = 0;
 
         for (int row = 0; row < chestRows; row++) {
@@ -673,10 +680,10 @@ void DrawInventoryScreen(void)
                         BlockType bt = (BlockType)item;
                         const char *name = GetBlockName(bt);
                         const char *typeLabel = NULL; Color typeColor = {180,180,190,200};
-                        if (IsTool(bt)) { typeLabel = "Tool"; typeColor = (Color){100,160,220,255}; }
-                        else if (IsArmor(bt)) { typeLabel = "Armor"; typeColor = (Color){180,100,220,255}; }
-                        else if (IsFood(bt)) { typeLabel = "Food"; typeColor = (Color){100,200,100,255}; }
-                        else { typeLabel = "Block"; typeColor = (Color){180,175,190,200}; }
+                        if (IsTool(bt)) { typeLabel = S(STR_TYPE_TOOL); typeColor = (Color){100,160,220,255}; }
+                        else if (IsArmor(bt)) { typeLabel = S(STR_TYPE_ARMOR); typeColor = (Color){180,100,220,255}; }
+                        else if (IsFood(bt)) { typeLabel = S(STR_TYPE_FOOD); typeColor = (Color){100,200,100,255}; }
+                        else { typeLabel = S(STR_TYPE_BLOCK); typeColor = (Color){180,175,190,200}; }
                         int tw = MeasureGameTextWidth(name, 14);
                         int typeW = MeasureGameTextWidth(typeLabel, 11);
                         int maxW = tw > typeW ? tw : typeW;
@@ -787,6 +794,7 @@ void DrawInventoryScreen(void)
                     if (hover && heldItem == BLOCK_AIR) {
                         tooltipId = item;
                         tooltipText = GetBlockName((BlockType)item);
+                        tooltipEnchant = player.itemEnchantments[si];
                         tooltipX = (int)mouse.x;
                         tooltipY = (int)mouse.y - 20;
                     }
@@ -853,8 +861,25 @@ void DrawInventoryScreen(void)
         // Tooltip
         if (tooltipText) {
             int tw = MeasureGameTextWidth(tooltipText, 14) + 10;
-            DrawRectangle(tooltipX, tooltipY - 14, tw, 20, (Color){30, 28, 38, 230});
+            int th = 20;
+            if (ENCH_TYPE(tooltipEnchant) != ENCH_NONE) th = 36;
+            DrawRectangle(tooltipX, tooltipY - 14, tw, th, (Color){30, 28, 38, 230});
             DrawGameText(tooltipText, tooltipX + 5, tooltipY - 12, 14, WHITE);
+            if (ENCH_TYPE(tooltipEnchant) != ENCH_NONE) {
+                int enchType = ENCH_TYPE(tooltipEnchant);
+                int enchLvl = ENCH_LEVEL(tooltipEnchant);
+                StringId enchStr = STR_NONE;
+                if (enchType == ENCH_SHARPNESS) enchStr = STR_ENCH_SHARPNESS;
+                else if (enchType == ENCH_EFFICIENCY) enchStr = STR_ENCH_EFFICIENCY;
+                else if (enchType == ENCH_PROTECTION) enchStr = STR_ENCH_PROTECTION;
+                else if (enchType == ENCH_FORTUNE) enchStr = STR_ENCH_FORTUNE;
+                else if (enchType == ENCH_UNBREAKING) enchStr = STR_ENCH_UNBREAKING;
+                const char *enchName = S(enchStr);
+                int ew = MeasureGameTextWidth(TextFormat("%s %d", enchName, enchLvl), 12) + 10;
+                if (ew + 10 > tw) tw = ew + 10;
+                DrawRectangle(tooltipX, tooltipY - 14, tw, th, (Color){30, 28, 38, 230});
+                DrawGameText(TextFormat("%s %d", enchName, enchLvl), tooltipX + 5, tooltipY + 4, 12, (Color){180, 120, 255, 255});
+            }
         }
 
         // Draw held item on cursor
@@ -1085,9 +1110,11 @@ void DrawInventoryScreen(void)
                                 if (slotType == i) {
                                     player.armor[i] = player.inventory[s];
                                     player.armorDurability[i] = player.toolDurability[s];
+                                    player.armorEnchantments[i] = player.itemEnchantments[s];
                                     player.inventory[s] = BLOCK_AIR;
                                     player.inventoryCount[s] = 0;
                                     player.toolDurability[s] = 0;
+                                    player.itemEnchantments[s] = 0;
                                     PlaySoundUIClick();
                                     break;
                                 }
@@ -1099,8 +1126,10 @@ void DrawInventoryScreen(void)
                     heldItem = player.armor[i];
                     heldCount = 1;
                     heldDurability = player.armorDurability[i];
+                    heldItemEnchant = player.armorEnchantments[i];
                     player.armor[i] = BLOCK_AIR;
                     player.armorDurability[i] = 0;
+                    player.armorEnchantments[i] = 0;
                     PlaySoundUIClick();
                 } else if (heldItem != BLOCK_AIR && player.armor[i] == BLOCK_AIR) {
                     // Equip held armor
@@ -1109,9 +1138,8 @@ void DrawInventoryScreen(void)
                         if (slotType == i) {
                             player.armor[i] = heldItem;
                             player.armorDurability[i] = heldDurability;
-                            heldItem = BLOCK_AIR;
-                            heldCount = 0;
-                            heldDurability = 0;
+                            player.armorEnchantments[i] = heldItemEnchant;
+                            ClearHeldItem();
                             PlaySoundUIClick();
                         }
                     }
@@ -1122,11 +1150,14 @@ void DrawInventoryScreen(void)
                         if (slotType == i) {
                             uint8_t tmpItem = player.armor[i];
                             int tmpDur = player.armorDurability[i];
+                            uint16_t tmpEnch = player.armorEnchantments[i];
                             player.armor[i] = heldItem;
                             player.armorDurability[i] = heldDurability;
+                            player.armorEnchantments[i] = heldItemEnchant;
                             heldItem = tmpItem;
                             heldCount = 1;
                             heldDurability = tmpDur;
+                            heldItemEnchant = tmpEnch;
                             PlaySoundUIClick();
                         }
                     }
@@ -1288,16 +1319,16 @@ void DrawInventoryScreen(void)
                         if (furnaceOpen) {
                             uint8_t item = player.inventory[idx];
                             int count = player.inventoryCount[idx];
-                            if (item == ITEM_COAL) {
-                                // Transfer coal to fuel slot
+                            if (GetFuelBurnTime(item) > 0.0f) {
+                                // Transfer fuel to fuel slot
                                 if (furnaceFuel == BLOCK_AIR) {
-                                    furnaceFuel = ITEM_COAL;
+                                    furnaceFuel = item;
                                     furnaceFuelCount = count;
                                     player.inventory[idx] = BLOCK_AIR;
                                     player.inventoryCount[idx] = 0;
                                     player.toolDurability[idx] = 0;
                                     transferred = true;
-                                } else if (furnaceFuel == ITEM_COAL) {
+                                } else if (furnaceFuel == item) {
                                     int space = 64 - furnaceFuelCount;
                                     int toAdd = count > space ? space : count;
                                     furnaceFuelCount += toAdd;
@@ -1337,9 +1368,11 @@ void DrawInventoryScreen(void)
                                 if (slot >= 0 && player.armor[slot] == BLOCK_AIR) {
                                     player.armor[slot] = player.inventory[idx];
                                     player.armorDurability[slot] = player.toolDurability[idx];
+                                    player.armorEnchantments[slot] = player.itemEnchantments[idx];
                                     player.inventory[idx] = BLOCK_AIR;
                                     player.inventoryCount[idx] = 0;
                                     player.toolDurability[idx] = 0;
+                                    player.itemEnchantments[idx] = 0;
                                     transferred = true;
                                     PlaySoundUIClick();
                                 }
@@ -1383,17 +1416,18 @@ void DrawInventoryScreen(void)
                     heldItem = player.inventory[idx];
                     heldCount = player.inventoryCount[idx];
                     heldDurability = player.toolDurability[idx];
+                    heldItemEnchant = player.itemEnchantments[idx];
                     player.inventory[idx] = BLOCK_AIR;
                     player.inventoryCount[idx] = 0;
                     player.toolDurability[idx] = 0;
+                    player.itemEnchantments[idx] = 0;
                     PlaySoundUIClick();
                 } else if (heldItem != BLOCK_AIR && player.inventory[idx] == BLOCK_AIR) {
                     player.inventory[idx] = heldItem;
                     player.inventoryCount[idx] = heldCount;
                     player.toolDurability[idx] = heldDurability;
-                    heldItem = BLOCK_AIR;
-                    heldCount = 0;
-                    heldDurability = 0;
+                    player.itemEnchantments[idx] = heldItemEnchant;
+                    ClearHeldItem();
                     PlaySoundUIClick();
                 } else if (heldItem != BLOCK_AIR && player.inventory[idx] == heldItem) {
                     int space = 64 - player.inventoryCount[idx];
@@ -1406,12 +1440,15 @@ void DrawInventoryScreen(void)
                     uint8_t tmpItem = player.inventory[idx];
                     int tmpCount = player.inventoryCount[idx];
                     int tmpDur = player.toolDurability[idx];
+                    uint16_t tmpEnch = player.itemEnchantments[idx];
                     player.inventory[idx] = heldItem;
                     player.inventoryCount[idx] = heldCount;
                     player.toolDurability[idx] = heldDurability;
+                    player.itemEnchantments[idx] = heldItemEnchant;
                     heldItem = tmpItem;
                     heldCount = tmpCount;
                     heldDurability = tmpDur;
+                    heldItemEnchant = tmpEnch;
                     PlaySoundUIClick();
                 }
             }
@@ -1496,10 +1533,10 @@ void DrawInventoryScreen(void)
                     // Item type label
                     const char *typeLabel = NULL;
                     Color typeColor = {180, 180, 190, 200};
-                    if (IsTool(bt)) { typeLabel = "Tool"; typeColor = (Color){100, 160, 220, 255}; }
-                    else if (IsArmor(bt)) { typeLabel = "Armor"; typeColor = (Color){180, 100, 220, 255}; }
-                    else if (IsFood(bt)) { typeLabel = "Food"; typeColor = (Color){100, 200, 100, 255}; }
-                    else { typeLabel = "Block"; typeColor = (Color){180, 175, 190, 200}; }
+                    if (IsTool(bt)) { typeLabel = S(STR_TYPE_TOOL); typeColor = (Color){100, 160, 220, 255}; }
+                    else if (IsArmor(bt)) { typeLabel = S(STR_TYPE_ARMOR); typeColor = (Color){180, 100, 220, 255}; }
+                    else if (IsFood(bt)) { typeLabel = S(STR_TYPE_FOOD); typeColor = (Color){100, 200, 100, 255}; }
+                    else { typeLabel = S(STR_TYPE_BLOCK); typeColor = (Color){180, 175, 190, 200}; }
 
                     int typeW = MeasureGameTextWidth(typeLabel, 11);
                     int maxW = tw > typeW ? tw : typeW;
@@ -1587,6 +1624,67 @@ void DrawWorld(void)
     if (viewRight > worldPixelW - edgeW) {
         DrawRectangle(worldPixelW - edgeW, (int)viewTop, edgeW, (int)(viewBottom - viewTop), (Color){180, 40, 40, 150});
     }
+}
+
+// Fire glow and particle effects for torches, lanterns, lava
+static float fireTimer = 0.0f;
+void DrawFireEffects(float dt)
+{
+    fireTimer += dt;
+    float viewLeft = camera.target.x - (SCREEN_WIDTH / 2.0f) / camera.zoom;
+    float viewRight = camera.target.x + (SCREEN_WIDTH / 2.0f) / camera.zoom;
+    float viewTop = camera.target.y - (SCREEN_HEIGHT / 2.0f) / camera.zoom;
+    float viewBottom = camera.target.y + (SCREEN_HEIGHT / 2.0f) / camera.zoom;
+
+    int minBX = (int)(viewLeft / BLOCK_SIZE) - 1;
+    int maxBX = (int)(viewRight / BLOCK_SIZE) + 1;
+    int minBY = (int)(viewTop / BLOCK_SIZE) - 1;
+    int maxBY = (int)(viewBottom / BLOCK_SIZE) + 1;
+    if (minBX < 0) minBX = 0;
+    if (maxBX >= WORLD_WIDTH) maxBX = WORLD_WIDTH - 1;
+    if (minBY < 0) minBY = 0;
+    if (maxBY >= WORLD_HEIGHT) maxBY = WORLD_HEIGHT - 1;
+
+    float time = (float)GetTime();
+
+    for (int bx = minBX; bx <= maxBX; bx++) {
+        for (int by = minBY; by <= maxBY; by++) {
+            uint8_t block = world[bx][by];
+            bool isFire = (block == BLOCK_TORCH || block == BLOCK_LANTERN);
+            bool isLava = (block == BLOCK_LAVA);
+            if (!isFire && !isLava) continue;
+
+            float cx = bx * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
+            float cy = by * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
+            uint8_t light = GetLightLevel(bx, by);
+            if (light < 4) continue;
+
+            // Glow halo
+            float glowRadius = isLava ? 20.0f : 30.0f;
+            float flicker = 0.8f + sinf(time * 8.0f + bx * 3.7f + by * 5.3f) * 0.15f
+                                   + sinf(time * 13.0f + bx * 7.1f) * 0.05f;
+            unsigned char glowA = (unsigned char)(25 * flicker * (light / 15.0f));
+            Color glowColor = isLava
+                ? (Color){255, 120, 20, glowA}
+                : (Color){255, 180, 50, glowA};
+            // Multi-layer glow
+            for (int r = 3; r > 0; r--) {
+                float radius = glowRadius * r / 3.0f;
+                unsigned char a = glowA / r;
+                Color gc = {glowColor.r, glowColor.g, glowColor.b, a};
+                DrawCircleV((Vector2){cx, cy}, radius, gc);
+            }
+
+            // Spawn fire particles (throttled)
+            if (isFire && fireTimer > 0.08f) {
+                SpawnFireParticle(cx, cy - 4);
+            }
+            if (isLava && fireTimer > 0.2f) {
+                SpawnFireParticle(cx + (float)(rand() % 12 - 6), cy - 2);
+            }
+        }
+    }
+    if (fireTimer > 0.2f) fireTimer = 0.0f;
 }
 
 void DrawMiningCrack(void)
@@ -1899,11 +1997,11 @@ void DrawPlayerSprite(void)
 //----------------------------------------------------------------------------------
 void DrawHotbar(void)
 {
-    int slotSize = 42;
-    int padding = 3;
+    int slotSize = 44;
+    int padding = 4;
     int totalW = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * padding;
     int startX = (SCREEN_WIDTH - totalW) / 2;
-    int startY = SCREEN_HEIGHT - slotSize - 10;
+    int startY = SCREEN_HEIGHT - slotSize - 12;
 
     Vector2 mouse = Win32GetMousePosition();
     int hoveredSlot = -1;
@@ -1915,13 +2013,15 @@ void DrawHotbar(void)
     slotBounce *= powf(0.05f, GetFrameTime());
     if (slotBounce < 0.01f) slotBounce = 0.0f;
 
-    // Background shadow
-    DrawRectangle(startX - 2, startY - 2, totalW + 8, slotSize + 8, (Color){0, 0, 0, 50});
-    // Background
-    DrawRectangle(startX - 4, startY - 4, totalW + 8, slotSize + 8, (Color){25, 22, 32, 200});
-    // Gradient top
-    DrawRectangle(startX - 4, startY - 4, totalW + 8, 12, (Color){30, 27, 38, 200});
-    DrawRectangleLines(startX - 4, startY - 4, totalW + 8, slotSize + 8, (Color){60, 55, 75, 180});
+    float time = (float)GetTime();
+
+    // Glass-morphism background
+    DrawRectangle(startX - 6, startY - 6, totalW + 12, slotSize + 12, (Color){0, 0, 0, 80});
+    DrawRectangle(startX - 4, startY - 4, totalW + 8, slotSize + 8, (Color){20, 18, 30, 220});
+    // Top accent line
+    DrawRectangle(startX - 4, startY - 4, totalW + 8, 2, (Color){80, 120, 200, 180});
+    // Subtle bottom highlight
+    DrawRectangle(startX - 4, startY + slotSize + 2, totalW + 8, 2, (Color){50, 45, 65, 120});
 
     for (int i = 0; i < HOTBAR_SLOTS; i++) {
         int x = startX + i * (slotSize + padding);
@@ -1933,76 +2033,94 @@ void DrawHotbar(void)
 
         if (hover) hoveredSlot = i;
 
+        int drawY = selected ? y - (int)(slotBounce * 4.0f) : y;
+
         if (selected) {
-            int bounceOff = (int)(slotBounce * 3.0f);
-            int bounceGrow = (int)(slotBounce * 4.0f);
-            DrawRectangle(x - 2 - bounceGrow, y - 2 - bounceOff, slotSize + 4 + bounceGrow * 2, slotSize + 4 + bounceGrow, (Color){140, 130, 170, (unsigned char)(80 + (int)(slotBounce * 60))});
-        } else if (hA > 0.01f) {
-            unsigned char glowA = (unsigned char)(30 * hA);
-            DrawRectangle(x - 1, y - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, glowA});
-        }
-        Color slotColor, borderColor;
-        if (selected) {
-            slotColor = (Color){100, 95, 110, 230};
-            borderColor = (Color){180, 170, 200, 255};
+            // Selected slot — bright glow with animated border
+            float pulse = sinf(time * 4.0f) * 0.3f + 0.7f;
+            // Outer glow
+            for (int gl = 4; gl > 0; gl--) {
+                unsigned char ga = (unsigned char)(20 * pulse / gl);
+                DrawRectangle(x - gl, drawY - gl, slotSize + gl * 2, slotSize + gl * 2,
+                             (Color){100, 160, 255, ga});
+            }
+            // Slot body
+            DrawRectangle(x, drawY, slotSize, slotSize, (Color){45, 50, 70, 240});
+            // Top gradient
+            DrawRectangle(x, drawY, slotSize, slotSize / 3, (Color){55, 60, 85, 240});
+            // Bright border
+            DrawRectangleLines(x, drawY, slotSize, slotSize, (Color){120, 170, 255, 220});
+            // Selection indicator dot
+            DrawRectangle(x + slotSize / 2 - 2, drawY - 6, 4, 3, (Color){120, 170, 255, 200});
         } else {
-            slotColor = (Color){
-                (unsigned char)(50 + (int)(15 * hA)),
-                (unsigned char)(47 + (int)(15 * hA)),
-                (unsigned char)(58 + (int)(20 * hA)),
-                (unsigned char)(200 + (int)(20 * hA))
-            };
-            borderColor = (Color){
-                (unsigned char)(70 + (int)(30 * hA)),
-                (unsigned char)(65 + (int)(30 * hA)),
-                (unsigned char)(80 + (int)(40 * hA)),
-                (unsigned char)(200 + (int)(20 * hA))
-            };
+            // Normal slot — subtle glass effect
+            unsigned char r = (unsigned char)(38 + (int)(18 * hA));
+            unsigned char g = (unsigned char)(36 + (int)(18 * hA));
+            unsigned char b = (unsigned char)(48 + (int)(25 * hA));
+            unsigned char a = (unsigned char)(200 + (int)(30 * hA));
+            DrawRectangle(x, drawY, slotSize, slotSize, (Color){r, g, b, a});
+            // Top highlight
+            DrawRectangle(x, drawY, slotSize, slotSize / 4, (Color){(unsigned char)(r + 10), (unsigned char)(g + 10), (unsigned char)(b + 12), a});
+            // Border
+            DrawRectangleLines(x, drawY, slotSize, slotSize, (Color){
+                (unsigned char)(60 + (int)(25 * hA)),
+                (unsigned char)(58 + (int)(25 * hA)),
+                (unsigned char)(75 + (int)(30 * hA)),
+                (unsigned char)(180 + (int)(30 * hA))
+            });
+            // Hover glow
+            if (hA > 0.01f) {
+                DrawRectangle(x - 1, drawY - 1, slotSize + 2, slotSize + 2, (Color){80, 100, 140, (unsigned char)(25 * hA)});
+            }
         }
-        int drawY = selected ? y - (int)(slotBounce * 3.0f) : y;
-        DrawRectangle(x, drawY, slotSize, slotSize, slotColor);
-        // Gradient (lighter top)
-        DrawRectangle(x, drawY, slotSize, slotSize / 3, (Color){(unsigned char)(slotColor.r + 8), (unsigned char)(slotColor.g + 8), (unsigned char)(slotColor.b + 8), slotColor.a});
-        // Rounded corners
-        int hcr = 3;
-        DrawCircleV((Vector2){(float)(x + hcr), (float)(drawY + hcr)}, hcr, slotColor);
-        DrawCircleV((Vector2){(float)(x + slotSize - hcr), (float)(drawY + hcr)}, hcr, slotColor);
-        DrawCircleV((Vector2){(float)(x + hcr), (float)(drawY + slotSize - hcr)}, hcr, slotColor);
-        DrawCircleV((Vector2){(float)(x + slotSize - hcr), (float)(drawY + slotSize - hcr)}, hcr, slotColor);
-        DrawRectangleLines(x, drawY, slotSize, slotSize, borderColor);
+
+        // Rounded corners overlay
+        int hcr = 4;
+        DrawCircleV((Vector2){(float)(x + hcr), (float)(drawY + hcr)}, hcr, selected ? (Color){45, 50, 70, 240} : (Color){38, 36, 48, 200});
+        DrawCircleV((Vector2){(float)(x + slotSize - hcr), (float)(drawY + hcr)}, hcr, selected ? (Color){45, 50, 70, 240} : (Color){38, 36, 48, 200});
+        DrawCircleV((Vector2){(float)(x + hcr), (float)(drawY + slotSize - hcr)}, hcr, selected ? (Color){45, 50, 70, 240} : (Color){38, 36, 48, 200});
+        DrawCircleV((Vector2){(float)(x + slotSize - hcr), (float)(drawY + slotSize - hcr)}, hcr, selected ? (Color){45, 50, 70, 240} : (Color){38, 36, 48, 200});
 
         int item = player.inventory[i];
         if (item != BLOCK_AIR && item < BLOCK_COUNT && blockAtlas.id > 0) {
             Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
-            Rectangle dst = { (float)(x + 4), (float)(drawY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
+            Rectangle dst = { (float)(x + 5), (float)(drawY + 5), (float)(slotSize - 10), (float)(slotSize - 10) };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
 
             if (player.inventoryCount[i] > 1) {
-                // Shadow for readability
-                DrawGameText(TextFormat("%d", player.inventoryCount[i]),
-                         x + slotSize - 19, drawY + slotSize - 14, 13, (Color){0, 0, 0, 150});
-                DrawGameText(TextFormat("%d", player.inventoryCount[i]),
-                         x + slotSize - 20, drawY + slotSize - 15, 13, WHITE);
+                // Count badge with background pill
+                const char *countStr = TextFormat("%d", player.inventoryCount[i]);
+                int ctw = MeasureGameTextWidth(countStr, 12);
+                int badgeX = x + slotSize - ctw - 5;
+                int badgeY = drawY + slotSize - 16;
+                DrawRectangle(badgeX - 2, badgeY - 1, ctw + 4, 14, (Color){0, 0, 0, 140});
+                DrawGameText(countStr, badgeX, badgeY, 12, (Color){240, 240, 255, 230});
             }
 
             if (IsTool((BlockType)item)) {
                 int maxDur = GetToolMaxDurability((BlockType)item);
                 if (maxDur > 0) {
                     float pct = (float)player.toolDurability[i] / maxDur;
-                    int barW = slotSize - 8;
+                    int barW = slotSize - 10;
                     int barH = 3;
-                    int barX = x + 4;
-                    int barY = drawY + slotSize - 5;
-                    Color barColor = pct > 0.5f ? GREEN : (pct > 0.25f ? YELLOW : RED);
-                    DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, 180});
+                    int barX = x + 5;
+                    int barY = drawY + slotSize - 6;
+                    // Smooth color gradient: green → yellow → orange → red
+                    Color barColor;
+                    if (pct > 0.6f) barColor = (Color){80, 200, 100, 220};
+                    else if (pct > 0.3f) barColor = (Color){220, 180, 60, 220};
+                    else barColor = (Color){220, 80, 60, 220};
+                    DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, 120});
                     DrawRectangle(barX, barY, (int)(barW * pct), barH, barColor);
+                    // Highlight on top of bar
+                    DrawRectangle(barX, barY, (int)(barW * pct), 1, (Color){255, 255, 255, 40});
                 }
             }
         }
 
-        // Slot number - dimmer for empty slots
-        Color numColor = (item != BLOCK_AIR) ? (Color){180, 170, 190, 120} : (Color){120, 115, 130, 80};
-        DrawGameText(TextFormat("%d", i + 1), x + 2, drawY + 1,10, numColor);
+        // Slot number — subtle, top-left
+        Color numColor = selected ? (Color){160, 200, 255, 140} : (Color){130, 125, 150, 70};
+        DrawGameText(TextFormat("%d", i + 1), x + 3, drawY + 2, 10, numColor);
     }
 
     // Tooltip for hovered slot
@@ -2062,15 +2180,16 @@ void DrawHotbar(void)
 //----------------------------------------------------------------------------------
 void DrawPlayerStatus(void)
 {
-    int slotSize = 42;
-    int padding = 3;
+    int slotSize = 44;
+    int padding = 4;
     int totalW = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * padding;
     int startX = (SCREEN_WIDTH - totalW) / 2;
-    int barY = SCREEN_HEIGHT - slotSize - 46;
+    int barY = SCREEN_HEIGHT - slotSize - 48;
 
-    int iconSize = 12;
+    int iconSize = 10;
     int iconPad = 2;
     int barX = startX;
+    float time = (float)GetTime();
 
     // Health hearts with damage pulse and low-health flash
     static float heartPulse = 0.0f;
@@ -2082,68 +2201,77 @@ void DrawPlayerStatus(void)
     if (heartPulse < 0.01f) heartPulse = 0.0f;
 
     bool healthLow = player.health <= 6;
-    float healthFlash = healthLow ? (sinf((float)GetTime() * 4.0f) * 0.3f + 0.7f) : 1.0f;
+    float healthFlash = healthLow ? (sinf(time * 4.0f) * 0.3f + 0.7f) : 1.0f;
 
     for (int i = 0; i < MAX_HEALTH / 2; i++) {
         int x = barX + i * (iconSize + iconPad);
         bool filled = player.health >= (i + 1) * 2;
         bool half = !filled && player.health >= i * 2 + 1;
-        Color c = filled ? (Color){200, 45, 45, 255} : (half ? (Color){150, 40, 40, 230} : (Color){50, 18, 18, 180});
+        Color c = filled ? (Color){220, 60, 60, 255} : (half ? (Color){170, 50, 50, 230} : (Color){55, 25, 25, 160});
         if (filled) {
-            // Damage flash: brief white pulse
             float flash = 1.0f + heartPulse * 0.5f;
-            // Low health pulse
-            float pulse = healthFlash;
-            float brightness = flash * pulse;
+            float brightness = flash * healthFlash;
             c.r = (unsigned char)(c.r * brightness > 255 ? 255 : c.r * brightness);
             c.g = (unsigned char)(c.g * brightness > 255 ? 255 : c.g * brightness);
             c.b = (unsigned char)(c.b * brightness > 255 ? 255 : c.b * brightness);
         }
-        DrawRectangle(x, barY, iconSize, iconSize, c);
-        DrawRectangleLines(x, barY, iconSize, iconSize, (Color){90, 30, 30, 180});
+        // Diamond shape for hearts
+        int cx = x + iconSize / 2;
+        int cy = barY + iconSize / 2;
+        DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
+        DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){100, 35, 35, 160});
     }
 
-    // Hunger (flash when low)
-    int hungerX = barX + (MAX_HEALTH / 2) * (iconSize + iconPad) + 10;
+    // Hunger
+    int hungerX = barX + (MAX_HEALTH / 2) * (iconSize + iconPad) + 12;
     bool hungerLow = player.hunger <= 6;
-    float hungerFlash = hungerLow ? (sinf((float)GetTime() * 4.0f) * 0.3f + 0.7f) : 1.0f;
+    float hungerFlash = hungerLow ? (sinf(time * 4.0f) * 0.3f + 0.7f) : 1.0f;
     for (int i = 0; i < MAX_HUNGER / 2; i++) {
         int x = hungerX + i * (iconSize + iconPad);
         bool filled = player.hunger >= (i + 1) * 2;
         bool half = !filled && player.hunger >= i * 2 + 1;
-        Color c = filled ? (Color){170, 110, 35, 255} : (half ? (Color){110, 75, 28, 230} : (Color){45, 28, 12, 180});
+        Color c = filled ? (Color){200, 140, 50, 255} : (half ? (Color){130, 90, 35, 230} : (Color){50, 32, 14, 160});
         if (hungerLow && filled) {
             c.r = (unsigned char)(c.r * hungerFlash);
             c.g = (unsigned char)(c.g * hungerFlash);
             c.b = (unsigned char)(c.b * hungerFlash);
         }
-        DrawRectangle(x, barY, iconSize, iconSize, c);
-        DrawRectangleLines(x, barY, iconSize, iconSize, (Color){75, 48, 18, 180});
+        DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
+        DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){80, 55, 20, 160});
     }
 
     // Oxygen (only show when underwater or not full)
     if (player.oxygen < MAX_OXYGEN) {
-        int oxyX = hungerX + (MAX_HUNGER / 2) * (iconSize + iconPad) + 10;
+        int oxyX = hungerX + (MAX_HUNGER / 2) * (iconSize + iconPad) + 12;
         for (int i = 0; i < MAX_OXYGEN / 2; i++) {
             int x = oxyX + i * (iconSize + iconPad);
             bool filled = player.oxygen >= (i + 1) * 2;
             bool half = !filled && player.oxygen >= i * 2 + 1;
-            Color c = filled ? (Color){70, 170, 240, 255} : (half ? (Color){50, 120, 190, 230} : (Color){25, 50, 90, 180});
-            DrawRectangle(x, barY, iconSize, iconSize, c);
-            DrawRectangleLines(x, barY, iconSize, iconSize, (Color){35, 70, 110, 180});
+            Color c = filled ? (Color){80, 180, 240, 255} : (half ? (Color){55, 130, 200, 230} : (Color){28, 55, 95, 160});
+            DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
+            DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){40, 75, 115, 160});
         }
     }
 
-    // XP bar (always visible)
+    // XP bar — sleek thin bar
     {
-        int xpBarX = hungerX;
-        int xpBarY = barY + iconSize + 3;
-        int xpBarW = (MAX_HUNGER / 2) * (iconSize + iconPad) - iconPad;
-        int xpBarH = 3;
+        int xpBarX = startX;
+        int xpBarY = barY + iconSize + 5;
+        int xpBarW = totalW;
+        int xpBarH = 4;
         float xpPct = (float)player.xp / MAX_XP;
-        DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){25, 25, 25, 200});
+        // Background
+        DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){20, 20, 25, 180});
         if (player.xp > 0) {
-            DrawRectangle(xpBarX, xpBarY, (int)(xpBarW * xpPct), xpBarH, (Color){70, 200, 45, 220});
+            // XP fill with glow
+            DrawRectangle(xpBarX, xpBarY, (int)(xpBarW * xpPct), xpBarH, (Color){60, 220, 80, 230});
+            DrawRectangle(xpBarX, xpBarY, (int)(xpBarW * xpPct), 1, (Color){100, 255, 120, 180});
+        }
+        // XP level number
+        if (player.xp > 0) {
+            const char *xpStr = TextFormat("%d", player.xp / 10);
+            int xpTextW = MeasureGameTextWidth(xpStr, 11);
+            DrawGameText(xpStr, xpBarX - xpTextW - 6, xpBarY - 1, 11, (Color){80, 220, 100, 180});
         }
     }
 }
@@ -2253,27 +2381,33 @@ void DrawMessage(void)
 {
     if (messageTimer <= 0.0f) return;
 
-    // Slide-in animation (decays from 1.0 to 0.0)
+    // Slide-in animation
     messageSlide *= powf(0.01f, GetFrameTime());
     if (messageSlide < 0.01f) messageSlide = 0.0f;
 
-    int fontSize = 18;
+    int fontSize = 16;
     int textW = MeasureGameTextWidth(messageText, fontSize);
-    int x = (SCREEN_WIDTH - textW) / 2;
-    int slideOffset = (int)((1.0f - messageSlide) * -20.0f);
-    int y = SCREEN_HEIGHT / 2 + 80 + slideOffset;
+    int padX = 20, padY = 10;
+    int pillW = textW + padX * 2;
+    int pillH = fontSize + padY * 2;
+    int x = (SCREEN_WIDTH - pillW) / 2;
+    int slideOffset = (int)((1.0f - messageSlide) * -25.0f);
+    int y = SCREEN_HEIGHT / 2 + 90 + slideOffset;
 
     float alpha = messageTimer > 0.5f ? 1.0f : messageTimer * 2.0f;
     unsigned char a = (unsigned char)(alpha * 255);
 
-    // Message shadow
-    DrawRectangle(x - 12, y - 4, textW + 28, fontSize + 12, (Color){0, 0, 0, (unsigned char)(a * 0.4f)});
-    // Message background
-    DrawRectangle(x - 14, y - 6, textW + 28, fontSize + 12, (Color){25, 22, 32, (unsigned char)(a * 0.85f)});
-    DrawRectangleLines(x - 14, y - 6, textW + 28, fontSize + 12, (Color){90, 85, 110, (unsigned char)(a * 0.6f)});
-    // Text shadow
-    DrawGameText(messageText, x + 1, y + 1, fontSize, (Color){0, 0, 0, (unsigned char)(a * 0.5f)});
-    DrawGameText(messageText, x, y, fontSize, (Color){messageColor.r, messageColor.g, messageColor.b, a});
+    // Glass-morphism pill background
+    DrawRectangle(x, y, pillW, pillH, (Color){15, 14, 22, (unsigned char)(a * 0.9f)});
+    // Top accent line (colored based on message type)
+    DrawRectangle(x, y, pillW, 2, (Color){messageColor.r, messageColor.g, messageColor.b, (unsigned char)(a * 0.8f)});
+    // Subtle inner highlight
+    DrawRectangle(x + 1, y + 1, pillW - 2, pillH / 3, (Color){30, 28, 40, (unsigned char)(a * 0.4f)});
+    // Border
+    DrawRectangleLines(x, y, pillW, pillH, (Color){60, 55, 75, (unsigned char)(a * 0.5f)});
+    // Text
+    int textX = (SCREEN_WIDTH - textW) / 2;
+    DrawGameText(messageText, textX, y + padY, fontSize, (Color){messageColor.r, messageColor.g, messageColor.b, a});
 }
 
 //----------------------------------------------------------------------------------
@@ -2281,51 +2415,63 @@ void DrawMessage(void)
 //----------------------------------------------------------------------------------
 void DrawPauseMenu(void)
 {
-    // Panel open/close animation
     static float pauseAnim = 0.0f;
     float dt = GetFrameTime();
     float target = gamePaused ? 1.0f : 0.0f;
     pauseAnim += (target - pauseAnim) * 25.0f * dt;
     if (pauseAnim < 0.01f && !gamePaused) return;
     if (pauseAnim > 0.99f) pauseAnim = 1.0f;
+    float time = (float)GetTime();
 
-    unsigned char pauseOA = (unsigned char)(160 * pauseAnim);
+    // Dark overlay with scan lines
+    unsigned char pauseOA = (unsigned char)(170 * pauseAnim);
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, pauseOA});
+    for (int y = 0; y < SCREEN_HEIGHT; y += 3) {
+        DrawRectangle(0, y, SCREEN_WIDTH, 1, (Color){0, 0, 0, (unsigned char)(8 * pauseAnim)});
+    }
 
-    int boxW = 400;
-    int boxH = 510;
+    int boxW = 420;
+    int boxH = 520;
     int boxX = (SCREEN_WIDTH - boxW) / 2;
     int boxY = (SCREEN_HEIGHT - boxH) / 2;
     boxY += (int)((1.0f - pauseAnim) * 40.0f);
 
-    // Container shadow
-    DrawRectangle(boxX + 4, boxY + 4, boxW, boxH, (Color){0, 0, 0, 60});
     // Container
-    DrawRectangle(boxX, boxY, boxW, boxH, (Color){45, 42, 50, 240});
-    // Gradient top
-    DrawRectangle(boxX, boxY, boxW, 50, (Color){50, 47, 56, 240});
-    DrawRectangleLines(boxX, boxY, boxW, boxH, (Color){90, 85, 100, 255});
-    DrawRectangleLines(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){65, 60, 75, 200});
+    DrawRectangle(boxX, boxY, boxW, boxH, (Color){18, 16, 25, 240});
+    // Top accent
+    DrawRectangle(boxX, boxY, boxW, 2, (Color){50, 130, 140, 150});
+    // Bottom accent
+    DrawRectangle(boxX, boxY + boxH - 2, boxW, 2, (Color){110, 50, 130, 120});
+    // Corner dots
+    DrawRectangle(boxX - 1, boxY - 1, 3, 3, (Color){60, 150, 160, 150});
+    DrawRectangle(boxX + boxW - 2, boxY - 1, 3, 3, (Color){60, 150, 160, 150});
+    DrawRectangle(boxX - 1, boxY + boxH - 2, 3, 3, (Color){110, 60, 140, 150});
+    DrawRectangle(boxX + boxW - 2, boxY + boxH - 2, 3, 3, (Color){110, 60, 140, 150});
+    // Border
+    DrawRectangleLines(boxX, boxY, boxW, boxH, (Color){50, 120, 130, 120});
 
     // Title
     const char *title = S(STR_PAUSED);
-    int titleW = MeasureGameTextWidth(title, 26);
-    DrawGameText(title, boxX + (boxW - titleW) / 2, boxY + 16, 26, (Color){220, 210, 230, 255});
+    int titleW = MeasureGameTextWidth(title, 28);
+    int titleX = boxX + (boxW - titleW) / 2;
+    DrawGameText(title, titleX + 1, boxY + 15, 28, (Color){0, 0, 0, 100});
+    DrawGameText(title, titleX, boxY + 14, 28, (Color){180, 200, 210, 255});
+    DrawRectangle(boxX + 20, boxY + 46, boxW - 40, 1, (Color){60, 120, 130, 60});
 
     Vector2 mouse = Win32GetMousePosition();
 
     // --- Volume Sliders ---
-    int sliderX = boxX + 28;
-    int sliderW = boxW - 80;
-    int sliderY = boxY + 56;
+    int sliderX = boxX + 30;
+    int sliderW = boxW - 90;
+    int sliderY = boxY + 58;
 
-    static int activeSlider = -1; // 0=BGM, 1=SFX, -1=none
+    static int activeSlider = -1;
 
     // BGM Volume
-    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY,16, (Color){180, 175, 190, 255});
+    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 15, (Color){140, 160, 170, 200});
     sliderY += 20;
-    Rectangle bgmTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 6.0f };
-    DrawRectangleRec(bgmTrack, (Color){35, 33, 42, 255});
+    Rectangle bgmTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 4.0f };
+    DrawRectangleRec(bgmTrack, (Color){25, 25, 35, 255});
     Rectangle bgmArea = { (float)(sliderX - 10), (float)(sliderY - 8), (float)(sliderW + 20), 24.0f };
     bool bgmHover = CheckCollisionPointRec(mouse, bgmArea);
 
@@ -2337,19 +2483,19 @@ void DrawPauseMenu(void)
         if (bgmVolumeSlider > 1.0f) bgmVolumeSlider = 1.0f;
         SetBGMVolume(bgmVolumeSlider);
     }
-    DrawRectangle(sliderX, sliderY, (int)(bgmVolumeSlider * sliderW), 6, (Color){80, 180, 80, 255});
-    Color bgmHandleColor = (activeSlider == 0 || bgmHover) ? (Color){255, 255, 255, 255} : (Color){200, 200, 200, 255};
-    DrawRectangle((int)(sliderX + bgmVolumeSlider * sliderW) - 5, sliderY - 3, 10, 12, bgmHandleColor);
+    DrawRectangle(sliderX, sliderY, (int)(bgmVolumeSlider * sliderW), 4, (Color){60, 150, 120, 220});
+    Color bgmHandleColor = (activeSlider == 0 || bgmHover) ? (Color){180, 200, 200, 255} : (Color){120, 150, 140, 200};
+    DrawRectangle((int)(sliderX + bgmVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, bgmHandleColor);
     char bgmText[16];
     sprintf(bgmText, "%d%%", (int)(bgmVolumeSlider * 100));
-    DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 3,14, (Color){180, 175, 190, 200});
+    DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){130, 150, 150, 160});
 
     // SFX Volume
-    sliderY += 34;
-    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY,16, (Color){180, 175, 190, 255});
+    sliderY += 36;
+    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 15, (Color){150, 130, 160, 200});
     sliderY += 20;
-    Rectangle sfxTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 6.0f };
-    DrawRectangleRec(sfxTrack, (Color){35, 33, 42, 255});
+    Rectangle sfxTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 4.0f };
+    DrawRectangleRec(sfxTrack, (Color){25, 25, 35, 255});
     Rectangle sfxArea = { (float)(sliderX - 10), (float)(sliderY - 8), (float)(sliderW + 20), 24.0f };
     bool sfxHover = CheckCollisionPointRec(mouse, sfxArea);
 
@@ -2361,130 +2507,110 @@ void DrawPauseMenu(void)
         if (sfxVolumeSlider > 1.0f) sfxVolumeSlider = 1.0f;
         SetSFXVolume(sfxVolumeSlider);
     }
-    DrawRectangle(sliderX, sliderY, (int)(sfxVolumeSlider * sliderW), 6, (Color){80, 140, 200, 255});
-    Color sfxHandleColor = (activeSlider == 1 || sfxHover) ? (Color){255, 255, 255, 255} : (Color){200, 200, 200, 255};
-    DrawRectangle((int)(sliderX + sfxVolumeSlider * sliderW) - 5, sliderY - 3, 10, 12, sfxHandleColor);
+    DrawRectangle(sliderX, sliderY, (int)(sfxVolumeSlider * sliderW), 4, (Color){140, 60, 150, 220});
+    Color sfxHandleColor = (activeSlider == 1 || sfxHover) ? (Color){200, 180, 210, 255} : (Color){150, 120, 160, 200};
+    DrawRectangle((int)(sliderX + sfxVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, sfxHandleColor);
     char sfxText[16];
     sprintf(sfxText, "%d%%", (int)(sfxVolumeSlider * 100));
-    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3,14, (Color){180, 175, 190, 200});
+    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){150, 130, 160, 160});
 
     // --- Controls ---
-    int ctrlY = sliderY + 34;
+    int ctrlY = sliderY + 36;
     const char *ctrlTitle = S(STR_CONTROLS_TITLE);
-    DrawGameText(ctrlTitle, boxX + (boxW - MeasureGameTextWidth(ctrlTitle,16)) / 2, ctrlY,16, (Color){200, 190, 100, 220});
-    ctrlY += 22;
+    DrawGameText(ctrlTitle, boxX + (boxW - MeasureGameTextWidth(ctrlTitle, 16)) / 2, ctrlY, 16, (Color){180, 170, 120, 180});
+    ctrlY += 6;
+    DrawRectangle(boxX + 20, ctrlY, boxW - 40, 1, (Color){120, 110, 70, 40});
+    ctrlY += 14;
 
-    int keyX = boxX + 28;
-    int actX = boxX + 140;
+    int keyX = boxX + 30;
+    int actX = boxX + 150;
     const char *keys[] = { S(STR_KEY_WASD), S(STR_KEY_SPACE), S(STR_KEY_SHIFT), S(STR_KEY_LCLICK), S(STR_KEY_RCLICK), S(STR_KEY_E), S(STR_KEY_H), S(STR_KEY_F3), S(STR_KEY_ESC), S(STR_KEY_19) };
     const char *acts[] = { S(STR_ACT_MOVE), S(STR_ACT_JUMP), S(STR_ACT_SPRINT), S(STR_ACT_BREAK), S(STR_ACT_PLACE), S(STR_ACT_INVENTORY), S(STR_ACT_HEAL), S(STR_ACT_DEBUG), S(STR_ACT_PAUSE), S(STR_ACT_HOTBAR) };
     int numControls = sizeof(keys) / sizeof(keys[0]);
 
     for (int i = 0; i < numControls; i++) {
-        DrawGameText(keys[i], keyX, ctrlY,13, (Color){220, 215, 230, 220});
-        DrawGameText(acts[i], actX, ctrlY,13, (Color){170, 165, 180, 220});
-        ctrlY += 16;
+        DrawGameText(keys[i], keyX, ctrlY, 12, (Color){140, 160, 170, 160});
+        DrawGameText(acts[i], actX, ctrlY, 12, (Color){150, 150, 160, 160});
+        ctrlY += 15;
     }
 
     // --- Buttons ---
     int btnW = 110;
     int btnH = 34;
     int btnY = boxY + boxH - 52;
-    int btnGap = 10;
+    int btnGap = 12;
     int totalBtnW = btnW * 3 + btnGap * 2;
     int btnStartX = boxX + (boxW - totalBtnW) / 2;
 
-    // Continue button
-    Rectangle btnContinue = { (float)btnStartX, (float)btnY, (float)btnW, (float)btnH };
-    bool hoverC = CheckCollisionPointRec(mouse, btnContinue);
-    float hC = GetHoverAlpha(50, hoverC, dt);
-    unsigned char cR = (unsigned char)(55 + (int)(15 * hC));
-    unsigned char cG = (unsigned char)(95 + (int)(35 * hC));
-    unsigned char cB = (unsigned char)(55 + (int)(15 * hC));
-    Color bgC = (Color){cR, cG, cB, 230};
-    DrawRectangleRec(btnContinue, bgC);
-    DrawRectangle((int)btnContinue.x, (int)btnContinue.y, btnW, btnH / 3,
-                 (Color){(unsigned char)(cR + 12), (unsigned char)(cG + 12), (unsigned char)(cB + 12), 230});
-    int cr = 3;
-    DrawCircleV((Vector2){btnContinue.x + cr, btnContinue.y + cr}, cr, bgC);
-    DrawCircleV((Vector2){btnContinue.x + btnW - cr, btnContinue.y + cr}, cr, bgC);
-    DrawCircleV((Vector2){btnContinue.x + cr, btnContinue.y + btnH - cr}, cr, bgC);
-    DrawCircleV((Vector2){btnContinue.x + btnW - cr, btnContinue.y + btnH - cr}, cr, bgC);
-    unsigned char cBorderA = (unsigned char)(80 + (int)(40 * hC));
-    DrawRectangleLinesEx(btnContinue, 1, (Color){120, 200, 120, cBorderA});
-    if (hoverC && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        DrawRectangle((int)btnContinue.x, (int)btnContinue.y, btnW, btnH, (Color){0, 0, 0, 30});
-    }
-    DrawGameText(S(STR_CONTINUE), (int)(btnContinue.x + (btnW - MeasureGameTextWidth(S(STR_CONTINUE), 16)) / 2),
-             (int)(btnContinue.y + 8), 16, WHITE);
-
-    if (hoverC && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        PlaySoundUIClick();
-        gamePaused = false;
+    // Continue
+    {
+        int bx = btnStartX;
+        Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
+        bool hover = CheckCollisionPointRec(mouse, r);
+        float h = GetHoverAlpha(50, hover, dt);
+        if (h > 0.01f) DrawRectangle(bx - 1, btnY - 1, btnW + 2, btnH + 2, (Color){50, 130, 110, (unsigned char)(15 * h * pauseAnim)});
+        DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
+        unsigned char r1 = (unsigned char)((22 + (int)(20 * h)) * pauseAnim);
+        unsigned char g1 = (unsigned char)((38 + (int)(60 * h)) * pauseAnim);
+        unsigned char b1 = (unsigned char)((32 + (int)(40 * h)) * pauseAnim);
+        DrawRectangle(bx, btnY, btnW, btnH, (Color){r1, g1, b1, (unsigned char)(220 * pauseAnim)});
+        DrawRectangle(bx, btnY, btnW, btnH / 3, (Color){(unsigned char)(r1 + 8), (unsigned char)(g1 + 8), (unsigned char)(b1 + 8), (unsigned char)(220 * pauseAnim)});
+        DrawRectangleLinesEx(r, 1, (Color){60, 140, 120, (unsigned char)(140 * pauseAnim)});
+        const char *label = S(STR_CONTINUE);
+        int tw = MeasureGameTextWidth(label, 16);
+        DrawGameText(label, bx + (btnW - tw) / 2, btnY + 8, 16, (Color){210, 220, 215, (unsigned char)(240 * pauseAnim)});
+        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { PlaySoundUIClick(); gamePaused = false; }
     }
 
-    // Main Menu button
-    Rectangle btnMenu = { (float)(btnStartX + btnW + btnGap), (float)btnY, (float)btnW, (float)btnH };
-    bool hoverM = CheckCollisionPointRec(mouse, btnMenu);
-    float hM = GetHoverAlpha(51, hoverM, dt);
-    unsigned char mR = (unsigned char)(50 + (int)(20 * hM));
-    unsigned char mG = (unsigned char)(65 + (int)(25 * hM));
-    unsigned char mB = (unsigned char)(100 + (int)(40 * hM));
-    Color bgM = (Color){mR, mG, mB, 230};
-    DrawRectangleRec(btnMenu, bgM);
-    DrawRectangle((int)btnMenu.x, (int)btnMenu.y, btnW, btnH / 3,
-                 (Color){(unsigned char)(mR + 12), (unsigned char)(mG + 12), (unsigned char)(mB + 12), 230});
-    DrawCircleV((Vector2){btnMenu.x + cr, btnMenu.y + cr}, cr, bgM);
-    DrawCircleV((Vector2){btnMenu.x + btnW - cr, btnMenu.y + cr}, cr, bgM);
-    DrawCircleV((Vector2){btnMenu.x + cr, btnMenu.y + btnH - cr}, cr, bgM);
-    DrawCircleV((Vector2){btnMenu.x + btnW - cr, btnMenu.y + btnH - cr}, cr, bgM);
-    unsigned char mBorderA = (unsigned char)(70 + (int)(50 * hM));
-    DrawRectangleLinesEx(btnMenu, 1, (Color){130, 170, 230, mBorderA});
-    if (hoverM && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        DrawRectangle((int)btnMenu.x, (int)btnMenu.y, btnW, btnH, (Color){0, 0, 0, 30});
-    }
-    DrawGameText(S(STR_MAIN_MENU), (int)(btnMenu.x + (btnW - MeasureGameTextWidth(S(STR_MAIN_MENU), 16)) / 2),
-             (int)(btnMenu.y + 8), 16, WHITE);
-
-    if (hoverM && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        PlaySoundUIClick();
-        if (currentSavePath[0]) SaveWorld(currentSavePath);
-        if (NetIsHost()) NetHostStop();
-        else if (NetIsClient()) NetClientDisconnect();
-        gamePaused = false;
-        inventoryOpen = false;
-        StartTransition(STATE_MENU);
-        menuSelection = 0;
+    // Main Menu
+    {
+        int bx = btnStartX + btnW + btnGap;
+        Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
+        bool hover = CheckCollisionPointRec(mouse, r);
+        float h = GetHoverAlpha(51, hover, dt);
+        if (h > 0.01f) DrawRectangle(bx - 1, btnY - 1, btnW + 2, btnH + 2, (Color){40, 100, 150, (unsigned char)(15 * h * pauseAnim)});
+        DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
+        unsigned char r1 = (unsigned char)((20 + (int)(15 * h)) * pauseAnim);
+        unsigned char g1 = (unsigned char)((30 + (int)(50 * h)) * pauseAnim);
+        unsigned char b1 = (unsigned char)((45 + (int)(70 * h)) * pauseAnim);
+        DrawRectangle(bx, btnY, btnW, btnH, (Color){r1, g1, b1, (unsigned char)(220 * pauseAnim)});
+        DrawRectangle(bx, btnY, btnW, btnH / 3, (Color){(unsigned char)(r1 + 8), (unsigned char)(g1 + 8), (unsigned char)(b1 + 8), (unsigned char)(220 * pauseAnim)});
+        DrawRectangleLinesEx(r, 1, (Color){50, 120, 170, (unsigned char)(140 * pauseAnim)});
+        const char *label = S(STR_MAIN_MENU);
+        int tw = MeasureGameTextWidth(label, 16);
+        DrawGameText(label, bx + (btnW - tw) / 2, btnY + 8, 16, (Color){210, 215, 225, (unsigned char)(240 * pauseAnim)});
+        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            PlaySoundUIClick();
+            if (currentSavePath[0]) SaveWorld(currentSavePath);
+            if (NetIsHost()) NetHostStop();
+            else if (NetIsClient()) NetClientDisconnect();
+            gamePaused = false; inventoryOpen = false;
+            StartTransition(STATE_MENU); menuSelection = 0;
+        }
     }
 
-    // Quit button
-    Rectangle btnQuit = { (float)(btnStartX + (btnW + btnGap) * 2), (float)btnY, (float)btnW, (float)btnH };
-    bool hoverQ = CheckCollisionPointRec(mouse, btnQuit);
-    float hQ = GetHoverAlpha(52, hoverQ, dt);
-    unsigned char qR = (unsigned char)(100 + (int)(40 * hQ));
-    unsigned char qG = (unsigned char)(45 + (int)(15 * hQ));
-    unsigned char qB = (unsigned char)(45 + (int)(15 * hQ));
-    Color bgQ = (Color){qR, qG, qB, 230};
-    DrawRectangleRec(btnQuit, bgQ);
-    DrawRectangle((int)btnQuit.x, (int)btnQuit.y, btnW, btnH / 3,
-                 (Color){(unsigned char)(qR + 12), (unsigned char)(qG + 12), (unsigned char)(qB + 12), 230});
-    DrawCircleV((Vector2){btnQuit.x + cr, btnQuit.y + cr}, cr, bgQ);
-    DrawCircleV((Vector2){btnQuit.x + btnW - cr, btnQuit.y + cr}, cr, bgQ);
-    DrawCircleV((Vector2){btnQuit.x + cr, btnQuit.y + btnH - cr}, cr, bgQ);
-    DrawCircleV((Vector2){btnQuit.x + btnW - cr, btnQuit.y + btnH - cr}, cr, bgQ);
-    unsigned char qBorderA = (unsigned char)(70 + (int)(60 * hQ));
-    DrawRectangleLinesEx(btnQuit, 1, (Color){200, 100, 100, qBorderA});
-    if (hoverQ && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        DrawRectangle((int)btnQuit.x, (int)btnQuit.y, btnW, btnH, (Color){0, 0, 0, 30});
-    }
-    DrawGameText(S(STR_BTN_QUIT), (int)(btnQuit.x + (btnW - MeasureGameTextWidth(S(STR_BTN_QUIT), 16)) / 2),
-             (int)(btnQuit.y + 8), 16, WHITE);
-
-    if (hoverQ && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-        PlaySoundUIClick();
-        if (currentSavePath[0]) SaveWorld(currentSavePath);
-        CloseWindow();
-        exit(0);
+    // Quit
+    {
+        int bx = btnStartX + (btnW + btnGap) * 2;
+        Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
+        bool hover = CheckCollisionPointRec(mouse, r);
+        float h = GetHoverAlpha(52, hover, dt);
+        if (h > 0.01f) DrawRectangle(bx - 1, btnY - 1, btnW + 2, btnH + 2, (Color){150, 50, 55, (unsigned char)(15 * h * pauseAnim)});
+        DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
+        unsigned char r1 = (unsigned char)((42 + (int)(50 * h)) * pauseAnim);
+        unsigned char g1 = (unsigned char)((22 + (int)(20 * h)) * pauseAnim);
+        unsigned char b1 = (unsigned char)((24 + (int)(20 * h)) * pauseAnim);
+        DrawRectangle(bx, btnY, btnW, btnH, (Color){r1, g1, b1, (unsigned char)(220 * pauseAnim)});
+        DrawRectangle(bx, btnY, btnW, btnH / 3, (Color){(unsigned char)(r1 + 8), (unsigned char)(g1 + 8), (unsigned char)(b1 + 8), (unsigned char)(220 * pauseAnim)});
+        DrawRectangleLinesEx(r, 1, (Color){160, 60, 65, (unsigned char)(140 * pauseAnim)});
+        const char *label = S(STR_BTN_QUIT);
+        int tw = MeasureGameTextWidth(label, 16);
+        DrawGameText(label, bx + (btnW - tw) / 2, btnY + 8, 16, (Color){220, 210, 210, (unsigned char)(240 * pauseAnim)});
+        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            PlaySoundUIClick();
+            if (currentSavePath[0]) SaveWorld(currentSavePath);
+            CloseWindow(); exit(0);
+        }
     }
 }
 
@@ -2502,46 +2628,89 @@ void DrawDeathScreen(float dt)
 
     deathFadeTimer += dt;
     float alpha = deathFadeTimer < 1.0f ? deathFadeTimer : 1.0f;
+    float time = (float)GetTime();
 
-    // Dark red overlay with vignette feel
-    unsigned char overlayA = (unsigned char)(alpha * 160);
-    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){80, 0, 0, overlayA});
-    // Extra dark edges
-    DrawRectangle(0, 0, SCREEN_WIDTH, 60, (Color){0, 0, 0, (unsigned char)(alpha * 80)});
-    DrawRectangle(0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 60, (Color){0, 0, 0, (unsigned char)(alpha * 80)});
+    // Dramatic dark overlay with red vignette
+    unsigned char overlayA = (unsigned char)(alpha * 180);
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){60, 0, 0, overlayA});
+
+    // Radial vignette effect (darker edges)
+    for (int edge = 0; edge < 80; edge += 4) {
+        unsigned char edgeA = (unsigned char)(alpha * (80 - edge));
+        DrawRectangle(0, edge, SCREEN_WIDTH, 4, (Color){0, 0, 0, edgeA});
+        DrawRectangle(0, SCREEN_HEIGHT - edge - 4, SCREEN_WIDTH, 4, (Color){0, 0, 0, edgeA});
+        DrawRectangle(edge, 0, 4, SCREEN_HEIGHT, (Color){0, 0, 0, (unsigned char)(edgeA * 0.7f)});
+        DrawRectangle(SCREEN_WIDTH - edge - 4, 0, 4, SCREEN_HEIGHT, (Color){0, 0, 0, (unsigned char)(edgeA * 0.7f)});
+    }
+
+    // Animated blood drip lines
+    for (int i = 0; i < 5; i++) {
+        int dripX = (SCREEN_WIDTH / 6) * (i + 1);
+        float dripProgress = (alpha - 0.2f - i * 0.05f);
+        if (dripProgress > 0.0f) {
+            int dripH = (int)(dripProgress * SCREEN_HEIGHT * 0.4f);
+            if (dripH > SCREEN_HEIGHT / 2) dripH = SCREEN_HEIGHT / 2;
+            unsigned char dripA = (unsigned char)(40 * alpha);
+            DrawRectangle(dripX, 0, 2, dripH, (Color){120, 0, 0, dripA});
+        }
+    }
 
     if (alpha > 0.4f) {
+        float textFade = (alpha - 0.4f) / 0.6f;
+        unsigned char textA = (unsigned char)(textFade * 255);
+
+        // "YOU DIED" with dramatic glow
         const char *text = S(STR_YOU_DIED);
-        int fontSize = 52;
+        int fontSize = 56;
         int textW = MeasureGameTextWidth(text, fontSize);
-        unsigned char textA = (unsigned char)((alpha - 0.4f) / 0.6f * 255);
         int tx = (SCREEN_WIDTH - textW) / 2;
-        int ty = SCREEN_HEIGHT / 2 - 60;
+        int ty = SCREEN_HEIGHT / 2 - 70;
+
+        // Pulsing red glow
+        float pulse = sinf(time * 2.0f) * 0.3f + 0.7f;
+        unsigned char glowA = (unsigned char)(30 * pulse * textFade);
+        for (int r = 5; r > 0; r--) {
+            DrawGameText(text, tx - r, ty, fontSize, (Color){180, 0, 0, (unsigned char)(glowA / r)});
+            DrawGameText(text, tx + r, ty, fontSize, (Color){180, 0, 0, (unsigned char)(glowA / r)});
+            DrawGameText(text, tx, ty - r, fontSize, (Color){180, 0, 0, (unsigned char)(glowA / r)});
+            DrawGameText(text, tx, ty + r, fontSize, (Color){180, 0, 0, (unsigned char)(glowA / r)});
+        }
         // Shadow
-        DrawGameText(text, tx + 3, ty + 3, fontSize, (Color){0, 0, 0, (unsigned char)(textA * 0.5f)});
-        DrawGameText(text, tx, ty, fontSize, (Color){220, 40, 40, textA});
+        DrawGameText(text, tx + 3, ty + 3, fontSize, (Color){0, 0, 0, (unsigned char)(textA * 0.6f)});
+        // Main text
+        DrawGameText(text, tx, ty, fontSize, (Color){230, 50, 50, textA});
+
+        // Decorative line under title
+        int lineW = 200;
+        int lineX = (SCREEN_WIDTH - lineW) / 2;
+        DrawRectangle(lineX, ty + 65, lineW, 1, (Color){150, 50, 50, (unsigned char)(textA * 0.6f)});
 
         // Death cause
         const char *cause = S(lastDeathCause);
         int causeW = MeasureGameTextWidth(cause, 18);
-        DrawGameText(cause, (SCREEN_WIDTH - causeW) / 2, ty + 60, 18, (Color){180, 170, 160, textA});
+        DrawGameText(cause, (SCREEN_WIDTH - causeW) / 2, ty + 75, 18, (Color){200, 180, 170, textA});
 
         // Score (XP)
         char scoreBuf[64];
         snprintf(scoreBuf, sizeof(scoreBuf), S(STR_DEATH_SCORE), player.xp);
         int scoreW = MeasureGameTextWidth(scoreBuf, 16);
-        DrawGameText(scoreBuf, (SCREEN_WIDTH - scoreW) / 2, ty + 85, 16, (Color){200, 200, 100, textA});
+        DrawGameText(scoreBuf, (SCREEN_WIDTH - scoreW) / 2, ty + 100, 16, (Color){220, 200, 120, textA});
     }
 
     if (alpha > 0.8f) {
+        float subFade = (alpha - 0.8f) * 5.0f;
+        unsigned char subA = (unsigned char)(subFade * 255);
+
+        // Respawn button with hover effect
         const char *sub = S(STR_PRESS_SPACE_RESPAWN);
         int subW = MeasureGameTextWidth(sub, 18);
-        unsigned char subA = (unsigned char)((alpha - 0.8f) * 5.0f * 255);
-        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, SCREEN_HEIGHT / 2 + 30, 18, (Color){200, 200, 200, subA});
+        float bounce = sinf(time * 3.0f) * 0.15f + 0.85f;
+        unsigned char subAB = (unsigned char)(subA * bounce);
+        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, SCREEN_HEIGHT / 2 + 40, 18, (Color){230, 230, 230, subAB});
 
         const char *escHint = S(STR_PRESS_ESC_MENU);
-        int escW = MeasureGameTextWidth(escHint,14);
-        DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, SCREEN_HEIGHT / 2 + 58,14, (Color){160, 155, 170, (unsigned char)(subA * 0.7f)});
+        int escW = MeasureGameTextWidth(escHint, 14);
+        DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, SCREEN_HEIGHT / 2 + 68, 14, (Color){160, 155, 170, (unsigned char)(subA * 0.6f)});
     }
 }
 
@@ -2684,12 +2853,13 @@ void DrawLargeMap(void)
     int rangeX = 300; // blocks visible horizontally
     int rangeY = rangeX * mapH / mapW; // maintain aspect ratio
 
-    // Draw terrain columns
-    for (int px = 0; px < mapW; px++) {
+    // Draw terrain columns (2x2 pixel blocks for performance)
+    int step = 2;
+    for (int px = 0; px < mapW; px += step) {
         int worldBX = playerBX + (px - mapW / 2) * rangeX / (mapW / 2);
         if (worldBX < 0 || worldBX >= WORLD_WIDTH) continue;
 
-        for (int py = 0; py < mapH; py++) {
+        for (int py = 0; py < mapH; py += step) {
             int worldBY = playerBY + (py - mapH / 2) * rangeY / (mapH / 2);
             if (worldBY < 0 || worldBY >= WORLD_HEIGHT) continue;
 
@@ -2728,7 +2898,7 @@ void DrawLargeMap(void)
                 default: c = (Color){100, 100, 100, 255}; break;
             }
             if (c.a > 0) {
-                DrawRectangle(mapX + px, mapY + py, 1, 1, c);
+                DrawRectangle(mapX + px, mapY + py, step, step, c);
             }
         }
     }
@@ -2894,6 +3064,17 @@ void DrawMainMenu(void)
     int titleLen = (int)strlen(title);
     float titleTotalDur = 0.4f + titleLen * 0.06f;
 
+    // Precompute character widths and positions
+    int charWidths[128];
+    int charPositions[128];
+    int runX = titleX;
+    for (int k = 0; k < titleLen && k < 128; k++) {
+        char tmp[2] = { title[k], 0 };
+        charWidths[k] = MeasureGameTextWidth(tmp, titleSize);
+        charPositions[k] = runX;
+        runX += charWidths[k];
+    }
+
     // Letter-by-letter bounce-in
     for (int ci = 0; ci < titleLen; ci++) {
         float letterStart = ci * 0.06f;
@@ -2901,7 +3082,6 @@ void DrawMainMenu(void)
         if (lt < 0.0f) continue;
         float progress = lt / 0.4f;
         if (progress > 1.0f) progress = 1.0f;
-        // Bounce easing
         float bounce;
         if (progress < 0.6f) {
             bounce = progress / 0.6f;
@@ -2913,86 +3093,79 @@ void DrawMainMenu(void)
         }
         float alpha = progress < 0.3f ? progress / 0.3f : 1.0f;
         float offsetY = (1.0f - bounce) * -30.0f;
-        // Measure character position
         char chBuf[2] = { title[ci], 0 };
-        int charW = MeasureGameTextWidth(chBuf, titleSize);
-        int cx = titleX;
-        for (int k = 0; k < ci; k++) {
-            char tmp[2] = { title[k], 0 };
-            cx += MeasureGameTextWidth(tmp, titleSize);
-        }
+        int cx = charPositions[ci];
         int cy = titleY + (int)offsetY;
         unsigned char ca = (unsigned char)(alpha * 255);
-        // Glow per letter
-        float letterGlow = sinf(time * 2.0f + ci * 0.5f) * 0.3f + 0.7f;
-        unsigned char ga = (unsigned char)(30 * letterGlow * alpha);
-        for (int r = 3; r > 0; r--) {
-            DrawGameText(chBuf, cx - r, cy, titleSize, (Color){80, 160, 255, (unsigned char)(ga / r)});
-            DrawGameText(chBuf, cx + r, cy, titleSize, (Color){80, 160, 255, (unsigned char)(ga / r)});
-            DrawGameText(chBuf, cx, cy - r, titleSize, (Color){80, 160, 255, (unsigned char)(ga / r)});
-            DrawGameText(chBuf, cx, cy + r, titleSize, (Color){80, 160, 255, (unsigned char)(ga / r)});
-        }
-        DrawGameText(chBuf, cx + 2, cy + 2, titleSize, (Color){0, 0, 0, (unsigned char)(120 * alpha)});
-        DrawGameText(chBuf, cx, cy, titleSize, (Color){240, 235, 255, ca});
+        // Clean shadow + text
+        DrawGameText(chBuf, cx + 1, cy + 1, titleSize, (Color){0, 0, 0, (unsigned char)(100 * alpha)});
+        DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 235, 250, ca});
     }
 
-    // Title shadow + main text (for letters that have fully appeared)
+    // Title after animation — clean with subtle depth
     if (elapsed > titleTotalDur) {
-        float glow = sinf(time * 1.5f) * 0.3f + 0.7f;
-        unsigned char glowA = (unsigned char)(35 * glow);
-        for (int r = 4; r > 0; r--) {
-            DrawGameText(title, titleX - r, titleY, titleSize, (Color){80, 160, 255, (unsigned char)(glowA / r)});
-            DrawGameText(title, titleX + r, titleY, titleSize, (Color){80, 160, 255, (unsigned char)(glowA / r)});
-            DrawGameText(title, titleX, titleY - r, titleSize, (Color){80, 160, 255, (unsigned char)(glowA / r)});
-            DrawGameText(title, titleX, titleY + r, titleSize, (Color){80, 160, 255, (unsigned char)(glowA / r)});
-        }
-        DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){0, 0, 0, 120});
-        DrawGameText(title, titleX, titleY, titleSize, (Color){240, 235, 255, 255});
+        // Shadow
+        DrawGameText(title, titleX + 1, titleY + 1, titleSize, (Color){0, 0, 0, 100});
+        // Main text
+        DrawGameText(title, titleX, titleY, titleSize, (Color){235, 235, 250, 255});
     }
 
-    // Subtitle with fade-in after title
+    // Subtitle
     float subFade = (elapsed - titleTotalDur) / 0.5f;
     if (subFade > 0.0f) {
         if (subFade > 1.0f) subFade = 1.0f;
         const char *sub = S(STR_SUBTITLE);
         int subW = MeasureGameTextWidth(sub, 18);
-        unsigned char subA = (unsigned char)(subFade * (180 + sinf(time * 2.0f) * 30));
+        unsigned char subA = (unsigned char)(subFade * 160);
         float subY = 160.0f + (1.0f - subFade) * 10.0f;
-        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, (int)subY, 18, (Color){180, 175, 200, subA});
+        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, (int)subY, 18, (Color){170, 175, 190, subA});
     }
 
-    // Animated decorative separator with dots
+    // Scan lines overlay (very subtle)
+    for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
+        unsigned char scanA = (unsigned char)(3 + (int)(sinf(y * 0.5f + time * 2.0f) * 2));
+        DrawRectangle(0, y, SCREEN_WIDTH, 1, (Color){0, 0, 0, scanA});
+    }
+
+    // Circuit-line separator (muted)
     float sepFade = (elapsed - titleTotalDur - 0.3f) / 0.4f;
     if (sepFade > 0.0f) {
         if (sepFade > 1.0f) sepFade = 1.0f;
-        int lineW = 280;
-        int lineX = (SCREEN_WIDTH - lineW) / 2;
+        unsigned char la = (unsigned char)(sepFade * 120);
         int lineY = 190;
-        unsigned char la = (unsigned char)(sepFade * 160);
-        DrawRectangle(lineX, lineY, lineW, 1, (Color){60, 55, 80, (unsigned char)(la * 0.6f)});
-        // Animated bright segment
-        float segPos = sinf(time * 0.6f) * 0.5f + 0.5f;
-        int segW = lineW / 3;
-        int segX = lineX + (int)((lineW - segW) * segPos);
-        DrawRectangle(segX, lineY, segW, 1, (Color){100, 140, 200, la});
-        // Center diamond
-        float pulse = sinf(time * 2.0f) * 0.3f + 0.7f;
+        int cx = SCREEN_WIDTH / 2;
+        // Main lines
+        DrawRectangle(cx - 200, lineY, 400, 1, (Color){40, 120, 130, (unsigned char)(la * 0.4f)});
+        DrawRectangle(cx - 180, lineY + 3, 360, 1, (Color){100, 40, 120, (unsigned char)(la * 0.3f)});
+        // Animated segment
+        float segPos = sinf(time * 0.8f) * 0.5f + 0.5f;
+        int segW = 80;
+        int segX = cx - 180 + (int)(360 * segPos) - segW / 2;
+        DrawRectangle(segX, lineY, segW, 1, (Color){60, 160, 170, la});
+        // Center node
+        float pulse = sinf(time * 3.0f) * 0.3f + 0.7f;
         unsigned char da = (unsigned char)(la * pulse);
-        int dcx = SCREEN_WIDTH / 2;
-        DrawRectangle(dcx - 2, lineY - 2, 4, 4, (Color){130, 170, 230, da});
-        // Side dots
+        DrawRectangle(cx - 2, lineY - 2, 4, 4, (Color){60, 150, 170, da});
+        // Branch stubs
         for (int d = 1; d <= 3; d++) {
-            unsigned char dotA = (unsigned char)(da * (0.8f - d * 0.2f));
-            DrawRectangle(dcx - 15 * d, lineY - 1, 2, 2, (Color){100, 140, 200, dotA});
-            DrawRectangle(dcx + 15 * d, lineY - 1, 2, 2, (Color){100, 140, 200, dotA});
+            unsigned char branchA = (unsigned char)(da * (0.6f - d * 0.12f));
+            DrawRectangle(cx - 60 * d, lineY - 3, 1, 6, (Color){50, 120, 140, branchA});
+            DrawRectangle(cx + 60 * d, lineY - 3, 1, 6, (Color){50, 120, 140, branchA});
+        }
+        // Data dots
+        for (int s = 0; s < 4; s++) {
+            float streamPos = fmodf(time * 1.5f + s * 0.3f, 1.0f);
+            int streamX = cx - 180 + (int)(360 * streamPos);
+            unsigned char streamA = (unsigned char)(la * 0.4f * sinf(streamPos * 3.14159f));
+            DrawRectangle(streamX, lineY - 1, 2, 2, (Color){60, 150, 130, streamA});
         }
     }
 
-    // Buttons with staggered slide-in entrance
-    int btnW = 260, btnH = 44;
+    // Cyberpunk flat buttons with neon glow
+    int btnW = 280, btnH = 44;
     int btnX = (SCREEN_WIDTH - btnW) / 2;
     int btnY = 210;
-    int spacing = 50;
+    int spacing = 52;
     float btnDelay0 = titleTotalDur + 0.2f;
 
     Vector2 mouse = Win32GetMousePosition();
@@ -3005,19 +3178,19 @@ void DrawMainMenu(void)
         if (GetSlotInfo(i, &info) && info.exists) { hasAnySave = true; break; }
     }
     bool btnEnabled[] = { true, hasAnySave, true, true, true, true };
+    // Muted cyberpunk colors
     Color btnSelColors[] = {
-        {70, 140, 70, 255}, {60, 100, 160, 255}, {50, 120, 160, 255}, {140, 100, 50, 255}, {100, 80, 150, 255}, {150, 50, 50, 255}
+        {30, 140, 110, 255}, {30, 100, 160, 255}, {120, 40, 150, 255}, {160, 140, 40, 255}, {100, 40, 130, 255}, {160, 50, 60, 255}
     };
     Color btnNormColors[] = {
-        {40, 75, 40, 230}, {35, 58, 100, 230}, {30, 68, 100, 230}, {82, 60, 30, 230}, {58, 44, 90, 230}, {82, 30, 30, 230}
+        {18, 32, 28, 230}, {18, 26, 40, 230}, {28, 18, 38, 230}, {32, 30, 18, 230}, {25, 18, 32, 230}, {38, 20, 22, 230}
     };
     Color btnBorderSel[] = {
-        {160, 255, 160, 255}, {130, 190, 255, 255}, {120, 200, 255, 255}, {255, 200, 120, 255}, {170, 145, 220, 255}, {255, 130, 130, 255}
+        {50, 180, 150, 200}, {50, 140, 200, 200}, {160, 70, 200, 200}, {200, 180, 50, 200}, {140, 60, 180, 200}, {200, 70, 80, 200}
     };
     Color btnBorderNorm[] = {
-        {70, 110, 70, 200}, {60, 90, 140, 200}, {50, 100, 140, 200}, {120, 90, 50, 200}, {80, 65, 120, 200}, {120, 50, 50, 200}
+        {40, 70, 60, 140}, {30, 55, 80, 140}, {50, 30, 65, 140}, {60, 55, 30, 140}, {40, 25, 55, 140}, {65, 35, 38, 140}
     };
-    // Button icon shapes: 0=+, folder, globe, link, gear, x
     int btnIcons[] = { 0, 1, 4, 5, 2, 3 };
 
     for (int i = 0; i < btnCount; i++) {
@@ -3026,7 +3199,6 @@ void DrawMainMenu(void)
         float btnProgress = (elapsed - btnDelay) / 0.35f;
         if (btnProgress < 0.0f) continue;
         if (btnProgress > 1.0f) btnProgress = 1.0f;
-        // Ease out cubic
         float bp = 1.0f - (1.0f - btnProgress) * (1.0f - btnProgress) * (1.0f - btnProgress);
         float slideX = (1.0f - bp) * -80.0f;
         float btnAlpha = bp;
@@ -3038,74 +3210,78 @@ void DrawMainMenu(void)
         bool sel = (menuSelection == i);
         float hAlpha = GetHoverAlpha(i, hover && btnEnabled[i], dt);
 
-        // Hover scale effect (slight enlargement from center)
-        float scale = 1.0f + hAlpha * 0.04f;
-        int scaledW = (int)(btnW * scale);
-        int scaledH = (int)(btnH * scale);
-        int scaledX = drawX - (scaledW - btnW) / 2;
-        int scaledY = by - (scaledH - btnH) / 2;
-
         Color bg, border;
         if (!btnEnabled[i]) {
-            bg = (Color){40, 40, 45, (unsigned char)(150 * btnAlpha)};
-            border = (Color){50, 50, 55, (unsigned char)(120 * btnAlpha)};
+            bg = (Color){20, 20, 25, (unsigned char)(150 * btnAlpha)};
+            border = (Color){40, 40, 50, (unsigned char)(100 * btnAlpha)};
         } else if (sel) {
             bg = (Color){btnSelColors[i].r, btnSelColors[i].g, btnSelColors[i].b,
-                         (unsigned char)(btnSelColors[i].a * btnAlpha)};
+                         (unsigned char)(220 * btnAlpha)};
             border = (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b,
-                             (unsigned char)(btnBorderSel[i].a * btnAlpha)};
+                             (unsigned char)(255 * btnAlpha)};
         } else {
-            unsigned char r = (unsigned char)((btnNormColors[i].r + (int)(18 * hAlpha)) * btnAlpha);
-            unsigned char g = (unsigned char)((btnNormColors[i].g + (int)(18 * hAlpha)) * btnAlpha);
-            unsigned char b = (unsigned char)((btnNormColors[i].b + (int)(18 * hAlpha)) * btnAlpha);
+            unsigned char r = (unsigned char)((btnNormColors[i].r + (int)(15 * hAlpha)) * btnAlpha);
+            unsigned char g = (unsigned char)((btnNormColors[i].g + (int)(15 * hAlpha)) * btnAlpha);
+            unsigned char b = (unsigned char)((btnNormColors[i].b + (int)(15 * hAlpha)) * btnAlpha);
             unsigned char a = (unsigned char)((btnNormColors[i].a + (int)(20 * hAlpha)) * btnAlpha);
             bg = (Color){r, g, b, a};
             border = (Color){btnBorderNorm[i].r, btnBorderNorm[i].g, btnBorderNorm[i].b,
-                             (unsigned char)(btnBorderNorm[i].a * btnAlpha)};
+                             (unsigned char)((btnBorderNorm[i].a + (int)(40 * hAlpha)) * btnAlpha)};
         }
 
-        // Selection glow (layered)
+        // Subtle glow for selected button
         if (sel && btnEnabled[i]) {
-            float pulse = sinf(time * 3.0f) * 0.3f + 0.7f;
+            float pulse = sinf(time * 3.0f) * 0.2f + 0.7f;
             for (int gl = 3; gl > 0; gl--) {
-                unsigned char ga = (unsigned char)(15 * pulse * btnAlpha / gl);
-                DrawRectangle(scaledX - gl * 2, scaledY - gl * 2,
-                             scaledW + gl * 4, scaledH + gl * 4,
+                unsigned char ga = (unsigned char)(8 * pulse * btnAlpha / gl);
+                DrawRectangle(drawX - gl, by - gl, btnW + gl * 2, btnH + gl * 2,
                              (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b, ga});
             }
         } else if (hAlpha > 0.01f && btnEnabled[i]) {
-            unsigned char ga = (unsigned char)(20 * hAlpha * btnAlpha);
-            DrawRectangle(scaledX - 2, scaledY - 2, scaledW + 4, scaledH + 4,
-                         (Color){btnBorderNorm[i].r, btnBorderNorm[i].g, btnBorderNorm[i].b, ga});
+            unsigned char ga = (unsigned char)(12 * hAlpha * btnAlpha);
+            DrawRectangle(drawX - 1, by - 1, btnW + 2, btnH + 2,
+                         (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b, ga});
         }
 
         // Drop shadow
-        DrawRectangle(scaledX + 2, scaledY + 3, scaledW, scaledH,
-                     (Color){0, 0, 0, (unsigned char)(40 * btnAlpha)});
+        DrawRectangle(drawX + 2, by + 3, btnW, btnH, (Color){0, 0, 0, (unsigned char)(50 * btnAlpha)});
 
-        // Button body with gradient
-        DrawRectangle(scaledX, scaledY, scaledW, scaledH, bg);
-        DrawRectangle(scaledX, scaledY, scaledW, scaledH / 4,
+        // Button body with vertical gradient
+        DrawRectangle(drawX, by, btnW, btnH, bg);
+        // Top highlight band
+        DrawRectangle(drawX, by, btnW, btnH / 4,
                      (Color){(unsigned char)(bg.r + 15), (unsigned char)(bg.g + 15),
-                             (unsigned char)(bg.b + 15), bg.a});
-        // Bottom highlight
-        DrawRectangle(scaledX + 2, scaledY + scaledH - 2, scaledW - 4, 1,
-                     (Color){255, 255, 255, (unsigned char)(8 * btnAlpha)});
+                             (unsigned char)(bg.b + 18), bg.a});
+        // Bottom shadow band
+        DrawRectangle(drawX, by + btnH - 3, btnW, 3,
+                     (Color){(unsigned char)(bg.r > 10 ? bg.r - 10 : 0), (unsigned char)(bg.g > 10 ? bg.g - 10 : 0),
+                             (unsigned char)(bg.b > 10 ? bg.b - 10 : 0), bg.a});
 
-        // Rounded corners
-        int cr = 5;
-        DrawCircleV((Vector2){(float)(scaledX + cr), (float)(scaledY + cr)}, (float)cr, bg);
-        DrawCircleV((Vector2){(float)(scaledX + scaledW - cr), (float)(scaledY + cr)}, (float)cr, bg);
-        DrawCircleV((Vector2){(float)(scaledX + cr), (float)(scaledY + scaledH - cr)}, (float)cr, bg);
-        DrawCircleV((Vector2){(float)(scaledX + scaledW - cr), (float)(scaledY + scaledH - cr)}, (float)cr, bg);
-        DrawRectangleLinesEx((Rectangle){(float)scaledX, (float)scaledY, (float)scaledW, (float)scaledH},
-                            sel ? 2 : 1, border);
+        // Neon border (rectangular)
+        DrawRectangleLinesEx((Rectangle){(float)drawX, (float)by, (float)btnW, (float)btnH}, sel ? 2 : 1, border);
 
-        // Icon (small geometric shape on the left)
-        int iconX = scaledX + 18;
-        int iconY = scaledY + scaledH / 2;
-        unsigned char iconA = (unsigned char)(180 * btnAlpha);
-        Color iconC = btnEnabled[i] ? (Color){200, 220, 255, iconA} : (Color){80, 80, 90, iconA};
+        // Subtle accent lines
+        int accentLen = 8;
+        DrawRectangle(drawX - accentLen, by + btnH / 2 - 1, accentLen, 1, (Color){border.r, border.g, border.b, (unsigned char)(100 * btnAlpha)});
+        DrawRectangle(drawX + btnW, by + btnH / 2 - 1, accentLen, 1, (Color){border.r, border.g, border.b, (unsigned char)(100 * btnAlpha)});
+
+        // Corner dots
+        int cornerSz = 2;
+        DrawRectangle(drawX, by, cornerSz, cornerSz, (Color){border.r, border.g, border.b, (unsigned char)(160 * btnAlpha)});
+        DrawRectangle(drawX + btnW - 1, by, cornerSz, cornerSz, (Color){border.r, border.g, border.b, (unsigned char)(160 * btnAlpha)});
+
+        // Scan line on selected
+        if (sel && btnEnabled[i]) {
+            float scanPos = fmodf(time * 2.0f, 1.0f);
+            int scanY = by + (int)(btnH * scanPos);
+            DrawRectangle(drawX + 2, scanY, btnW - 4, 1, (Color){255, 255, 255, (unsigned char)(20 * btnAlpha)});
+        }
+
+        // Icon
+        int iconX = drawX + 20;
+        int iconY = by + btnH / 2;
+        unsigned char iconA = (unsigned char)(200 * btnAlpha);
+        Color iconC = btnEnabled[i] ? (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b, iconA} : (Color){60, 60, 70, iconA};
         switch (btnIcons[i]) {
             case 0: // + for New Game
                 DrawRectangle(iconX - 1, iconY - 5, 2, 10, iconC);
@@ -3130,8 +3306,6 @@ void DrawMainMenu(void)
                 DrawCircleLines(iconX, iconY, 5.0f, iconC);
                 DrawRectangle(iconX - 5, iconY, 10, 1, iconC);
                 DrawRectangle(iconX, iconY - 5, 1, 10, iconC);
-                DrawRectangle(iconX - 3, iconY - 3, 6, 1, iconC);
-                DrawRectangle(iconX - 3, iconY + 2, 6, 1, iconC);
                 break;
             case 5: // link for Join Game
                 DrawRectangle(iconX - 5, iconY - 1, 4, 2, iconC);
@@ -3143,43 +3317,38 @@ void DrawMainMenu(void)
 
         // Click feedback flash
         if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && btnEnabled[i]) {
-            DrawRectangle(scaledX, scaledY, scaledW, scaledH, (Color){255, 255, 255, 30});
+            DrawRectangle(drawX, by, btnW, btnH, (Color){255, 255, 255, 30});
         }
 
-        // Button label
+        // Button label with glitch
         Color textColor = btnEnabled[i]
             ? (Color){255, 255, 255, (unsigned char)(255 * btnAlpha)}
-            : (Color){100, 100, 110, (unsigned char)(150 * btnAlpha)};
+            : (Color){80, 80, 90, (unsigned char)(120 * btnAlpha)};
         int textW = MeasureGameTextWidth(btnLabels[i], 22);
-        int textX = scaledX + (scaledW - textW) / 2 + 6; // offset for icon
-        int textY = scaledY + (scaledH - 22) / 2;
-        DrawGameText(btnLabels[i], textX + 1, textY + 1, 22, (Color){0, 0, 0, (unsigned char)(100 * btnAlpha)});
+        int textX = drawX + (btnW - textW) / 2 + 8;
+        int textY = by + (btnH - 22) / 2;
+        // Glitch effect on selected button
+        if (sel && btnEnabled[i] && rand() % 30 == 0) {
+            DrawGameText(btnLabels[i], textX + 2, textY, 22, (Color){0, 255, 255, (unsigned char)(80 * btnAlpha)});
+            DrawGameText(btnLabels[i], textX - 1, textY, 22, (Color){255, 0, 100, (unsigned char)(60 * btnAlpha)});
+        }
         DrawGameText(btnLabels[i], textX, textY, 22, textColor);
     }
 
-    // Bottom hints with fade-in
+    // Bottom hints
     float hintFade = (elapsed - btnDelay0 - btnCount * 0.12f - 0.3f) / 0.5f;
     if (hintFade > 0.0f) {
         if (hintFade > 1.0f) hintFade = 1.0f;
+        unsigned char h1a = (unsigned char)(hintFade * 120);
         const char *hint1 = S(STR_HINT_NAVIGATE);
-        unsigned char h1a = (unsigned char)(hintFade * 160);
-        DrawGameText(hint1, (SCREEN_WIDTH - MeasureGameTextWidth(hint1, 14)) / 2, SCREEN_HEIGHT - 50, 13,
-                     (Color){160, 155, 170, h1a});
+        int hint1W = MeasureGameTextWidth(hint1, 13);
+        DrawRectangle((SCREEN_WIDTH - hint1W) / 2, SCREEN_HEIGHT - 48, hint1W, 1, (Color){50, 120, 130, (unsigned char)(h1a * 0.3f)});
+        DrawGameText(hint1, (SCREEN_WIDTH - hint1W) / 2, SCREEN_HEIGHT - 62, 13, (Color){150, 160, 165, h1a});
         const char *hint2 = S(STR_HINT_CONTROLS);
-        unsigned char h2a = (unsigned char)(hintFade * 130);
-        DrawGameText(hint2, (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 13)) / 2, SCREEN_HEIGHT - 30, 13,
-                     (Color){130, 125, 140, h2a});
-
-        // Version tag with subtle glow
-        unsigned char va = (unsigned char)(hintFade * 100);
-        DrawGameText("v0.3", 12, SCREEN_HEIGHT - 20, 13, (Color){80, 120, 180, (unsigned char)(va * 0.3f)});
-        DrawGameText("v0.3", 10, SCREEN_HEIGHT - 22, 13, (Color){100, 140, 200, va});
-    }
-
-    // Bottom vignette overlay for depth
-    for (int y = 0; y < 50; y++) {
-        unsigned char va = (unsigned char)((50 - y) * 2.5f);
-        DrawRectangle(0, SCREEN_HEIGHT - y, SCREEN_WIDTH, 1, (Color){5, 8, 18, va});
+        unsigned char h2a = (unsigned char)(hintFade * 100);
+        DrawGameText(hint2, (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 13)) / 2, SCREEN_HEIGHT - 38, 13, (Color){120, 125, 130, h2a});
+        unsigned char va = (unsigned char)(hintFade * 90);
+        DrawGameText("v0.3", 10, SCREEN_HEIGHT - 20, 13, (Color){80, 130, 140, va});
     }
 }
 
@@ -3445,39 +3614,36 @@ void DrawSettingsScreen(void)
     // Background gradient
     for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
         float t = (float)y / SCREEN_HEIGHT;
-        unsigned char r = (unsigned char)(15 + t * 20);
-        unsigned char g = (unsigned char)(18 + t * 15);
-        unsigned char b = (unsigned char)(35 + t * 25);
+        unsigned char r = (unsigned char)(12 + t * 14);
+        unsigned char g = (unsigned char)(14 + t * 10);
+        unsigned char b = (unsigned char)(25 + t * 18);
         DrawRectangle(0, y, SCREEN_WIDTH, 4, (Color){r, g, b, 255});
     }
 
     // Title
     const char *title = S(STR_SETTINGS);
-    int titleW = MeasureGameTextWidth(title, 48);
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 2, 18, 48, (Color){0, 0, 0, 100});
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 16, 48, (Color){220, 215, 240, 255});
-
-    // Decorative line
-    int lineW = 200;
-    int lineX = (SCREEN_WIDTH - lineW) / 2;
-    DrawRectangle(lineX, 70, lineW, 1, (Color){100, 95, 110, 150});
+    int titleW = MeasureGameTextWidth(title, 42);
+    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 1, 20, 42, (Color){0, 0, 0, 80});
+    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 18, 42, (Color){190, 195, 210, 255});
+    // Subtle line under title
+    DrawRectangle((SCREEN_WIDTH - 120) / 2, 65, 120, 1, (Color){80, 85, 100, 100});
 
     Vector2 mouse = Win32GetMousePosition();
 
-    // Settings panel - fits entirely on screen
+    // Settings panel
     int panelW = 520;
     int panelH = 620;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
-    int panelY = 80;
+    int panelY = 78;
 
     // Panel shadow
-    DrawRectangle(panelX + 3, panelY + 3, panelW, panelH, (Color){0, 0, 0, 50});
+    DrawRectangle(panelX + 2, panelY + 2, panelW, panelH, (Color){0, 0, 0, 40});
     // Panel background
-    DrawRectangle(panelX, panelY, panelW, panelH, (Color){25, 22, 32, 240});
-    // Panel gradient (lighter top)
-    DrawRectangle(panelX, panelY, panelW, panelH / 3, (Color){30, 27, 40, 240});
-    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){70, 65, 85, 200});
-    DrawRectangleLines(panelX + 1, panelY + 1, panelW - 2, panelH - 2, (Color){50, 45, 65, 150});
+    DrawRectangle(panelX, panelY, panelW, panelH, (Color){22, 20, 30, 240});
+    // Subtle top highlight
+    DrawRectangle(panelX, panelY, panelW, 1, (Color){50, 55, 70, 120});
+    // Border
+    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){55, 52, 68, 160});
 
     int leftX = panelX + 30;
     int rightX = panelX + panelW / 2 + 10;
@@ -3487,32 +3653,30 @@ void DrawSettingsScreen(void)
     // ============================================================
     // Section: Audio
     // ============================================================
-    int sectionY = panelY + 12;
-    // Section header with line
-    DrawRectangle(leftX, sectionY + 8, 4, 14, (Color){200, 190, 100, 220});
-    DrawGameText(S(STR_SECTION_AUDIO), leftX + 12, sectionY, 15, (Color){200, 190, 100, 220});
-    sectionY += 26;
+    int sectionY = panelY + 14;
+    // Section header
+    DrawGameText(S(STR_SECTION_AUDIO), leftX, sectionY, 14, (Color){160, 165, 180, 220});
+    DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){45, 42, 55, 100});
+    sectionY += 28;
 
     // Music Volume
-    DrawGameText(S(STR_MUSIC_VOLUME), leftX, sectionY, 13, (Color){200, 195, 215, 255});
-    int musicSliderX = leftX + MeasureGameTextWidth(S(STR_MUSIC_VOLUME), 13) + 10;
-    int musicSliderW = panelX + panelW - 30 - musicSliderX - 40;
-    DrawRectangle(musicSliderX, sectionY + 6, musicSliderW, 6, (Color){40, 38, 50, 200});
-    DrawRectangleLines(musicSliderX, sectionY + 6, musicSliderW, 6, (Color){60, 55, 75, 150});
-
+    DrawGameText(S(STR_MUSIC_VOLUME), leftX, sectionY, 13, (Color){170, 175, 190, 230});
+    int musicSliderX = leftX + MeasureGameTextWidth(S(STR_MUSIC_VOLUME), 13) + 12;
+    int musicSliderW = panelX + panelW - 30 - musicSliderX - 45;
+    // Track
+    DrawRectangle(musicSliderX, sectionY + 7, musicSliderW, 4, (Color){35, 33, 45, 200});
+    // Fill
     extern float bgmVolumeSlider;
     float bgmVal = bgmVolumeSlider;
-    int handleX = musicSliderX + (int)(bgmVal * musicSliderW);
-    Rectangle bgmHandle = { (float)(handleX - 6), (float)sectionY, 12, 18 };
-    bool bgmHover = CheckCollisionPointRec(mouse, bgmHandle);
-    // Slider fill with gradient
-    DrawRectangle(musicSliderX, sectionY + 6, (int)(bgmVal * musicSliderW), 6, (Color){80, 160, 80, 200});
-    DrawRectangle(musicSliderX, sectionY + 6, (int)(bgmVal * musicSliderW), 3, (Color){100, 200, 100, 100});
+    DrawRectangle(musicSliderX, sectionY + 7, (int)(bgmVal * musicSliderW), 4, (Color){70, 140, 80, 200});
+    DrawRectangle(musicSliderX, sectionY + 7, (int)(bgmVal * musicSliderW), 1, (Color){100, 180, 110, 120});
     // Handle
-    DrawRectangle(handleX - 6, sectionY, 12, 18, bgmHover ? (Color){120, 180, 120, 255} : (Color){80, 150, 80, 255});
-    DrawRectangleLines(handleX - 6, sectionY, 12, 18, (Color){160, 220, 160, 200});
+    int handleX = musicSliderX + (int)(bgmVal * musicSliderW);
+    Rectangle bgmHandle = { (float)(handleX - 5), (float)(sectionY - 2), 10, 16 };
+    bool bgmHover = CheckCollisionPointRec(mouse, bgmHandle);
+    DrawRectangle(handleX - 5, sectionY - 2, 10, 16, bgmHover ? (Color){100, 170, 110, 255} : (Color){70, 130, 80, 255});
     sprintf(volText, "%d%%", (int)(bgmVal * 100));
-    DrawGameText(volText, musicSliderX + musicSliderW + 8, sectionY, 13, (Color){180, 175, 195, 220});
+    DrawGameText(volText, musicSliderX + musicSliderW + 8, sectionY, 13, (Color){150, 155, 170, 200});
 
     Rectangle bgmTrack = { (float)musicSliderX, (float)(sectionY - 4), (float)musicSliderW, 26 };
     if (win32LMB && (bgmHover || CheckCollisionPointRec(mouse, bgmTrack))) {
@@ -3524,23 +3688,20 @@ void DrawSettingsScreen(void)
     sectionY += 26;
 
     // SFX Volume
-    DrawGameText(S(STR_SOUND_EFFECTS), leftX, sectionY, 13, (Color){200, 195, 215, 255});
-    int sfxSliderX = leftX + MeasureGameTextWidth(S(STR_SOUND_EFFECTS), 13) + 10;
-    int sfxSliderW = panelX + panelW - 30 - sfxSliderX - 40;
-    DrawRectangle(sfxSliderX, sectionY + 6, sfxSliderW, 6, (Color){40, 38, 50, 200});
-    DrawRectangleLines(sfxSliderX, sectionY + 6, sfxSliderW, 6, (Color){60, 55, 75, 150});
-
+    DrawGameText(S(STR_SOUND_EFFECTS), leftX, sectionY, 13, (Color){170, 175, 190, 230});
+    int sfxSliderX = leftX + MeasureGameTextWidth(S(STR_SOUND_EFFECTS), 13) + 12;
+    int sfxSliderW = panelX + panelW - 30 - sfxSliderX - 45;
+    DrawRectangle(sfxSliderX, sectionY + 7, sfxSliderW, 4, (Color){35, 33, 45, 200});
     extern float sfxVolumeSlider;
     float sfxVal = sfxVolumeSlider;
+    DrawRectangle(sfxSliderX, sectionY + 7, (int)(sfxVal * sfxSliderW), 4, (Color){60, 100, 170, 200});
+    DrawRectangle(sfxSliderX, sectionY + 7, (int)(sfxVal * sfxSliderW), 1, (Color){80, 130, 200, 120});
     int sfxHandleX = sfxSliderX + (int)(sfxVal * sfxSliderW);
-    Rectangle sfxHandle = { (float)(sfxHandleX - 6), (float)sectionY, 12, 18 };
+    Rectangle sfxHandle = { (float)(sfxHandleX - 5), (float)(sectionY - 2), 10, 16 };
     bool sfxHover = CheckCollisionPointRec(mouse, sfxHandle);
-    DrawRectangle(sfxSliderX, sectionY + 6, (int)(sfxVal * sfxSliderW), 6, (Color){80, 120, 200, 200});
-    DrawRectangle(sfxSliderX, sectionY + 6, (int)(sfxVal * sfxSliderW), 3, (Color){100, 150, 230, 100});
-    DrawRectangle(sfxHandleX - 6, sectionY, 12, 18, sfxHover ? (Color){120, 150, 200, 255} : (Color){80, 120, 180, 255});
-    DrawRectangleLines(sfxHandleX - 6, sectionY, 12, 18, (Color){140, 180, 230, 200});
+    DrawRectangle(sfxHandleX - 5, sectionY - 2, 10, 16, sfxHover ? (Color){80, 120, 190, 255} : (Color){60, 95, 150, 255});
     sprintf(volText, "%d%%", (int)(sfxVal * 100));
-    DrawGameText(volText, sfxSliderX + sfxSliderW + 8, sectionY, 13, (Color){180, 175, 195, 220});
+    DrawGameText(volText, sfxSliderX + sfxSliderW + 8, sectionY, 13, (Color){150, 155, 170, 200});
 
     Rectangle sfxTrack = { (float)sfxSliderX, (float)(sectionY - 4), (float)sfxSliderW, 26 };
     if (win32LMB && (sfxHover || CheckCollisionPointRec(mouse, sfxTrack))) {
@@ -3554,12 +3715,12 @@ void DrawSettingsScreen(void)
     // ============================================================
     // Section: Display
     // ============================================================
-    DrawRectangle(leftX, sectionY + 8, 4, 14, (Color){100, 160, 220, 220});
-    DrawGameText(S(STR_SECTION_DISPLAY), leftX + 12, sectionY, 15, (Color){100, 160, 220, 220});
+    DrawGameText(S(STR_SECTION_DISPLAY), leftX, sectionY, 14, (Color){160, 165, 180, 220});
+    DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){45, 42, 55, 100});
     sectionY += 24;
 
     // Window mode buttons
-    DrawGameText(S(STR_WINDOW_MODE), leftX, sectionY, 13, (Color){200, 195, 215, 255});
+    DrawGameText(S(STR_WINDOW_MODE), leftX, sectionY, 13, (Color){170, 175, 190, 230});
     sectionY += 20;
 
     int btnW = 100;
@@ -3622,14 +3783,14 @@ void DrawSettingsScreen(void)
     sectionY += 20;
 
     // ============================================================
-    // Section: Language & Font (side by side)
+    // Section: Language & Font
     // ============================================================
-    DrawRectangle(leftX, sectionY + 8, 4, 14, (Color){180, 120, 200, 220});
-    DrawGameText(S(STR_SECTION_LANGUAGE), leftX + 12, sectionY, 15, (Color){180, 120, 200, 220});
-    sectionY += 24;
+    DrawGameText(S(STR_SECTION_LANGUAGE), leftX, sectionY, 14, (Color){160, 165, 180, 220});
+    DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){45, 42, 55, 100});
+    sectionY += 28;
 
     // Language buttons
-    DrawGameText(S(STR_LANGUAGE), leftX, sectionY, 13, (Color){200, 195, 215, 255});
+    DrawGameText(S(STR_LANGUAGE), leftX, sectionY, 13, (Color){170, 175, 190, 230});
     sectionY += 18;
 
     const char *langNames[] = { S(STR_LANG_NAME_EN), S(STR_LANG_NAME_ZH), S(STR_LANG_NAME_JA) };
@@ -3678,7 +3839,7 @@ void DrawSettingsScreen(void)
     sectionY += langBtnH + 14;
 
     // Font buttons
-    DrawGameText(S(STR_FONT), leftX, sectionY, 13, (Color){200, 195, 215, 255});
+    DrawGameText(S(STR_FONT), leftX, sectionY, 13, (Color){170, 175, 190, 230});
     sectionY += 18;
 
     const char *fontNames[] = { S(STR_FONT_NAME_BUILTIN), S(STR_FONT_NAME_LXGW) };
@@ -3725,10 +3886,58 @@ void DrawSettingsScreen(void)
     sectionY += fontBtnH + 18;
 
     // ============================================================
-    // Section: Controls (compact 2-column)
+    // Section: Difficulty
     // ============================================================
-    DrawRectangle(leftX, sectionY + 8, 4, 14, (Color){100, 200, 140, 220});
-    DrawGameText(S(STR_CONTROLS_TITLE), leftX + 12, sectionY, 15, (Color){100, 200, 140, 220});
+    DrawGameText(S(STR_DIFFICULTY), leftX, sectionY, 14, (Color){160, 165, 180, 220});
+    DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){45, 42, 55, 100});
+    sectionY += 28;
+
+    const char *diffNames[] = {
+        S(STR_DIFFICULTY_PEACEFUL), S(STR_DIFFICULTY_EASY),
+        S(STR_DIFFICULTY_NORMAL), S(STR_DIFFICULTY_HARD)
+    };
+    Color diffColors[] = {
+        {60, 140, 80, 230}, {80, 120, 60, 230}, {60, 80, 120, 230}, {140, 60, 60, 230}
+    };
+    Color diffColorsSel[] = {
+        {80, 200, 100, 255}, {120, 180, 80, 255}, {80, 120, 180, 255}, {200, 80, 80, 255}
+    };
+    int diffBtnW = 110;
+    int diffBtnH = 26;
+    int diffBtnGap = 6;
+
+    for (int i = 0; i < DIFFICULTY_COUNT; i++) {
+        int bx = leftX + i * (diffBtnW + diffBtnGap);
+        Rectangle btn = { (float)bx, (float)sectionY, (float)diffBtnW, (float)diffBtnH };
+        bool hover = CheckCollisionPointRec(mouse, btn);
+        bool sel = (gameDifficulty == i);
+        float hA = GetHoverAlpha(340 + i, hover && !sel, GetFrameTime());
+
+        Color bg = sel ? diffColorsSel[i] : (Color){
+            (unsigned char)(diffColors[i].r + (int)(15 * hA)),
+            (unsigned char)(diffColors[i].g + (int)(15 * hA)),
+            (unsigned char)(diffColors[i].b + (int)(15 * hA)),
+            diffColors[i].a
+        };
+        DrawRectangle((int)btn.x, (int)btn.y, (int)btn.width, (int)btn.height, bg);
+        if (sel) DrawRectangleLines((int)btn.x, (int)btn.y, (int)btn.width, (int)btn.height, WHITE);
+
+        int textW = MeasureGameTextWidth(diffNames[i], 13);
+        DrawGameText(diffNames[i], bx + (diffBtnW - textW) / 2, sectionY + 6, 13,
+                 sel ? WHITE : (Color){180, 175, 195, 220});
+
+        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !sel) {
+            gameDifficulty = (Difficulty)i;
+            PlaySoundUIClick();
+        }
+    }
+    sectionY += diffBtnH + 18;
+
+    // ============================================================
+    // Section: Controls
+    // ============================================================
+    DrawGameText(S(STR_CONTROLS_TITLE), leftX, sectionY, 14, (Color){160, 165, 180, 220});
+    DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){45, 42, 55, 100});
     sectionY += 22;
 
     const char *controls[] = {
@@ -3763,25 +3972,29 @@ void DrawSettingsScreen(void)
         sectionY += 14;
     }
 
-    // Back button - inside panel at bottom
-    int backBtnW = 140;
-    int backBtnH = 32;
+    // Back button
+    int backBtnW = 130;
+    int backBtnH = 30;
     int backBtnX = (SCREEN_WIDTH - backBtnW) / 2;
-    int backBtnY = panelY + panelH - backBtnH - 12;
+    int backBtnY = panelY + panelH - backBtnH - 14;
     Rectangle backBtn = { (float)backBtnX, (float)backBtnY, (float)backBtnW, (float)backBtnH };
     bool backHover = CheckCollisionPointRec(mouse, backBtn);
     float hBack = GetHoverAlpha(330, backHover, GetFrameTime());
-    Color backBg = (Color){
-        (unsigned char)(55 + (int)(25 * hBack)),
-        (unsigned char)(50 + (int)(25 * hBack)),
-        (unsigned char)(70 + (int)(30 * hBack)),
-        (unsigned char)(220 + (int)(20 * hBack))
-    };
-    DrawRectangleRec(backBtn, backBg);
-    DrawRectangleLinesEx(backBtn, backHover ? 2 : 1, (Color){100, 95, 120, 200});
+    DrawRectangle(backBtnX + 2, backBtnY + 2, backBtnW, backBtnH, (Color){0, 0, 0, (unsigned char)(30 * hBack)});
+    DrawRectangle(backBtnX, backBtnY, backBtnW, backBtnH, (Color){
+        (unsigned char)(40 + (int)(18 * hBack)),
+        (unsigned char)(38 + (int)(18 * hBack)),
+        (unsigned char)(52 + (int)(22 * hBack)),
+        230});
+    DrawRectangle(backBtnX, backBtnY, backBtnW, backBtnH / 3, (Color){
+        (unsigned char)(48 + (int)(18 * hBack)),
+        (unsigned char)(46 + (int)(18 * hBack)),
+        (unsigned char)(60 + (int)(22 * hBack)),
+        230});
+    DrawRectangleLinesEx(backBtn, 1, (Color){80, 78, 95, (unsigned char)(160 + (int)(30 * hBack))});
     const char *backText = S(STR_BACK);
-    int backTextW = MeasureGameTextWidth(backText, 16);
-    DrawGameText(backText, backBtnX + (backBtnW - backTextW) / 2, backBtnY + 8, 16, WHITE);
+    int backTextW = MeasureGameTextWidth(backText, 15);
+    DrawGameText(backText, backBtnX + (backBtnW - backTextW) / 2, backBtnY + 7, 15, (Color){200, 200, 210, 240});
 
     // ESC to go back
     if (Win32IsKeyPressed(KEY_ESCAPE) || (backHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {

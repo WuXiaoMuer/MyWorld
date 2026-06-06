@@ -52,14 +52,14 @@ static float noiseBurstGen(float t, float freq, unsigned int *rng) {
     return noise * env;
 }
 
-// Stone/metallic break - higher pitched
+// Stone/metallic break - muted thud
 static float stoneBreakGen(float t, float freq, unsigned int *rng) {
     (void)freq;
-    float env = expf(-t * 8.0f);
+    float env = expf(-t * 10.0f);
     *rng = *rng * 1103515245 + 12345;
     float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
-    float tone = fast_sine(t * 800.0f) * 0.4f;
-    return (noise * 0.6f + tone) * env;
+    float tone = fast_sine(t * 400.0f) * 0.4f;
+    return (noise * 0.35f + tone) * env;
 }
 
 // Place sound - short thud
@@ -91,14 +91,14 @@ static float landGen(float t, float freq, unsigned int *rng) {
     return (noise * 0.3f + tone) * env;
 }
 
-// Hurt - noise with tone
+// Hurt - softer impact
 static float hurtGen(float t, float freq, unsigned int *rng) {
     (void)freq;
-    float env = expf(-t * 6.0f);
+    float env = expf(-t * 8.0f);
     *rng = *rng * 1103515245 + 12345;
     float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
-    float tone = fast_sine(t * 250.0f) * 0.4f;
-    return (noise * 0.5f + tone) * env;
+    float tone = fast_sine(t * 200.0f) * 0.35f;
+    return (noise * 0.3f + tone) * env;
 }
 
 // Death - descending
@@ -124,11 +124,11 @@ static float eatGen(float t, float freq, unsigned int *rng) {
     return (phase1 + noise * 0.4f) * env * (0.5f + 0.5f * mod);
 }
 
-// UI click
+// UI click - soft
 static float clickGen(float t, float freq, unsigned int *rng) {
     (void)freq; (void)rng;
-    float env = expf(-t * 30.0f);
-    return fast_sine(t * 1200.0f) * env * 0.4f;
+    float env = expf(-t * 25.0f);
+    return fast_sine(t * 800.0f) * env * 0.3f;
 }
 
 // Craft - pleasant ding
@@ -140,12 +140,12 @@ static float craftGen(float t, float freq, unsigned int *rng) {
     return (s + s2) * env;
 }
 
-// XP orb pickup
+// XP orb pickup - gentle chime
 static float xpGen(float t, float freq, unsigned int *rng) {
     (void)freq; (void)rng;
-    float env = expf(-t * 5.0f);
-    float pitch = 1000.0f + t * 500.0f;
-    return fast_sine(t * pitch) * env * 0.35f;
+    float env = expf(-t * 6.0f);
+    float pitch = 600.0f + t * 200.0f;
+    return fast_sine(t * pitch) * env * 0.25f;
 }
 
 // Drop item
@@ -189,6 +189,17 @@ static float pigGen(float t, float freq, unsigned int *rng) {
     return (s + nasal) * env;
 }
 
+// Villager "hmm" - low hum with vibrato
+static float villagerGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = expf(-t * 4.0f) * (1.0f - expf(-t * 50.0f));
+    float pitch = 180.0f + fast_sine(t * 8.0f) * 15.0f;
+    float s = fast_sine(t * pitch) * 0.3f;
+    float harmonic = fast_sine(t * pitch * 2.0f) * 0.15f;
+    float nasal = fast_sine(t * pitch * 3.0f) * 0.08f;
+    return (s + harmonic + nasal) * env;
+}
+
 // Water splash - noise burst with filter
 static float splashGen(float t, float freq, unsigned int *rng) {
     (void)freq;
@@ -200,33 +211,33 @@ static float splashGen(float t, float freq, unsigned int *rng) {
     return (noise * 0.4f + tone + bubble) * env;
 }
 
-// Skeleton bone rattle - dry clicks with high-freq noise bursts
+// Skeleton bone rattle - soft dry clicks
 static float skeletonGen(float t, float freq, unsigned int *rng) {
     (void)freq;
-    float env = expf(-t * 4.0f);
+    float env = expf(-t * 5.0f);
     // Multiple short click bursts
     float click1 = 0.0f, click2 = 0.0f, click3 = 0.0f;
     if (t < 0.06f) {
         float ce = expf(-t * 60.0f);
         *rng = *rng * 1103515245 + 12345;
-        click1 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.6f;
+        click1 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.35f;
     }
     if (t > 0.08f && t < 0.14f) {
         float ce = expf(-(t - 0.08f) * 70.0f);
         *rng = *rng * 1103515245 + 12345;
-        click2 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.5f;
+        click2 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.3f;
     }
     if (t > 0.16f && t < 0.21f) {
         float ce = expf(-(t - 0.16f) * 80.0f);
         *rng = *rng * 1103515245 + 12345;
-        click3 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.4f;
+        click3 = ((float)(*rng % 1000) / 500.0f - 1.0f) * ce * 0.25f;
     }
-    // Sustained dry rattle undertone
-    float rattle = fast_sine(t * 1800.0f) * fast_sine(t * 3.0f) * 0.15f;
+    // Soft rattle undertone
+    float rattle = fast_sine(t * 900.0f) * fast_sine(t * 3.0f) * 0.1f;
     return (click1 + click2 + click3 + rattle) * env;
 }
 
-// Creeper hiss - sustained white noise with high-freq filter and tremolo
+// Creeper hiss - soft sustained noise with tremolo
 static float creeperHissGen(float t, float freq, unsigned int *rng) {
     (void)freq;
     float env = 1.0f - t * 2.0f;
@@ -234,9 +245,9 @@ static float creeperHissGen(float t, float freq, unsigned int *rng) {
     env *= env;
     *rng = *rng * 1103515245 + 12345;
     float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
-    float hiss = fast_sine(t * 2000.0f) * 0.35f;
+    float hiss = fast_sine(t * 1200.0f) * 0.2f;
     float tremolo = 0.6f + 0.4f * fast_sine(t * 4.0f);
-    return (noise * 0.3f + hiss) * env * tremolo;
+    return (noise * 0.2f + hiss) * env * tremolo;
 }
 
 // Spider chittering - rapid high-freq pulses with noise
@@ -262,33 +273,33 @@ static float slimeGen(float t, float freq, unsigned int *rng) {
     return (tone + noise * 0.2f + squelch) * env * am;
 }
 
-// Enderman warble - extreme vibrato with teleport whoosh
+// Enderman warble - gentle vibrato with soft whoosh
 static float endermanGen(float t, float freq, unsigned int *rng) {
     (void)freq;
-    float env = 1.0f - t * 1.5f;
+    float env = 1.0f - t * 1.8f;
     if (env < 0) env = 0;
-    float vibrato = fast_sine(t * 20.0f) * 300.0f;
-    float tone = fast_sine(t * (600.0f + vibrato)) * 0.35f;
-    // Whoosh effect for teleport feel
+    float vibrato = fast_sine(t * 12.0f) * 120.0f;
+    float tone = fast_sine(t * (400.0f + vibrato)) * 0.25f;
+    // Soft whoosh effect
     float whoosh = 0.0f;
     if (t > 0.1f && t < 0.35f) {
         float wt = (t - 0.1f) / 0.25f;
         float wEnv = fast_sine(wt * 3.14159f);
         *rng = *rng * 1103515245 + 12345;
-        whoosh = ((float)(*rng % 1000) / 500.0f - 1.0f) * wEnv * 0.25f;
+        whoosh = ((float)(*rng % 1000) / 500.0f - 1.0f) * wEnv * 0.15f;
     }
     return (tone + whoosh) * env;
 }
 
-// Creeper fuse hiss
+// Creeper fuse hiss - softer
 static float creeperFuseGen(float t, float freq, unsigned int *rng) {
     (void)freq;
     float env = expf(-t * 3.0f);
     *rng = *rng * 1103515245 + 12345;
     float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
-    float hiss = fast_sine(t * 3000.0f) * 0.3f;
-    float sizzle = fast_sine(t * 5000.0f * (1.0f - t * 0.5f)) * 0.2f;
-    return (noise * 0.4f + hiss + sizzle) * env;
+    float hiss = fast_sine(t * 1500.0f) * 0.2f;
+    float sizzle = fast_sine(t * 2500.0f * (1.0f - t * 0.5f)) * 0.12f;
+    return (noise * 0.25f + hiss + sizzle) * env;
 }
 
 // Rain ambient - continuous filtered noise
@@ -299,6 +310,40 @@ static float rainAmbientGen(float t, float freq, unsigned int *rng) {
     float mod = 0.5f + 0.5f * fast_sine(t * 0.8f);
     float drip = fast_sine(t * 400.0f) * 0.1f * fast_sine(t * 2.0f);
     return (noise * 0.15f + drip) * mod;
+}
+
+// Cave drip - short water drop with reverb
+static float caveDripGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 8.0f);
+    float drop = fast_sine(t * 1800.0f) * env;
+    float echo = fast_sine(t * 900.0f) * expf(-t * 4.0f) * 0.3f;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    return (drop + echo + noise * env * 0.1f) * 0.5f;
+}
+
+// Cave ambience - low rumble with subtle drips
+static float caveAmbientGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    // Low rumble
+    float rumble = fast_sine(t * 30.0f) * 0.3f + fast_sine(t * 47.0f) * 0.2f;
+    // Occasional drip pattern
+    float dripMod = 0.5f + 0.5f * fast_sine(t * 0.3f);
+    float drip = fast_sine(t * 1200.0f * dripMod) * 0.05f * fast_sine(t * 1.5f);
+    return (noise * 0.08f + rumble + drip) * 0.6f;
+}
+
+// Wind - whooshing surface ambience
+static float windGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float mod = 0.5f + 0.5f * fast_sine(t * 0.5f);
+    float gust = fast_sine(t * 0.2f) * 0.5f + 0.5f;
+    return noise * 0.12f * mod * gust;
 }
 
 // Thunder - deep rumble with initial crack
@@ -320,6 +365,27 @@ static float thunderGen(float t, float freq, unsigned int *rng) {
     float rumble = (rumbleNoise * 0.3f + rumbleTone) * rumbleEnv * 0.4f;
 
     return crack + rumble;
+}
+
+// Item pickup - soft chime
+static float pickupGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 10.0f);
+    float tone = fast_sine(t * 800.0f) * 0.4f + fast_sine(t * 1200.0f) * 0.15f;
+    *rng = *rng * 1103515245 + 12345;
+    float click = (float)(*rng % 1000) / 500.0f - 1.0f;
+    return (tone + click * 0.05f) * env * 0.5f;
+}
+
+// Bow fire - twang with snap
+static float bowFireGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 6.0f);
+    float twang = fast_sine(t * 400.0f) * 0.4f + fast_sine(t * 600.0f) * 0.3f;
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float snap = noise * expf(-t * 30.0f) * 0.5f;
+    return (twang * env + snap) * 0.7f;
 }
 
 //----------------------------------------------------------------------------------
@@ -504,6 +570,10 @@ void InitSounds(void)
     sndPig = LoadSoundFromWave(w);
     UnloadWave(w);
 
+    w = GenerateWave(0.4f, sr, villagerGen);
+    sndVillager = LoadSoundFromWave(w);
+    UnloadWave(w);
+
     w = GenerateWave(0.3f, sr, skeletonGen);
     sndSkeleton = LoadSoundFromWave(w);
     UnloadWave(w);
@@ -538,6 +608,26 @@ void InitSounds(void)
 
     w = GenerateWave(2.5f, sr, thunderGen);
     sndThunder = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.8f, sr, caveDripGen);
+    sndCaveDrip = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(3.0f, sr, caveAmbientGen);
+    sndCaveAmbient = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(2.0f, sr, windGen);
+    sndWind = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.15f, sr, pickupGen);
+    sndPickup = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.3f, sr, bowFireGen);
+    sndBowFire = LoadSoundFromWave(w);
     UnloadWave(w);
 
     InitBGM();
@@ -585,6 +675,11 @@ void UnloadSounds(void)
     UnloadSound(sndCreeperFuse);
     UnloadSound(sndRain);
     UnloadSound(sndThunder);
+    UnloadSound(sndCaveDrip);
+    UnloadSound(sndCaveAmbient);
+    UnloadSound(sndWind);
+    UnloadSound(sndPickup);
+    UnloadSound(sndBowFire);
     if (bgm.stream.buffer) UnloadMusicStream(bgm);
     CloseAudioDevice();
 }
@@ -678,6 +773,18 @@ void PlaySoundFootstep(void) {
     PlaySound(sndFootstep);
 }
 
+void PlaySoundPickup(void) {
+    if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndPickup, sfxVolume * 0.5f);
+    PlaySound(sndPickup);
+}
+
+void PlaySoundBowFire(void) {
+    if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndBowFire, sfxVolume);
+    PlaySound(sndBowFire);
+}
+
 void PlaySoundMob(MobType type) {
     if (!IsAudioDeviceReady()) return;
     if (type == MOB_ZOMBIE) { SetSoundVolume(sndZombie, sfxVolume); PlaySound(sndZombie); }
@@ -687,6 +794,7 @@ void PlaySoundMob(MobType type) {
     else if (type == MOB_SPIDER) { SetSoundVolume(sndSpider, sfxVolume * 0.7f); PlaySound(sndSpider); }
     else if (type == MOB_SLIME) { SetSoundVolume(sndSlime, sfxVolume * 0.6f); PlaySound(sndSlime); }
     else if (type == MOB_ENDERMAN) { SetSoundVolume(sndEnderman, sfxVolume * 0.5f); PlaySound(sndEnderman); }
+    else if (type == MOB_VILLAGER) { SetSoundVolume(sndVillager, sfxVolume * 0.6f); PlaySound(sndVillager); }
 }
 
 void PlaySoundSplash(void) {
@@ -745,8 +853,64 @@ void PlaySoundMobAt(MobType type, float mobX, float mobY) {
     else if (type == MOB_SPIDER) s = sndSpider;
     else if (type == MOB_SLIME) s = sndSlime;
     else if (type == MOB_ENDERMAN) s = sndEnderman;
+    else if (type == MOB_VILLAGER) s = sndVillager;
     else return;
 
     SetSoundVolume(s, vol);
     PlaySound(s);
+}
+
+// Ambient sound state
+static bool cavePlaying = false;
+static bool windPlaying = false;
+static float dripTimer = 0.0f;
+
+void UpdateAmbientSounds(void) {
+    if (!IsAudioDeviceReady()) return;
+
+    int playerBX = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
+    int playerBY = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
+    uint8_t light = GetLightLevel(playerBX, playerBY);
+    bool underwater = IsPlayerUnderwater();
+
+    // Cave ambient: play when underground (low light) and not underwater
+    bool inCave = (light < 8) && !underwater;
+    if (inCave) {
+        // Cave rumble
+        if (!IsSoundPlaying(sndCaveAmbient)) {
+            SetSoundVolume(sndCaveAmbient, sfxVolume * 0.15f);
+            PlaySound(sndCaveAmbient);
+        }
+        // Periodic cave drips
+        dripTimer -= GetFrameTime();
+        if (dripTimer <= 0.0f) {
+            dripTimer = 3.0f + (float)(rand() % 500) / 100.0f; // 3-8 seconds
+            SetSoundVolume(sndCaveDrip, sfxVolume * 0.25f);
+            PlaySound(sndCaveDrip);
+        }
+        cavePlaying = true;
+    } else if (cavePlaying) {
+        StopSound(sndCaveAmbient);
+        cavePlaying = false;
+        dripTimer = 0.0f;
+    }
+
+    // Wind: play when on surface and exposed to sky
+    bool exposed = true;
+    if (playerBY >= 0 && playerBY < WORLD_HEIGHT) {
+        for (int y = 0; y < playerBY; y++) {
+            if (IsBlockSolid(playerBX, y)) { exposed = false; break; }
+        }
+    }
+    bool onSurface = exposed && !underwater && light >= 10;
+    if (onSurface) {
+        if (!IsSoundPlaying(sndWind)) {
+            SetSoundVolume(sndWind, sfxVolume * 0.08f);
+            PlaySound(sndWind);
+        }
+        windPlaying = true;
+    } else if (windPlaying) {
+        StopSound(sndWind);
+        windPlaying = false;
+    }
 }
