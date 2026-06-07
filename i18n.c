@@ -431,6 +431,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_PROTECTION] = "Protection",
     [STR_ENCH_FORTUNE] = "Fortune",
     [STR_ENCH_UNBREAKING] = "Unbreaking",
+    [STR_ENCH_SILK_TOUCH] = "Silk Touch",
+    // Fishing items
+    [STR_ITEM_FISHING_ROD] = "Fishing Rod",
+    [STR_ITEM_RAW_FISH] = "Raw Fish",
+    [STR_ITEM_COOKED_FISH] = "Cooked Fish",
+    // Cauldron
+    [STR_BLOCK_CAULDRON] = "Cauldron",
     [STR_ENCHANTED] = "Enchanted",
 
     // Enchanting messages
@@ -502,6 +509,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_BEEF] = "Cook Beef",
     [STR_SMELT_MUTTON] = "Cook Mutton",
     [STR_SMELT_CHICKEN] = "Cook Chicken",
+    [STR_SMELT_FISH] = "Cook Fish",
 },
 
 // ===== SIMPLIFIED CHINESE =====
@@ -892,6 +900,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_PROTECTION] = "保护",
     [STR_ENCH_FORTUNE] = "时运",
     [STR_ENCH_UNBREAKING] = "耐久",
+    [STR_ENCH_SILK_TOUCH] = "精准采集",
+    // Fishing items
+    [STR_ITEM_FISHING_ROD] = "钓鱼竿",
+    [STR_ITEM_RAW_FISH] = "生鱼",
+    [STR_ITEM_COOKED_FISH] = "烤鱼",
+    // Cauldron
+    [STR_BLOCK_CAULDRON] = "炼药釜",
     [STR_ENCHANTED] = "已附魔",
 
     // Enchanting messages
@@ -963,6 +978,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_BEEF] = "烤牛肉",
     [STR_SMELT_MUTTON] = "烤羊肉",
     [STR_SMELT_CHICKEN] = "烤鸡肉",
+    [STR_SMELT_FISH] = "烤鱼",
 },
 
 // ===== JAPANESE =====
@@ -1353,6 +1369,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_PROTECTION] = "保護",
     [STR_ENCH_FORTUNE] = "幸運",
     [STR_ENCH_UNBREAKING] = "耐久力",
+    [STR_ENCH_SILK_TOUCH] = "シルクの触手",
+    // Fishing items
+    [STR_ITEM_FISHING_ROD] = "釣竿",
+    [STR_ITEM_RAW_FISH] = "生の魚",
+    [STR_ITEM_COOKED_FISH] = "焼いた魚",
+    // Cauldron
+    [STR_BLOCK_CAULDRON] = "釜",
     [STR_ENCHANTED] = "エンチャント済み",
 
     // Enchanting messages
@@ -1424,6 +1447,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_BEEF] = "牛肉を焼く",
     [STR_SMELT_MUTTON] = "羊肉を焼く",
     [STR_SMELT_CHICKEN] = "鶏肉を焼く",
+    [STR_SMELT_FISH] = "魚を焼く",
 },
 };
 

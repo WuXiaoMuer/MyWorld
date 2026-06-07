@@ -5,18 +5,20 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format v9:
+// Save File Format v11:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
 //                + uint8 inventory[36] + int inventoryCount[36] + int toolDurability[36]
 //                + int health + int hunger + int oxygen + int xp
-//   Furnace:     10 fields (v5+)
+//   Furnace:     multi-furnace data (v5+, v9+ multi)
 //   Chests:      count + per-chest data (v6+)
 //   Weather:     type + duration (v7+)
 //   Achievements: bool[ACH_COUNT] + totalMobsKilled + totalBlocksPlaced (v9+)
 //   World:       RLE per column: (uint8 block, uint16 count) pairs
 //   Modified:    count + per-block x,y,type (v8+)
+//   Mobs:        count + per-mob data (v10+)
+//   Cauldrons:   count + per-cauldron x,y,fillLevel (v11+)
 //----------------------------------------------------------------------------------
 
 bool SaveExists(const char *path)
@@ -230,6 +232,16 @@ bool SaveWorld(const char *path)
         ok = ok && fwrite(&modifiedBlocks[i].x, sizeof(uint16_t), 1, f) == 1;
         ok = ok && fwrite(&modifiedBlocks[i].y, sizeof(uint16_t), 1, f) == 1;
         ok = ok && fwrite(&modifiedBlocks[i].blockType, sizeof(uint8_t), 1, f) == 1;
+    }
+
+    // v11+: cauldron data
+    if (version >= 11) {
+        ok = ok && fwrite(&cauldronCount, sizeof(int), 1, f) == 1;
+        for (int i = 0; i < cauldronCount && ok; i++) {
+            ok = ok && fwrite(&cauldrons[i].x, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&cauldrons[i].y, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&cauldrons[i].fillLevel, sizeof(uint8_t), 1, f) == 1;
+        }
     }
 
     fclose(f);
@@ -453,6 +465,17 @@ bool LoadWorld(const char *path)
         } else {
             InitMobs();
         }
+        // v11+: cauldron data
+        if (version >= 11) {
+            if (fread(&cauldronCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            for (int i = 0; i < cauldronCount && i < MAX_CAULDRONS; i++) {
+                if (fread(&cauldrons[i].x, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                if (fread(&cauldrons[i].y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+                if (fread(&cauldrons[i].fillLevel, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            }
+        } else {
+            cauldronCount = 0;
+        }
     } else {
         // v2 compat: default values
         for (int i = 0; i < INVENTORY_SLOTS; i++) {
@@ -495,7 +518,7 @@ bool LoadWorld(const char *path)
             for (int i = 0; i < count && y + i < WORLD_HEIGHT; i++) {
                 world[x][y + i] = block;
             }
-            y += count;
+            y += count > 0 ? count : 1;
         }
     }
 

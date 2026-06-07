@@ -103,7 +103,9 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(BLOCK_TORCH, 4, BLOCK_LANTERN, 1, STR_RECIPE_LANTERN, false);
     ADD_RECIPE(ITEM_IRON_INGOT, 3, ITEM_BUCKET, 1, STR_RECIPE_BUCKET, false);
     ADD_RECIPE(BLOCK_OBSIDIAN, 4, BLOCK_ENCHANTING_TABLE, 1, STR_RECIPE_ENCHANTING_TABLE, true);
+    ADD_RECIPE(ITEM_IRON_INGOT, 7, BLOCK_CAULDRON, 1, STR_BLOCK_CAULDRON, false);
     ADD_RECIPE(ITEM_STICK, 3, ITEM_BOW, 1, STR_RECIPE_BOW, false);
+    ADD_RECIPE(ITEM_STICK, 3, ITEM_FISHING_ROD, 1, STR_RECIPE_FISHING_ROD, false);
 
     // Redstone recipes
     ADD_RECIPE(ITEM_REDSTONE, 1, BLOCK_REDSTONE_WIRE, 1, STR_RECIPE_REDSTONE_WIRE, false);
@@ -132,6 +134,7 @@ void InitSmeltingRecipes(void)
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_BEEF, ITEM_COOKED_BEEF, STR_SMELT_BEEF};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_MUTTON, ITEM_COOKED_MUTTON, STR_SMELT_MUTTON};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_CHICKEN, ITEM_COOKED_CHICKEN, STR_SMELT_CHICKEN};
+    smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_FISH, ITEM_COOKED_FISH, STR_SMELT_FISH};
 }
 
 int FindSmeltRecipe(BlockType input)

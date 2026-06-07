@@ -44,9 +44,67 @@ void ReturnHeldItem(void)
             return;
         }
     }
-    // No empty slot — drop as entity
-    SpawnItemEntity(heldItem, heldCount, player.position.x + PLAYER_WIDTH / 2, player.position.y);
-    ClearHeldItem();
+}
+
+//----------------------------------------------------------------------------------
+// Menu UI Helper Functions
+//----------------------------------------------------------------------------------
+
+// Draw a rounded rectangle (simulated with overlapping rectangles + circles)
+static void DrawRoundedRect(int x, int y, int w, int h, float radius, Color color)
+{
+    if (radius <= 0.0f) {
+        DrawRectangle(x, y, w, h, color);
+        return;
+    }
+    radius = radius * 0.5f; // radius as fraction (0..1)
+    int rx = (int)(w * radius);
+    int ry = (int)(h * radius);
+    if (rx > w / 2) rx = w / 2;
+    if (ry > h / 2) ry = h / 2;
+
+    // Center
+    DrawRectangle(x + rx, y, w - rx * 2, h, color);
+    DrawRectangle(x, y + ry, w, h - ry * 2, color);
+    // Corners
+    if (rx > 0 && ry > 0) {
+        // Top-left
+        DrawCircle((int)(x + rx + 0.5f), (int)(y + ry + 0.5f), rx, color);
+        // Top-right
+        DrawCircle((int)(x + w - rx - 0.5f), (int)(y + ry + 0.5f), rx, color);
+        // Bottom-left
+        DrawCircle((int)(x + rx + 0.5f), (int)(y + h - ry - 0.5f), rx, color);
+        // Bottom-right
+        DrawCircle((int)(x + w - rx - 0.5f), (int)(y + h - ry - 0.5f), rx, color);
+    }
+}
+
+// Draw text with a left-to-right gradient
+static void DrawGradientText(const char *text, int x, int y, int fontSize, Color colorLeft, Color colorRight)
+{
+    int len = (int)strlen(text);
+    int drawX = x;
+    for (int i = 0; i < len; i++) {
+        char ch[2] = { text[i], 0 };
+        int charW = MeasureGameTextWidth(ch, fontSize);
+        float t = (float)i / (float)len;
+        unsigned char r = (unsigned char)(colorLeft.r + (colorRight.r - colorLeft.r) * t);
+        unsigned char g = (unsigned char)(colorLeft.g + (colorRight.g - colorLeft.g) * t);
+        unsigned char b = (unsigned char)(colorLeft.b + (colorRight.b - colorLeft.b) * t);
+        unsigned char a = (unsigned char)(colorLeft.a + (colorRight.a - colorLeft.a) * t);
+        DrawGameText(ch, drawX, y, fontSize, (Color){r, g, b, a});
+        drawX += charW;
+    }
+}
+
+// Draw a soft glow circle
+static void DrawGlowCircle(int cx, int cy, int radius, Color color, float intensity)
+{
+    for (int layer = radius; layer >= 1; layer--) {
+        float fade = 1.0f - (float)layer / (float)radius;
+        unsigned char a = (unsigned char)(color.a * fade * intensity);
+        DrawCircle(cx, cy, layer, (Color){color.r, color.g, color.b, a});
+    }
 }
 
 void ClearHeldItem(void)
@@ -2936,7 +2994,7 @@ void DrawLargeMap(void)
 }
 
 //----------------------------------------------------------------------------------
-// Main Menu
+// Main Menu — Redesigned: deep night, gold accent, premium card buttons
 //----------------------------------------------------------------------------------
 void DrawMainMenu(void)
 {
@@ -2945,8 +3003,8 @@ void DrawMainMenu(void)
 
     // Menu entrance animation state
     static float menuEnterTime = 0.0f;
-    static float dustX[40], dustY[40], dustSpeed[40], dustSize[40];
-    static float fireflyX[12], fireflyY[12], fireflyPhase[12];
+    static float dustX[80], dustY[80], dustSpeed[80], dustSize[80];
+    static float fireflyX[20], fireflyY[20], fireflyPhase[20];
     static float cloudX[6], cloudW[6], cloudY[6];
     static bool menuInited = false;
     extern bool g_resetMenuAnim;
@@ -2956,115 +3014,119 @@ void DrawMainMenu(void)
     }
     if (!menuInited) {
         menuEnterTime = time;
-        for (int i = 0; i < 40; i++) {
+        for (int i = 0; i < 80; i++) {
             dustX[i] = (float)(rand() % SCREEN_WIDTH);
             dustY[i] = (float)(rand() % SCREEN_HEIGHT);
-            dustSpeed[i] = 8.0f + (float)(rand() % 20);
+            dustSpeed[i] = 5.0f + (float)(rand() % 15);
             dustSize[i] = 1.0f + (float)(rand() % 3);
         }
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 15; i++) {
             fireflyX[i] = (float)(100 + rand() % (SCREEN_WIDTH - 200));
-            fireflyY[i] = (float)(200 + rand() % 400);
+            fireflyY[i] = (float)(250 + rand() % 300);
             fireflyPhase[i] = (float)(rand() % 100) * 0.1f;
         }
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 5; i++) {
             cloudX[i] = (float)(rand() % (SCREEN_WIDTH + 200) - 100);
-            cloudW[i] = 60.0f + (float)(rand() % 100);
-            cloudY[i] = 40.0f + (float)(rand() % 120);
+            cloudW[i] = 70.0f + (float)(rand() % 100);
+            cloudY[i] = 50.0f + (float)(rand() % 100);
         }
         menuInited = true;
     }
     float elapsed = time - menuEnterTime;
 
-    // Sky gradient background with subtle color shift
+    // ================================================================
+    // Background: deep night gradient (darker, richer)
+    // ================================================================
     for (int y = 0; y < SCREEN_HEIGHT; y += 2) {
         float t = (float)y / SCREEN_HEIGHT;
-        float shift = sinf(time * 0.15f) * 0.5f + 0.5f;
-        unsigned char r = (unsigned char)(8 + t * 18 + shift * 6);
-        unsigned char g = (unsigned char)(10 + t * 14 + sinf(time * 0.12f + 1.0f) * 4);
-        unsigned char b = (unsigned char)(28 + t * 35 + sinf(time * 0.1f + 2.0f) * 10);
+        float shift = sinf(time * 0.1f) * 0.5f + 0.5f;
+        // Deep navy → near-black
+        unsigned char r = (unsigned char)(4 + t * 10 + shift * 3);
+        unsigned char g = (unsigned char)(5 + t * 7 + sinf(time * 0.08f + 1.0f) * 2);
+        unsigned char b = (unsigned char)(14 + t * 22 + sinf(time * 0.06f + 2.0f) * 6);
         DrawRectangle(0, y, SCREEN_WIDTH, 2, (Color){r, g, b, 255});
     }
 
-    // Stars with twinkle
-    for (int i = 0; i < 40; i++) {
+    // ================================================================
+    // Stars: two layers (bright + dim)
+    // ================================================================
+    for (int i = 0; i < 80; i++) {
         int sx = (i * 131 + 47) % SCREEN_WIDTH;
-        int sy = (i * 83 + 19) % (SCREEN_HEIGHT / 2);
-        float twinkle = sinf(time * (2.0f + (i % 3)) + i * 1.7f) * 0.5f + 0.5f;
-        unsigned char a = (unsigned char)(twinkle * 150);
-        float sz = 1.0f + twinkle;
-        DrawRectangle(sx, sy, (int)sz, (int)sz, (Color){200, 210, 255, a});
-        if (twinkle > 0.85f)
-            DrawRectangle(sx - 1, sy, 3, 1, (Color){180, 200, 255, (unsigned char)(a * 0.4f)});
+        int sy = (i * 83 + 19) % (SCREEN_HEIGHT * 3 / 4);
+        float twinkle = sinf(time * (1.5f + (i % 5) * 0.8f) + i * 1.7f) * 0.5f + 0.5f;
+        unsigned char a = (unsigned char)(twinkle * (i % 3 == 0 ? 200 : 120));
+        float sz = (i % 3 == 0) ? 2.0f : 1.0f;
+        DrawRectangle(sx, sy, (int)sz, (int)sz, (Color){180 + (i%3)*24, 190 + (i%3)*22, 220, a});
     }
 
-    // Mountain silhouettes (parallax)
+    // ================================================================
+    // Subtle vignette: dark edges
+    // ================================================================
+    {
+        float cx = SCREEN_WIDTH / 2.0f;
+        float cy = SCREEN_HEIGHT / 2.0f;
+        float maxR = sqrtf(cx * cx + cy * cy);
+        for (int x = 0; x < SCREEN_WIDTH; x += 4) {
+            for (int dy = 0; dy < 4; dy++) {
+                float y = cy + dy - 2.0f;
+                float r = sqrtf((x - cx) * (x - cx) + (y - cy) * (y - cy)) / maxR;
+                if (r > 0.5f) {
+                    float v = (r - 0.5f) * 2.0f; // 0 at center, 1 at edge
+                    unsigned char a = (unsigned char)(v * v * 120);
+                    DrawRectangle(x, (int)y, 4, 1, (Color){0, 0, 0, a});
+                }
+            }
+        }
+    }
+
+    // ================================================================
+    // Clouds (slow, distant)
+    // ================================================================
     for (int i = 0; i < 5; i++) {
-        float mx = fmodf(-time * 3.0f + i * 300.0f, (float)(SCREEN_WIDTH + 400)) - 200;
-        float mh = 80.0f + (i * 37) % 100;
-        float mw = 200.0f + (i * 53) % 150;
-        unsigned char dark = (unsigned char)(18 + i * 4);
-        DrawTriangle(
-            (Vector2){mx, (float)SCREEN_HEIGHT - 60},
-            (Vector2){mx + mw, (float)SCREEN_HEIGHT - 60},
-            (Vector2){mx + mw * 0.5f, (float)SCREEN_HEIGHT - 60 - mh},
-            (Color){dark, dark + 3, dark + 12, 255}
-        );
-    }
-
-    // Hills (lighter, closer parallax)
-    for (int x = 0; x < SCREEN_WIDTH; x += 2) {
-        float h = 30.0f + sinf((x + time * 6.0f) * 0.008f) * 25.0f
-                        + sinf((x + time * 4.0f) * 0.015f + 1.0f) * 12.0f;
-        DrawRectangle(x, SCREEN_HEIGHT - 60 - (int)h, 2, (int)h + 60,
-                      (Color){22, 28, 42, 255});
-    }
-
-    // Ground
-    DrawRectangle(0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 60, (Color){18, 22, 32, 255});
-    DrawRectangle(0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, 2, (Color){35, 50, 70, 200});
-
-    // Clouds
-    for (int i = 0; i < 6; i++) {
-        cloudX[i] += dt * (4.0f + i * 1.5f);
+        cloudX[i] += dt * (2.5f + i * 1.2f);
         if (cloudX[i] > SCREEN_WIDTH + 100) cloudX[i] = -cloudW[i] - 50;
-        unsigned char ca = (unsigned char)(25 + i * 5);
-        DrawRectangle((int)cloudX[i], (int)cloudY[i], (int)cloudW[i], 8,
-                      (Color){ca + 20, ca + 25, ca + 40, 80});
-        DrawRectangle((int)cloudX[i] + 10, (int)cloudY[i] - 5, (int)(cloudW[i] * 0.6f), 6,
-                      (Color){ca + 25, ca + 30, ca + 45, 60});
+        unsigned char ca = (unsigned char)(18 + i * 4);
+        DrawRectangle((int)cloudX[i], (int)cloudY[i], (int)cloudW[i], 6,
+                      (Color){ca + 10, ca + 12, ca + 18, 50});
+        DrawRectangle((int)cloudX[i] + 10, (int)cloudY[i] - 4, (int)(cloudW[i] * 0.5f), 5,
+                      (Color){ca + 14, ca + 16, ca + 22, 35});
     }
 
-    // Floating dust particles with depth
+    // ================================================================
+    // Floating dust particles
+    // ================================================================
     for (int i = 0; i < 40; i++) {
         dustY[i] -= dustSpeed[i] * dt;
-        dustX[i] += sinf(time * 0.5f + i) * 8.0f * dt;
+        dustX[i] += sinf(time * 0.4f + i) * 6.0f * dt;
         if (dustY[i] < -5.0f) { dustY[i] = SCREEN_HEIGHT + 5.0f; dustX[i] = (float)(rand() % SCREEN_WIDTH); }
-        unsigned char da = (unsigned char)(20 + (i % 5) * 8);
+        unsigned char da = (unsigned char)(15 + (i % 5) * 6);
         DrawRectangle((int)dustX[i], (int)dustY[i], (int)dustSize[i], (int)dustSize[i],
-                      (Color){160, 170, 200, da});
+                      (Color){140, 150, 180, da});
     }
 
-    // Fireflies
-    for (int i = 0; i < 12; i++) {
-        float fx = fireflyX[i] + sinf(time * 0.4f + fireflyPhase[i]) * 30.0f;
-        float fy = fireflyY[i] + cosf(time * 0.3f + fireflyPhase[i] * 1.5f) * 15.0f;
-        float glow = sinf(time * 2.0f + fireflyPhase[i]) * 0.5f + 0.5f;
+    // ================================================================
+    // Fireflies — warm gold
+    // ================================================================
+    for (int i = 0; i < 15; i++) {
+        float fx = fireflyX[i] + sinf(time * 0.35f + fireflyPhase[i]) * 25.0f;
+        float fy = fireflyY[i] + cosf(time * 0.28f + fireflyPhase[i] * 1.5f) * 12.0f;
+        float glow = sinf(time * 1.8f + fireflyPhase[i]) * 0.5f + 0.5f;
         unsigned char fa = (unsigned char)(glow * 180);
-        DrawRectangle((int)fx, (int)fy, 2, 2, (Color){200, 230, 150, fa});
-        DrawRectangle((int)fx - 1, (int)fy - 1, 4, 4, (Color){180, 220, 120, (unsigned char)(fa * 0.3f)});
+        DrawRectangle((int)fx, (int)fy, 2, 2, (Color){255, 215, 100, fa});
+        DrawRectangle((int)fx - 1, (int)fy - 1, 4, 4, (Color){255, 200, 70, (unsigned char)(fa * 0.2f)});
     }
 
-    // Title with letter-by-letter entrance animation
+    // ================================================================
+    // Title — golden gradient with layered glow
+    // ================================================================
     const char *title = S(STR_TITLE);
-    int titleSize = 72;
+    int titleSize = 68;
     int titleW = MeasureGameTextWidth(title, titleSize);
     int titleX = (SCREEN_WIDTH - titleW) / 2;
-    int titleY = 75;
+    int titleY = 72;
     int titleLen = (int)strlen(title);
-    float titleTotalDur = 0.4f + titleLen * 0.06f;
 
-    // Precompute character widths and positions
+    float titleTotalDur = 0.4f + titleLen * 0.055f;
     int charWidths[128];
     int charPositions[128];
     int runX = titleX;
@@ -3075,98 +3137,86 @@ void DrawMainMenu(void)
         runX += charWidths[k];
     }
 
-    // Letter-by-letter bounce-in
+    // Bounce-in animation (same as before)
     for (int ci = 0; ci < titleLen; ci++) {
-        float letterStart = ci * 0.06f;
+        float letterStart = ci * 0.055f;
         float lt = elapsed - letterStart;
         if (lt < 0.0f) continue;
-        float progress = lt / 0.4f;
+        float progress = lt / 0.38f;
         if (progress > 1.0f) progress = 1.0f;
         float bounce;
-        if (progress < 0.6f) {
-            bounce = progress / 0.6f;
-            bounce = 1.2f * bounce;
-        } else if (progress < 0.8f) {
-            bounce = 1.2f - (progress - 0.6f) / 0.2f * 0.25f;
-        } else {
-            bounce = 0.95f + (progress - 0.8f) / 0.2f * 0.05f;
-        }
+        if (progress < 0.55f) { bounce = progress / 0.55f; bounce = 1.2f * bounce; }
+        else if (progress < 0.78f) { bounce = 1.2f - (progress - 0.55f) / 0.23f * 0.22f; }
+        else { bounce = 0.96f + (progress - 0.78f) / 0.22f * 0.04f; }
         float alpha = progress < 0.3f ? progress / 0.3f : 1.0f;
-        float offsetY = (1.0f - bounce) * -30.0f;
+        float offsetY = (1.0f - bounce) * -28.0f;
         char chBuf[2] = { title[ci], 0 };
         int cx = charPositions[ci];
         int cy = titleY + (int)offsetY;
         unsigned char ca = (unsigned char)(alpha * 255);
-        // Clean shadow + text
-        DrawGameText(chBuf, cx + 1, cy + 1, titleSize, (Color){0, 0, 0, (unsigned char)(100 * alpha)});
-        DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 235, 250, ca});
+        DrawGameText(chBuf, cx + 1, cy + 2, titleSize, (Color){0, 0, 0, (unsigned char)(100 * alpha)});
+        DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 210, 160, ca});
     }
 
-    // Title after animation — clean with subtle depth
+    // Final title — golden glow
     if (elapsed > titleTotalDur) {
-        // Shadow
-        DrawGameText(title, titleX + 1, titleY + 1, titleSize, (Color){0, 0, 0, 100});
-        // Main text
-        DrawGameText(title, titleX, titleY, titleSize, (Color){235, 235, 250, 255});
+        float breathe = sinf(time * 0.7f) * 0.25f + 0.75f;
+        unsigned char glowA = (unsigned char)(50 * breathe);
+        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 55, (Color){210, 160, 70, glowA}, 0.35f);
+        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 35, (Color){245, 200, 100, glowA}, 0.3f);
+        DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){0, 0, 0, 130});
+        Color titleLeft = (Color){210, 160, 70, 255};   // warm gold
+        Color titleRight = (Color){245, 208, 128, 255};  // light gold
+        DrawGradientText(title, titleX, titleY, titleSize, titleLeft, titleRight);
     }
 
-    // Subtitle
-    float subFade = (elapsed - titleTotalDur) / 0.5f;
+    // ================================================================
+    // Subtitle — refined
+    // ================================================================
+    float subFade = (elapsed - titleTotalDur) / 0.45f;
     if (subFade > 0.0f) {
         if (subFade > 1.0f) subFade = 1.0f;
         const char *sub = S(STR_SUBTITLE);
-        int subW = MeasureGameTextWidth(sub, 18);
-        unsigned char subA = (unsigned char)(subFade * 160);
-        float subY = 160.0f + (1.0f - subFade) * 10.0f;
-        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, (int)subY, 18, (Color){170, 175, 190, subA});
+        int subW = MeasureGameTextWidth(sub, 17);
+        unsigned char subA = (unsigned char)(subFade * 170);
+        float subY = 155.0f + (1.0f - subFade) * 8.0f;
+        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, (int)subY, 17, (Color){145, 145, 165, subA});
     }
 
-    // Scan lines overlay (very subtle)
-    for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
-        unsigned char scanA = (unsigned char)(3 + (int)(sinf(y * 0.5f + time * 2.0f) * 2));
-        DrawRectangle(0, y, SCREEN_WIDTH, 1, (Color){0, 0, 0, scanA});
-    }
-
-    // Circuit-line separator (muted)
-    float sepFade = (elapsed - titleTotalDur - 0.3f) / 0.4f;
+    // ================================================================
+    // Separator line — elegant gold gradient
+    // ================================================================
+    float sepFade = (elapsed - titleTotalDur - 0.25f) / 0.35f;
     if (sepFade > 0.0f) {
         if (sepFade > 1.0f) sepFade = 1.0f;
-        unsigned char la = (unsigned char)(sepFade * 120);
-        int lineY = 190;
+        unsigned char la = (unsigned char)(sepFade * 160);
+        int lineY = 188;
         int cx = SCREEN_WIDTH / 2;
-        // Main lines
-        DrawRectangle(cx - 200, lineY, 400, 1, (Color){40, 120, 130, (unsigned char)(la * 0.4f)});
-        DrawRectangle(cx - 180, lineY + 3, 360, 1, (Color){100, 40, 120, (unsigned char)(la * 0.3f)});
-        // Animated segment
-        float segPos = sinf(time * 0.8f) * 0.5f + 0.5f;
-        int segW = 80;
-        int segX = cx - 180 + (int)(360 * segPos) - segW / 2;
-        DrawRectangle(segX, lineY, segW, 1, (Color){60, 160, 170, la});
-        // Center node
-        float pulse = sinf(time * 3.0f) * 0.3f + 0.7f;
+        // Gradient line: gold → amber → gold
+        for (int dx = -180; dx <= 180; dx++) {
+            float t = (float)(dx + 180) / 360.0f;
+            // Two-tone: warm gold in center, amber at edges
+            float centerDist = fabsf(t - 0.5f) * 2.0f; // 0 at center, 1 at edges
+            unsigned char r = (unsigned char)(180 * (1.0f - centerDist * 0.3f) + 232 * centerDist * 0.1f);
+            unsigned char g = (unsigned char)(149 * (1.0f - centerDist * 0.2f) + 168 * centerDist * 0.2f);
+            unsigned char b = (unsigned char)(76 * (1.0f - centerDist * 0.15f) + 76 * centerDist * 0.15f);
+            DrawRectangle(cx + dx, lineY, 1, 1, (Color){r, g, b, (unsigned char)(la * (1.0f - centerDist * centerDist * 0.7f))});
+        }
+        // Center diamond
+        float pulse = sinf(time * 2.2f) * 0.3f + 0.7f;
         unsigned char da = (unsigned char)(la * pulse);
-        DrawRectangle(cx - 2, lineY - 2, 4, 4, (Color){60, 150, 170, da});
-        // Branch stubs
-        for (int d = 1; d <= 3; d++) {
-            unsigned char branchA = (unsigned char)(da * (0.6f - d * 0.12f));
-            DrawRectangle(cx - 60 * d, lineY - 3, 1, 6, (Color){50, 120, 140, branchA});
-            DrawRectangle(cx + 60 * d, lineY - 3, 1, 6, (Color){50, 120, 140, branchA});
-        }
-        // Data dots
-        for (int s = 0; s < 4; s++) {
-            float streamPos = fmodf(time * 1.5f + s * 0.3f, 1.0f);
-            int streamX = cx - 180 + (int)(360 * streamPos);
-            unsigned char streamA = (unsigned char)(la * 0.4f * sinf(streamPos * 3.14159f));
-            DrawRectangle(streamX, lineY - 1, 2, 2, (Color){60, 150, 130, streamA});
-        }
+        DrawRectangle(cx - 1, lineY - 2, 3, 3, (Color){245, 210, 120, da});
     }
 
-    // Cyberpunk flat buttons with neon glow
-    int btnW = 280, btnH = 44;
+    // ================================================================
+    // Buttons — premium card design with gold accent
+    // ================================================================
+    // These MUST match game.c UpdateMainMenu exactly
+    int btnW = 280, btnH = 46;
     int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = 210;
-    int spacing = 52;
-    float btnDelay0 = titleTotalDur + 0.2f;
+    int btnY = 225;
+    int spacing = 66;
+    float btnDelay0 = titleTotalDur + 0.15f;
 
     Vector2 mouse = Win32GetMousePosition();
 
@@ -3178,178 +3228,143 @@ void DrawMainMenu(void)
         if (GetSlotInfo(i, &info) && info.exists) { hasAnySave = true; break; }
     }
     bool btnEnabled[] = { true, hasAnySave, true, true, true, true };
-    // Muted cyberpunk colors
-    Color btnSelColors[] = {
-        {30, 140, 110, 255}, {30, 100, 160, 255}, {120, 40, 150, 255}, {160, 140, 40, 255}, {100, 40, 130, 255}, {160, 50, 60, 255}
-    };
-    Color btnNormColors[] = {
-        {18, 32, 28, 230}, {18, 26, 40, 230}, {28, 18, 38, 230}, {32, 30, 18, 230}, {25, 18, 32, 230}, {38, 20, 22, 230}
-    };
-    Color btnBorderSel[] = {
-        {50, 180, 150, 200}, {50, 140, 200, 200}, {160, 70, 200, 200}, {200, 180, 50, 200}, {140, 60, 180, 200}, {200, 70, 80, 200}
-    };
-    Color btnBorderNorm[] = {
-        {40, 70, 60, 140}, {30, 55, 80, 140}, {50, 30, 65, 140}, {60, 55, 30, 140}, {40, 25, 55, 140}, {65, 35, 38, 140}
-    };
-    int btnIcons[] = { 0, 1, 4, 5, 2, 3 };
+
+    // Color palette
+    // Default: dark card with subtle border
+    static const Color btnBgDefault  = {14, 15, 22, 240};
+    // Selected: warm dark with gold glow
+    static const Color btnBgSelected = {26, 22, 16, 250};
+    // Hover: slightly brighter
+    static const Color btnBgHover    = {20, 21, 30, 250};
+    // Borders
+    static const Color btnBorderDef  = {42, 45, 58, 180};
+    static const Color btnBorderSel  = {200, 149, 108, 230};  // gold
+    static const Color btnBorderHov  = {232, 168, 76, 255};    // bright gold
+    // Text
+    static const Color btnTextDef    = {210, 210, 220, 240};
+    static const Color btnTextSel    = {255, 245, 220, 255};  // warm white
+    static const Color btnTextHov    = {255, 250, 235, 255};
+    static const Color btnTextDis    = {60, 62, 75, 140};
 
     for (int i = 0; i < btnCount; i++) {
-        // Staggered entrance animation
-        float btnDelay = btnDelay0 + i * 0.12f;
-        float btnProgress = (elapsed - btnDelay) / 0.35f;
+        // Staggered entrance
+        float btnDelay = btnDelay0 + i * 0.08f;
+        float btnProgress = (elapsed - btnDelay) / 0.28f;
         if (btnProgress < 0.0f) continue;
         if (btnProgress > 1.0f) btnProgress = 1.0f;
-        float bp = 1.0f - (1.0f - btnProgress) * (1.0f - btnProgress) * (1.0f - btnProgress);
-        float slideX = (1.0f - bp) * -80.0f;
+        // Ease out quad
+        float bp = 1.0f - (1.0f - btnProgress) * (1.0f - btnProgress);
+        float slideX = (1.0f - bp) * -50.0f;
         float btnAlpha = bp;
 
         int by = btnY + i * spacing;
         int drawX = btnX + (int)slideX;
 
-        bool hover = CheckCollisionPointRec(mouse, (Rectangle){(float)btnX, (float)by, (float)btnW, (float)btnH});
+        bool hover = CheckCollisionPointRec(mouse, (Rectangle){(float)(drawX - 8), (float)by, (float)(btnW + 16), (float)btnH});
         bool sel = (menuSelection == i);
-        float hAlpha = GetHoverAlpha(i, hover && btnEnabled[i], dt);
+        bool enabled = btnEnabled[i];
+        float hAlpha = GetHoverAlpha(i, hover && enabled, dt);
 
-        Color bg, border;
-        if (!btnEnabled[i]) {
-            bg = (Color){20, 20, 25, (unsigned char)(150 * btnAlpha)};
-            border = (Color){40, 40, 50, (unsigned char)(100 * btnAlpha)};
-        } else if (sel) {
-            bg = (Color){btnSelColors[i].r, btnSelColors[i].g, btnSelColors[i].b,
-                         (unsigned char)(220 * btnAlpha)};
-            border = (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b,
-                             (unsigned char)(255 * btnAlpha)};
+        // Determine active state
+        bool isSel = sel && enabled;
+        bool isHover = hover && enabled;
+
+        // Background
+        Color bg;
+        if (!enabled) {
+            bg = (Color){10, 10, 16, (unsigned char)(130 * btnAlpha)};
+        } else if (isSel) {
+            bg = (Color){(unsigned char)(btnBgSelected.r * btnAlpha), (unsigned char)(btnBgSelected.g * btnAlpha), (unsigned char)(btnBgSelected.b * btnAlpha), (unsigned char)(btnBgSelected.a * btnAlpha)};
+        } else if (isHover) {
+            bg = (Color){(unsigned char)(btnBgHover.r * btnAlpha), (unsigned char)(btnBgHover.g * btnAlpha), (unsigned char)(btnBgHover.b * btnAlpha), (unsigned char)(btnBgHover.a * btnAlpha)};
         } else {
-            unsigned char r = (unsigned char)((btnNormColors[i].r + (int)(15 * hAlpha)) * btnAlpha);
-            unsigned char g = (unsigned char)((btnNormColors[i].g + (int)(15 * hAlpha)) * btnAlpha);
-            unsigned char b = (unsigned char)((btnNormColors[i].b + (int)(15 * hAlpha)) * btnAlpha);
-            unsigned char a = (unsigned char)((btnNormColors[i].a + (int)(20 * hAlpha)) * btnAlpha);
-            bg = (Color){r, g, b, a};
-            border = (Color){btnBorderNorm[i].r, btnBorderNorm[i].g, btnBorderNorm[i].b,
-                             (unsigned char)((btnBorderNorm[i].a + (int)(40 * hAlpha)) * btnAlpha)};
-        }
-
-        // Subtle glow for selected button
-        if (sel && btnEnabled[i]) {
-            float pulse = sinf(time * 3.0f) * 0.2f + 0.7f;
-            for (int gl = 3; gl > 0; gl--) {
-                unsigned char ga = (unsigned char)(8 * pulse * btnAlpha / gl);
-                DrawRectangle(drawX - gl, by - gl, btnW + gl * 2, btnH + gl * 2,
-                             (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b, ga});
-            }
-        } else if (hAlpha > 0.01f && btnEnabled[i]) {
-            unsigned char ga = (unsigned char)(12 * hAlpha * btnAlpha);
-            DrawRectangle(drawX - 1, by - 1, btnW + 2, btnH + 2,
-                         (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b, ga});
+            bg = (Color){(unsigned char)(btnBgDefault.r * btnAlpha), (unsigned char)(btnBgDefault.g * btnAlpha), (unsigned char)(btnBgDefault.b * btnAlpha), (unsigned char)(btnBgDefault.a * btnAlpha)};
         }
 
         // Drop shadow
-        DrawRectangle(drawX + 2, by + 3, btnW, btnH, (Color){0, 0, 0, (unsigned char)(50 * btnAlpha)});
+        DrawRoundedRect(drawX + 2, by + 3, btnW, btnH, 0.1f, (Color){0, 0, 0, (unsigned char)(35 * btnAlpha)});
 
-        // Button body with vertical gradient
-        DrawRectangle(drawX, by, btnW, btnH, bg);
-        // Top highlight band
-        DrawRectangle(drawX, by, btnW, btnH / 4,
-                     (Color){(unsigned char)(bg.r + 15), (unsigned char)(bg.g + 15),
-                             (unsigned char)(bg.b + 18), bg.a});
-        // Bottom shadow band
-        DrawRectangle(drawX, by + btnH - 3, btnW, 3,
-                     (Color){(unsigned char)(bg.r > 10 ? bg.r - 10 : 0), (unsigned char)(bg.g > 10 ? bg.g - 10 : 0),
-                             (unsigned char)(bg.b > 10 ? bg.b - 10 : 0), bg.a});
-
-        // Neon border (rectangular)
-        DrawRectangleLinesEx((Rectangle){(float)drawX, (float)by, (float)btnW, (float)btnH}, sel ? 2 : 1, border);
-
-        // Subtle accent lines
-        int accentLen = 8;
-        DrawRectangle(drawX - accentLen, by + btnH / 2 - 1, accentLen, 1, (Color){border.r, border.g, border.b, (unsigned char)(100 * btnAlpha)});
-        DrawRectangle(drawX + btnW, by + btnH / 2 - 1, accentLen, 1, (Color){border.r, border.g, border.b, (unsigned char)(100 * btnAlpha)});
-
-        // Corner dots
-        int cornerSz = 2;
-        DrawRectangle(drawX, by, cornerSz, cornerSz, (Color){border.r, border.g, border.b, (unsigned char)(160 * btnAlpha)});
-        DrawRectangle(drawX + btnW - 1, by, cornerSz, cornerSz, (Color){border.r, border.g, border.b, (unsigned char)(160 * btnAlpha)});
-
-        // Scan line on selected
-        if (sel && btnEnabled[i]) {
-            float scanPos = fmodf(time * 2.0f, 1.0f);
-            int scanY = by + (int)(btnH * scanPos);
-            DrawRectangle(drawX + 2, scanY, btnW - 4, 1, (Color){255, 255, 255, (unsigned char)(20 * btnAlpha)});
+        // Outer glow for selected
+        if (isSel) {
+            float pulse = sinf(time * 1.8f) * 0.2f + 0.8f;
+            unsigned char ga = (unsigned char)(12 * pulse * btnAlpha);
+            DrawRoundedRect(drawX - 5, by - 5, btnW + 10, btnH + 10, 0.1f,
+                (Color){btnBorderSel.r, btnBorderSel.g, btnBorderSel.b, ga});
+            DrawRoundedRect(drawX - 3, by - 3, btnW + 6, btnH + 6, 0.1f,
+                (Color){232, 168, 76, (unsigned char)(ga * 2)});
+        }
+        // Outer glow on hover
+        else if (hAlpha > 0.01f) {
+            unsigned char ga = (unsigned char)(8 * hAlpha * btnAlpha);
+            DrawRoundedRect(drawX - 2, by - 2, btnW + 4, btnH + 4, 0.1f,
+                (Color){232, 168, 76, ga});
         }
 
-        // Icon
-        int iconX = drawX + 20;
-        int iconY = by + btnH / 2;
-        unsigned char iconA = (unsigned char)(200 * btnAlpha);
-        Color iconC = btnEnabled[i] ? (Color){btnBorderSel[i].r, btnBorderSel[i].g, btnBorderSel[i].b, iconA} : (Color){60, 60, 70, iconA};
-        switch (btnIcons[i]) {
-            case 0: // + for New Game
-                DrawRectangle(iconX - 1, iconY - 5, 2, 10, iconC);
-                DrawRectangle(iconX - 5, iconY - 1, 10, 2, iconC);
-                break;
-            case 1: // folder for Load
-                DrawRectangle(iconX - 5, iconY - 3, 10, 8, iconC);
-                DrawRectangle(iconX - 5, iconY - 5, 5, 2, iconC);
-                break;
-            case 2: // gear for Settings
-                DrawCircleLines(iconX, iconY, 4.0f, iconC);
-                DrawRectangle(iconX - 1, iconY - 6, 2, 12, iconC);
-                DrawRectangle(iconX - 6, iconY - 1, 12, 2, iconC);
-                break;
-            case 3: // x for Quit
-                for (int l = -4; l <= 4; l += 2) {
-                    DrawRectangle(iconX + l, iconY + l, 2, 2, iconC);
-                    DrawRectangle(iconX + l, iconY - l, 2, 2, iconC);
-                }
-                break;
-            case 4: // globe for Host Game
-                DrawCircleLines(iconX, iconY, 5.0f, iconC);
-                DrawRectangle(iconX - 5, iconY, 10, 1, iconC);
-                DrawRectangle(iconX, iconY - 5, 1, 10, iconC);
-                break;
-            case 5: // link for Join Game
-                DrawRectangle(iconX - 5, iconY - 1, 4, 2, iconC);
-                DrawRectangle(iconX + 1, iconY - 1, 4, 2, iconC);
-                DrawRectangle(iconX - 3, iconY - 3, 2, 6, iconC);
-                DrawRectangle(iconX + 1, iconY - 3, 2, 6, iconC);
-                break;
+        // Button body
+        DrawRoundedRect(drawX, by, btnW, btnH, 0.1f, bg);
+
+        // Inner top highlight (subtle edge light)
+        DrawRectangle(drawX + 3, by + 2, btnW - 6, 1, (Color){255, 255, 255, (unsigned char)(8 * btnAlpha)});
+
+        // Border
+        Color border;
+        if (!enabled) {
+            border = (Color){28, 28, 38, (unsigned char)(60 * btnAlpha)};
+        } else if (isSel) {
+            border = (Color){btnBorderSel.r, btnBorderSel.g, btnBorderSel.b, (unsigned char)(btnBorderSel.a * btnAlpha)};
+        } else if (isHover) {
+            border = (Color){btnBorderHov.r, btnBorderHov.g, btnBorderHov.b, (unsigned char)(btnBorderHov.a * btnAlpha)};
+        } else {
+            border = (Color){btnBorderDef.r, btnBorderDef.g, btnBorderDef.b, (unsigned char)(btnBorderDef.a * btnAlpha)};
+        }
+        DrawRoundedRect(drawX, by, btnW, btnH, 0.1f, (Color){0, 0, 0, 0});
+        DrawRectangleLinesEx((Rectangle){(float)drawX, (float)by, (float)btnW, (float)btnH}, 1, border);
+
+        // Click flash
+        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && enabled) {
+            DrawRoundedRect(drawX, by, btnW, btnH, 0.1f, (Color){255, 255, 255, 35});
         }
 
-        // Click feedback flash
-        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && btnEnabled[i]) {
-            DrawRectangle(drawX, by, btnW, btnH, (Color){255, 255, 255, 30});
+        // Left accent line (for selected)
+        if (isSel) {
+            float linePulse = sinf(time * 2.5f) * 0.2f + 0.8f;
+            DrawRectangle(drawX + 3, by + 8, 3, btnH - 16, (Color){245, 200, 100, (unsigned char)(180 * linePulse * btnAlpha)});
         }
 
-        // Button label with glitch
-        Color textColor = btnEnabled[i]
-            ? (Color){255, 255, 255, (unsigned char)(255 * btnAlpha)}
-            : (Color){80, 80, 90, (unsigned char)(120 * btnAlpha)};
-        int textW = MeasureGameTextWidth(btnLabels[i], 22);
-        int textX = drawX + (btnW - textW) / 2 + 8;
-        int textY = by + (btnH - 22) / 2;
-        // Glitch effect on selected button
-        if (sel && btnEnabled[i] && rand() % 30 == 0) {
-            DrawGameText(btnLabels[i], textX + 2, textY, 22, (Color){0, 255, 255, (unsigned char)(80 * btnAlpha)});
-            DrawGameText(btnLabels[i], textX - 1, textY, 22, (Color){255, 0, 100, (unsigned char)(60 * btnAlpha)});
+        // Button label
+        Color textColor;
+        if (!enabled) {
+            textColor = (Color){btnTextDis.r, btnTextDis.g, btnTextDis.b, (unsigned char)(btnTextDis.a * btnAlpha)};
+        } else if (isSel) {
+            textColor = (Color){btnTextSel.r, btnTextSel.g, btnTextSel.b, (unsigned char)(btnTextSel.a * btnAlpha)};
+        } else if (isHover) {
+            textColor = (Color){btnTextHov.r, btnTextHov.g, btnTextHov.b, (unsigned char)(btnTextHov.a * btnAlpha)};
+        } else {
+            textColor = (Color){btnTextDef.r, btnTextDef.g, btnTextDef.b, (unsigned char)(btnTextDef.a * btnAlpha)};
         }
-        DrawGameText(btnLabels[i], textX, textY, 22, textColor);
+        int textW = MeasureGameTextWidth(btnLabels[i], 19);
+        int textX = drawX + (btnW - textW) / 2;
+        int textY = by + (btnH - 19) / 2;
+        DrawGameText(btnLabels[i], textX, textY, 19, textColor);
     }
 
-    // Bottom hints
-    float hintFade = (elapsed - btnDelay0 - btnCount * 0.12f - 0.3f) / 0.5f;
+    // ================================================================
+    // Bottom hints — refined
+    // ================================================================
+    float hintFade = (elapsed - btnDelay0 - btnCount * 0.08f - 0.25f) / 0.4f;
     if (hintFade > 0.0f) {
         if (hintFade > 1.0f) hintFade = 1.0f;
-        unsigned char h1a = (unsigned char)(hintFade * 120);
+        unsigned char h1a = (unsigned char)(hintFade * 110);
         const char *hint1 = S(STR_HINT_NAVIGATE);
-        int hint1W = MeasureGameTextWidth(hint1, 13);
-        DrawRectangle((SCREEN_WIDTH - hint1W) / 2, SCREEN_HEIGHT - 48, hint1W, 1, (Color){50, 120, 130, (unsigned char)(h1a * 0.3f)});
-        DrawGameText(hint1, (SCREEN_WIDTH - hint1W) / 2, SCREEN_HEIGHT - 62, 13, (Color){150, 160, 165, h1a});
+        int hint1W = MeasureGameTextWidth(hint1, 12);
+        DrawGameText(hint1, (SCREEN_WIDTH - hint1W) / 2, SCREEN_HEIGHT - 48, 12, (Color){120, 125, 140, h1a});
         const char *hint2 = S(STR_HINT_CONTROLS);
-        unsigned char h2a = (unsigned char)(hintFade * 100);
-        DrawGameText(hint2, (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 13)) / 2, SCREEN_HEIGHT - 38, 13, (Color){120, 125, 130, h2a});
-        unsigned char va = (unsigned char)(hintFade * 90);
-        DrawGameText("v0.3", 10, SCREEN_HEIGHT - 20, 13, (Color){80, 130, 140, va});
+        DrawGameText(hint2, (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 12)) / 2, SCREEN_HEIGHT - 30, 12, (Color){100, 105, 120, (unsigned char)(hintFade * 90)});
     }
+
+    // Version — subtle
+    unsigned char va = (unsigned char)(hintFade * 80);
+    DrawGameText("v0.3", 12, SCREEN_HEIGHT - 16, 12, (Color){70, 72, 85, va});
 }
 
 //----------------------------------------------------------------------------------
@@ -4000,6 +4015,120 @@ void DrawSettingsScreen(void)
     if (Win32IsKeyPressed(KEY_ESCAPE) || (backHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
         StartTransition(STATE_MENU);
         PlaySoundUIClick();
+    }
+}
+
+//----------------------------------------------------------------------------------
+// Enchanting Table UI
+//----------------------------------------------------------------------------------
+static const char* GetEnchantName(EnchantmentType type) {
+    switch (type) {
+        case ENCH_SHARPNESS:    return S(STR_ENCH_SHARPNESS);
+        case ENCH_EFFICIENCY:   return S(STR_ENCH_EFFICIENCY);
+        case ENCH_PROTECTION:   return S(STR_ENCH_PROTECTION);
+        case ENCH_FORTUNE:      return S(STR_ENCH_FORTUNE);
+        case ENCH_UNBREAKING:   return S(STR_ENCH_UNBREAKING);
+        case ENCH_SILK_TOUCH:   return S(STR_ENCH_SILK_TOUCH);
+        default:                return "Unknown";
+    }
+}
+
+void DrawEnchantingTableUI(void)
+{
+    if (!enchantOpen || enchantOptionCount == 0) return;
+
+    int panelW = 500, panelH = 320;
+    int panelX = (SCREEN_WIDTH - panelW) / 2;
+    int panelY = (SCREEN_HEIGHT - panelH) / 2;
+
+    // Panel background
+    DrawRectangle(panelX, panelY, panelW, panelH, (Color){25, 20, 40, 245});
+    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){100, 60, 180, 200});
+
+    // Title
+    DrawGameText(S(STR_BLOCK_ENCHANTING_TABLE), panelX + panelW / 2 - 60, panelY + 10, 18, (Color){180, 120, 255, 255});
+
+    // Item preview slot (left side)
+    int slotX = panelX + 20;
+    int slotY = panelY + 60;
+    int slotSize = 48;
+    DrawRectangle(slotX, slotY, slotSize, slotSize, (Color){40, 35, 55, 255});
+    DrawRectangleLines(slotX, slotY, slotSize, slotSize, (Color){120, 100, 180, 200});
+    // Draw the held item in the slot
+    if (enchantHeldItem != BLOCK_AIR && blockAtlas.id > 0) {
+        Rectangle src = { (float)(enchantHeldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+        Rectangle dst = { (float)(slotX + 8), (float)(slotY + 8), (float)(32), (float)(32) };
+        DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+    }
+    DrawGameText(GetBlockName((BlockType)enchantHeldItem), slotX + slotSize + 8, slotY + 18, 11, (Color){200, 200, 200, 255});
+
+    // XP available
+    DrawGameText(TextFormat("XP: %d", player.xp), panelX + panelW / 2 - 30, panelY + 270, 12, (Color){80, 220, 80, 200});
+
+    // 3 enchantment options (right side, stacked vertically)
+    int optX = panelX + 190;
+    int optY = panelY + 55;
+    int optH = 70;
+    int optW = panelW - 210;
+    int optPad = 6;
+
+    for (int i = 0; i < enchantOptionCount; i++) {
+        EnchantOption *eo = &enchantOptions[i];
+        if (eo->type == ENCH_NONE) continue;
+
+        int oy = optY + i * (optH + optPad);
+        int canAfford = (player.xp >= eo->xpCost);
+
+        // Option box
+        Color bgColor = canAfford ? (Color){45, 35, 70, 255} : (Color){35, 30, 40, 255};
+        DrawRectangle(optX, oy, optW, optH, bgColor);
+        DrawRectangleLines(optX, oy, optW, optH,
+            canAfford ? (Color){140, 80, 220, 220} : (Color){80, 60, 80, 160});
+
+        // Purple glow border for available
+        if (canAfford) {
+            DrawRectangleLines(optX - 1, oy - 1, optW + 2, optH + 2, (Color){160, 100, 240, 80});
+        }
+
+        // Enchantment name
+        const char *enchName = GetEnchantName(eo->type);
+        DrawGameText(enchName, optX + 10, oy + 8, 14, canAfford ? (Color){200, 160, 255, 255} : (Color){120, 100, 140, 200});
+
+        // Level
+        DrawGameText(TextFormat("Lv.%d", eo->level), optX + 10, oy + 26, 12, canAfford ? (Color){180, 140, 240, 220} : (Color){100, 80, 120, 180});
+
+        // XP cost
+        if (canAfford) {
+            DrawGameText(TextFormat("%d XP", eo->xpCost), optX + optW - 80, oy + 26, 12, (Color){80, 220, 80, 220});
+        } else {
+            DrawGameText(TextFormat("Need %d XP", eo->xpCost), optX + optW - 100, oy + 26, 11, (Color){220, 80, 80, 200});
+        }
+
+        // Click detection
+        bool hover = Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+                     GetMouseX() >= optX && GetMouseX() <= optX + optW &&
+                     GetMouseY() >= oy && GetMouseY() <= oy + optH;
+
+        if (hover && canAfford) {
+            // Apply enchantment
+            player.xp -= eo->xpCost;
+            player.itemEnchantments[enchantHeldItemSlot] = ENCH_PACK(eo->type, eo->level);
+
+            // Restore durability
+            int maxDur = IsTool((BlockType)enchantHeldItem) ? GetToolMaxDurability((BlockType)enchantHeldItem) :
+                         IsArmor((BlockType)enchantHeldItem) ? GetArmorMaxDurability((BlockType)enchantHeldItem) : 0;
+            if (IsTool((BlockType)enchantHeldItem)) {
+                player.toolDurability[enchantHeldItemSlot] = maxDur;
+            }
+
+            PlaySoundCraft();
+            ShowMessage(S(STR_MSG_ENCHANTED), (Color){180, 120, 255, 255});
+
+            // Close UI
+            enchantOpen = false;
+            inventoryOpen = false;
+            enchantOptionCount = 0;
+        }
     }
 }
 

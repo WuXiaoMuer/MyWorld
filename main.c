@@ -308,6 +308,7 @@ Texture2D crackTextures[CRACK_STAGES] = { 0 };
 bool showDebug = false;
 bool showLargeMap = false;
 bool inventoryOpen = false;
+bool enchantOpen = false;
 bool gamePaused = false;
 unsigned int worldSeed = 0;
 
@@ -393,6 +394,17 @@ Trade trades[MAX_TRADES];
 int tradeCount = 0;
 bool tradeOpen = false;
 int villagerTradeIndex = -1;
+
+// Enchanting UI state
+EnchantOption enchantOptions[MAX_ENCHANT_OPTIONS];
+int enchantOptionCount = 0;
+uint8_t enchantHeldItem = 0;
+int enchantHeldItemSlot = 0;
+int enchantTableBlockX = -1, enchantTableBlockY = -1;
+
+// Cauldron state
+CauldronData cauldrons[MAX_CAULDRONS];
+int cauldronCount = 0;
 
 // Smelting recipes
 SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];

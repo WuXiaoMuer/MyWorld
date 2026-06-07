@@ -166,6 +166,12 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Lava Bucket",   {200,80,20,255},  {240,120,30,255},  false, false, false},
     // Enchanting
     {"Enchant Table", {80,50,120,255},  {120,80,180,255},  true,  false, true},
+    // Fishing
+    {"Fishing Rod",      {150,140,100,255}, {120,110,80,255},  false, false, false},
+    {"Raw Fish",         {160,180,200,255}, {130,150,170,255}, false, false, false},
+    {"Cooked Fish",      {180,120,80,255},  {150,100,60,255},  false, false, false},
+    // Cauldron
+    {"Cauldron",         {100,95,110,255},  {80,75,90,255},    true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -2036,6 +2042,57 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
+
+    case BLOCK_CAULDRON: {
+        // Find cauldron fill level
+        uint8_t fill = 0;
+        for (int ci = 0; ci < cauldronCount; ci++) {
+            if (cauldrons[ci].x == worldX && cauldrons[ci].y == worldY) {
+                fill = cauldrons[ci].fillLevel;
+                break;
+            }
+        }
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                // Cauldron rim (top edge)
+                if (y == 0 || y == 1) {
+                    if (x > 0 && x < 15) {
+                        c = (Color){80, 75, 90, 255}; // top rim
+                    } else {
+                        c = (Color){60, 55, 70, 255}; // side rim
+                    }
+                }
+                // Side walls
+                else if (x == 0 || x == 1 || x == 14 || x == 15) {
+                    c = (Color){70, 65, 80, 255}; // iron wall
+                }
+                // Bottom
+                else if (y == 15) {
+                    c = (Color){60, 55, 70, 255};
+                }
+                // Interior (dark)
+                else if (y > 2 && x > 1 && x < 14) {
+                    c = (Color){40, 35, 50, 255};
+                    // Water fill
+                    if (fill > 0) {
+                        int waterTop = 2 + (4 - fill) * 3; // higher fill = higher water line
+                        if (y >= waterTop) {
+                            float waterAlpha = (float)(y - waterTop) / (float)(16 - waterTop);
+                            if (waterAlpha < 0) waterAlpha = 0;
+                            c = (Color){
+                                (unsigned char)(60 + 20 * waterAlpha),
+                                (unsigned char)(140 + 40 * waterAlpha),
+                                (unsigned char)(220 + 30 * waterAlpha),
+                                (unsigned char)(180 * waterAlpha + 60)
+                            };
+                        }
+                    }
+                }
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
 
     // Generic item rendering for any remaining items
     default:

@@ -204,6 +204,7 @@ void InitGame(void)
     InitParticles();
     InitEntities();
     InitProjectiles();
+    InitXpOrbs();
     InitLightMap();
     InitSmeltingRecipes();
     InitTrades();
@@ -228,6 +229,22 @@ void InitGame(void)
     InitChunkTable();
     UpdateChunks();
     player.playerDead = false;
+
+    // Scan for placed cauldrons in the world
+    {
+        cauldronCount = 0;
+        for (int x = 0; x < WORLD_WIDTH && cauldronCount < MAX_CAULDRONS; x++) {
+            for (int y = 0; y < WORLD_HEIGHT; y++) {
+                if (world[x][y] == BLOCK_CAULDRON) {
+                    // Only pick up the first few (topmost if stacked)
+                    int idx = cauldronCount++;
+                    cauldrons[idx].x = x;
+                    cauldrons[idx].y = y;
+                    cauldrons[idx].fillLevel = 0;
+                }
+            }
+        }
+    }
 
     // Reset achievement tracking for new game
     totalMobsKilled = 0;
@@ -625,30 +642,27 @@ static void UpdateMainMenu(float dt)
     // Mouse hover + click
     {
         Vector2 mouse = Win32GetMousePosition();
-        Vector2 delta = Win32GetMouseDelta();
-        int btnW = 260, btnH = 44;
+        int btnW = 260, btnH = 48;
         int btnX = (SCREEN_WIDTH - btnW) / 2;
-        int btnY = 210;
-        int spacing = 50;
+        int btnY = 220;
+        int spacing = 60;
 
         Rectangle btns[6];
         for (int i = 0; i < 6; i++) {
             btns[i] = (Rectangle){ (float)btnX, (float)(btnY + i * spacing), (float)btnW, (float)btnH };
         }
 
-        // Hover highlight only when mouse moves
-        if (fabsf(delta.x) > 0.5f || fabsf(delta.y) > 0.5f) {
-            for (int i = 0; i < 6; i++) {
-                bool hasSave = false;
-                for (int s = 0; s < MAX_SAVE_SLOTS; s++) {
-                    SaveSlotInfo info;
-                    if (GetSlotInfo(s, &info) && info.exists) { hasSave = true; break; }
-                }
-                bool enabled = (i == 0) || (i == 1 && hasSave) || (i == 2) || (i == 3) || (i == 4) || (i == 5);
-                if (enabled && CheckCollisionPointRec(mouse, btns[i])) {
-                    menuSelection = i;
-                    break;
-                }
+        // Hover highlight
+        for (int i = 0; i < 6; i++) {
+            bool hasSave = false;
+            for (int s = 0; s < MAX_SAVE_SLOTS; s++) {
+                SaveSlotInfo info;
+                if (GetSlotInfo(s, &info) && info.exists) { hasSave = true; break; }
+            }
+            bool enabled = (i == 0) || (i == 1 && hasSave) || (i == 2) || (i == 3) || (i == 4) || (i == 5);
+            if (enabled && CheckCollisionPointRec(mouse, btns[i])) {
+                menuSelection = i;
+                break;
             }
         }
 
@@ -1087,9 +1101,14 @@ void UpdateGame(float dt)
         PlaySoundUIClick();
     }
 
-    // ESC: close furnace first, then inventory, then large map, then toggle pause
+    // ESC: close enchanting first, then furnace, then chest, then inventory, then large map, then toggle pause
     if (Win32IsKeyPressed(KEY_ESCAPE)) {
-        if (furnaceOpen) {
+        if (enchantOpen) {
+            enchantOpen = false;
+            inventoryOpen = false;
+            gamePaused = false;
+            enchantOptionCount = 0;
+        } else if (furnaceOpen) {
             ReturnFurnaceItems();
             furnaceOpen = false;
             inventoryOpen = false;
@@ -1352,6 +1371,7 @@ void UpdateGame(float dt)
             }
             UpdateMobs(dt);
             UpdateProjectiles(dt);
+            UpdateXpOrbs(dt);
             UpdateEntities(dt);
             UpdateParticles(dt);
             // Pickup items for host player only (clients pick up on their side)
@@ -1594,6 +1614,7 @@ void UpdateGame(float dt)
             UpdatePlayer(dt);
             UpdateMobs(dt);
             UpdateProjectiles(dt);
+            UpdateXpOrbs(dt);
             UpdateEntities(dt);
             UpdateParticles(dt);
             PickupNearbyItems(player.position.x, player.position.y);
@@ -1761,6 +1782,7 @@ void DrawGame(void)
     DrawWater();
     DrawMobs();
     DrawProjectiles();
+    DrawXpOrbs();
     DrawEntities();
     DrawParticles();
     DrawRemotePlayers();
@@ -1812,6 +1834,7 @@ void DrawGame(void)
 
     DrawInventoryScreen();
     DrawTradeUI();
+    DrawEnchantingTableUI();
     DrawPauseMenu();
     DrawDeathScreen(GetFrameTime());
 

@@ -214,7 +214,8 @@ bool IsFood(BlockType item)
     return (item >= FOOD_RAW_PORK && item <= FOOD_BREAD) ||
            item == ITEM_RAW_BEEF || item == ITEM_COOKED_BEEF ||
            item == ITEM_RAW_MUTTON || item == ITEM_COOKED_MUTTON ||
-           item == ITEM_RAW_CHICKEN || item == ITEM_COOKED_CHICKEN;
+           item == ITEM_RAW_CHICKEN || item == ITEM_COOKED_CHICKEN ||
+           item == ITEM_RAW_FISH || item == ITEM_COOKED_FISH;
 }
 
 bool IsSword(BlockType tool)
@@ -270,6 +271,8 @@ int GetFoodValue(BlockType item)
     case ITEM_COOKED_MUTTON: return FOOD_COOKED_MUTTON_VALUE;
     case ITEM_RAW_CHICKEN: return FOOD_RAW_CHICKEN_VALUE;
     case ITEM_COOKED_CHICKEN: return FOOD_COOKED_CHICKEN_VALUE;
+    case ITEM_RAW_FISH: return FOOD_RAW_FISH_VALUE;
+    case ITEM_COOKED_FISH: return FOOD_COOKED_FISH_VALUE;
     default: return 0;
     }
 }
@@ -835,19 +838,40 @@ void PlayerBlockInteraction(void)
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Ore drop special cases (only if tool tier is sufficient)
                 if (CanToolMineBlock(selectedTool, bt) || bt == BLOCK_CROPS || bt == BLOCK_FARMLAND) {
+                    // Check for Silk Touch on the mining tool
+                    uint16_t silkEnch = player.itemEnchantments[player.selectedSlot];
+                    bool hasSilkTouch = (ENCH_TYPE(silkEnch) == ENCH_SILK_TOUCH);
                     uint8_t dropItem = bt;
-                    if (bt == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
-                    else if (bt == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
-                    else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
-                    else if (bt == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
-                    else if (bt == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
-                    else if (bt == BLOCK_CROPS) { dropItem = ITEM_WHEAT; }
-                    else if (bt == BLOCK_FARMLAND) { dropItem = BLOCK_DIRT; }
+                    bool useSilkTouch = false;
+                    if (hasSilkTouch) {
+                        // Silk Touch: drop block itself for specific block types
+                        if (bt == BLOCK_GLASS || bt == BLOCK_SAND || bt == BLOCK_GRAVEL ||
+                            bt == BLOCK_COAL_ORE || bt == BLOCK_IRON_ORE || bt == BLOCK_GOLD_ORE ||
+                            bt == BLOCK_DIAMOND_ORE || bt == BLOCK_REDSTONE_ORE || bt == BLOCK_LAPIS_ORE ||
+                            bt == BLOCK_OBSIDIAN || bt == BLOCK_LEAVES || bt == BLOCK_ICE ||
+                            bt == BLOCK_PACKED_ICE || bt == BLOCK_SANDSTONE || bt == BLOCK_SNOW ||
+                            bt == BLOCK_BOOKSHELF || bt == BLOCK_BONE_BLOCK || bt == BLOCK_MOSSY_COBBLESTONE) {
+                            useSilkTouch = true;
+                            dropItem = bt;
+                        }
+                    }
+                    if (!useSilkTouch) {
+                        // Normal drop behavior
+                        if (bt == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
+                        else if (bt == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
+                        else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
+                        else if (bt == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
+                        else if (bt == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
+                        else if (bt == BLOCK_CROPS) { dropItem = ITEM_WHEAT; }
+                        else if (bt == BLOCK_FARMLAND) { dropItem = BLOCK_DIRT; }
+                    }
                     int dropCount = 1;
-                    // Fortune enchantment: extra drops for ores
-                    uint16_t ench = player.itemEnchantments[player.selectedSlot];
-                    if (ENCH_TYPE(ench) == ENCH_FORTUNE && dropItem != bt) {
-                        if (rand() % 100 < ENCH_LEVEL(ench) * 15) dropCount++;
+                    // Fortune enchantment: extra drops for ores (not on Silk Touch blocks)
+                    if (!useSilkTouch) {
+                        uint16_t ench = player.itemEnchantments[player.selectedSlot];
+                        if (ENCH_TYPE(ench) == ENCH_FORTUNE && dropItem != bt) {
+                            if (rand() % 100 < ENCH_LEVEL(ench) * 15) dropCount++;
+                        }
                     }
                     // Crop drops scale with growth stage
                     if (bt == BLOCK_CROPS) {
@@ -988,38 +1012,65 @@ void PlayerBlockInteraction(void)
                         }
                     }
                     // Determine enchantment level (1-5) based on bookshelves
-                    int level = 1 + bookshelfCount / 5;  // 0-4 shelves=1, 5-9=2, 10-14=3, 15-19=4, 20-24=5
-                    if (level > 5) level = 5;
-                    // XP cost scales with level
-                    int xpCost = (level * 2 + 3) * 10;  // 50-130 XP
-                    if (player.xp < xpCost) {
-                        ShowMessage(S(STR_MSG_NOT_ENOUGH_XP), (Color){240, 80, 80, 255});
-                        return;
+                    int maxLevel = 1 + bookshelfCount / 5;
+                    if (maxLevel > 5) maxLevel = 5;
+                    if (maxLevel < 1) maxLevel = 1;
+
+                    // Generate 3 random enchantment options
+                    enchantOptionCount = 0;
+                    for (int opt = 0; opt < MAX_ENCHANT_OPTIONS && enchantOptionCount < MAX_ENCHANT_OPTIONS; opt++) {
+                        EnchantOption *eo = &enchantOptions[opt];
+                        eo->type = ENCH_NONE;
+
+                        bool hasSilkTouch = (ENCH_TYPE(player.itemEnchantments[slot]) == ENCH_SILK_TOUCH);
+                        bool hasFortune = (ENCH_TYPE(player.itemEnchantments[slot]) == ENCH_FORTUNE);
+
+                        // Choose enchantment type based on item
+                        if (IsArmor(selectedTool)) {
+                            int pool[] = { ENCH_PROTECTION, ENCH_PROTECTION, ENCH_UNBREAKING };
+                            eo->type = (EnchantmentType)pool[rand() % 3];
+                        } else if (IsSword(selectedTool)) {
+                            // Silk Touch excluded on swords (it's for mining)
+                            int pool[] = { ENCH_SHARPNESS, ENCH_SHARPNESS, ENCH_UNBREAKING };
+                            eo->type = (EnchantmentType)pool[rand() % 3];
+                        } else if (IsPickaxe(selectedTool)) {
+                            if (hasSilkTouch) {
+                                int pool[] = { ENCH_EFFICIENCY, ENCH_EFFICIENCY, ENCH_UNBREAKING };
+                                eo->type = (EnchantmentType)pool[rand() % 3];
+                            } else if (hasFortune) {
+                                int pool[] = { ENCH_EFFICIENCY, ENCH_EFFICIENCY, ENCH_UNBREAKING };
+                                eo->type = (EnchantmentType)pool[rand() % 3];
+                            } else {
+                                int pool[] = { ENCH_EFFICIENCY, ENCH_FORTUNE, ENCH_UNBREAKING, ENCH_EFFICIENCY };
+                                eo->type = (EnchantmentType)pool[rand() % 4];
+                            }
+                        } else if (selectedTool == ITEM_BOW) {
+                            int pool[] = { ENCH_UNBREAKING, ENCH_UNBREAKING, ENCH_UNBREAKING };
+                            eo->type = (EnchantmentType)pool[rand() % 3];
+                        } else {
+                            // Axe, shovel, hoe
+                            int pool[] = { ENCH_EFFICIENCY, ENCH_UNBREAKING, ENCH_EFFICIENCY };
+                            eo->type = (EnchantmentType)pool[rand() % 3];
+                        }
+
+                        if (eo->type == ENCH_NONE) continue;
+
+                        // Level: 1 to min(3, maxLevel)
+                        int lvl = 1 + rand() % maxLevel;
+                        if (lvl > 3) lvl = 3;
+                        eo->level = lvl;
+                        eo->xpCost = (lvl * 2 + 3) * 10;
+                        enchantOptionCount++;
                     }
-                    // Pick random enchantment appropriate for item type
-                    EnchantmentType ench = ENCH_NONE;
-                    if (IsArmor(selectedTool)) {
-                        ench = ENCH_PROTECTION;
-                    } else if (IsSword(selectedTool)) {
-                        int r = rand() % 3;
-                        ench = (r == 0) ? ENCH_SHARPNESS : (r == 1) ? ENCH_UNBREAKING : ENCH_SHARPNESS;
-                    } else if (IsPickaxe(selectedTool)) {
-                        int r = rand() % 4;
-                        ench = (r == 0) ? ENCH_EFFICIENCY : (r == 1) ? ENCH_FORTUNE : (r == 2) ? ENCH_UNBREAKING : ENCH_EFFICIENCY;
-                    } else if (selectedTool == ITEM_BOW) {
-                        ench = ENCH_UNBREAKING; // Bows only get Unbreaking
-                    } else {
-                        // Axe, shovel, hoe
-                        int r = rand() % 2;
-                        ench = (r == 0) ? ENCH_EFFICIENCY : ENCH_UNBREAKING;
-                    }
-                    player.xp -= xpCost;
-                    player.itemEnchantments[slot] = ENCH_PACK(ench, level);
-                    // Restore durability as a bonus
-                    int maxDur = IsTool(selectedTool) ? GetToolMaxDurability(selectedTool) : GetArmorMaxDurability(selectedTool);
-                    player.toolDurability[slot] = maxDur;
+
+                    enchantHeldItem = selectedTool;
+                    enchantHeldItemSlot = slot;
+                    enchantTableBlockX = blockX;
+                    enchantTableBlockY = blockY;
+                    enchantOpen = true;
+                    inventoryOpen = true;
+                    gamePaused = true;
                     PlaySoundCraft();
-                    ShowMessage(S(STR_MSG_ENCHANTED), (Color){180, 120, 255, 255});
                 } else {
                     inventoryOpen = true;
                     craftingTableOpen = true;
@@ -1135,6 +1186,100 @@ void PlayerBlockInteraction(void)
             }
         }
 
+        // Fishing rod
+        if (selectedTool == ITEM_FISHING_ROD) {
+            // Check for existing fishing line to retract
+            for (int i = 0; i < MAX_PROJECTILES; i++) {
+                if (projectiles[i].active && projectiles[i].isFishing) {
+                    if (projectiles[i].hasBite) {
+                        // Reel in with catch
+                        int roll = rand() % 100;
+                        int catchItem;
+                        if (roll < 60) {
+                            catchItem = ITEM_RAW_FISH;
+                        } else if (roll < 85) {
+                            int junk = rand() % 3;
+                            catchItem = (junk == 0) ? ITEM_STICK : (junk == 1) ? ITEM_BONE : ITEM_RAW_CHICKEN;
+                        } else {
+                            int treasure = rand() % 4;
+                            catchItem = (treasure == 0) ? ITEM_ENDER_PEARL : (treasure == 1) ? ITEM_IRON_INGOT :
+                                        (treasure == 2) ? ITEM_BOW : ITEM_STRING;
+                        }
+                        AddToInventory((BlockType)catchItem);
+                        ShowMessage(S(STR_FISH_CATCH), (Color){100, 200, 255, 255});
+                        PlaySoundPickup();
+                        projectiles[i].active = false;
+                    } else {
+                        // Just retract with nothing
+                        projectiles[i].active = false;
+                    }
+                    return;
+                }
+            }
+            // Cast new fishing line
+            float px = player.position.x + PLAYER_WIDTH / 2.0f;
+            float py = player.position.y + PLAYER_HEIGHT / 2.0f;
+            float dx = mouseWorld.x - px;
+            float dy = mouseWorld.y - py;
+            float dist = sqrtf(dx * dx + dy * dy);
+            if (dist > 1.0f) {
+                float speed = PROJECTILE_SPEED * 1.2f;
+                float maxDist = FISHING_ROD_MAX_RANGE;
+                if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; dist = maxDist; }
+                int projIdx = SpawnProjectile(px, py, (dx / dist) * speed, (dy / dist) * speed, true);
+                // Mark the newly spawned projectile as fishing line
+                if (projIdx >= 0 && projIdx < MAX_PROJECTILES) {
+                    projectiles[projIdx].isFishing = true;
+                    projectiles[projIdx].fishTimer = FISHING_MIN_DELAY + (float)(rand() % (int)(FISHING_MAX_DELAY - FISHING_MIN_DELAY));
+                    projectiles[projIdx].hasBite = false;
+                    projectiles[projIdx].lifetime = 120.0f; // 2 minute total lifetime
+                }
+                PlaySoundSplash();
+            }
+            return;
+        }
+
+        // Cauldron interaction
+        if (world[blockX][blockY] == BLOCK_CAULDRON) {
+            int cdIdx = -1;
+            for (int ci = 0; ci < cauldronCount; ci++) {
+                if (cauldrons[ci].x == blockX && cauldrons[ci].y == blockY) {
+                    cdIdx = ci;
+                    break;
+                }
+            }
+            if (cdIdx < 0 && cauldronCount < MAX_CAULDRONS) {
+                cdIdx = cauldronCount++;
+                cauldrons[cdIdx].x = blockX;
+                cauldrons[cdIdx].y = blockY;
+                cauldrons[cdIdx].fillLevel = 0;
+            }
+            if (cdIdx >= 0) {
+                // Right-click with water bucket -> fill
+                if (selectedTool == ITEM_WATER_BUCKET && cauldrons[cdIdx].fillLevel < 3) {
+                    cauldrons[cdIdx].fillLevel = 3;
+                    player.inventory[player.selectedSlot] = ITEM_BUCKET;
+                    PlaySoundSplash();
+                    return;
+                }
+                // Right-click with empty bucket -> empty
+                if (selectedTool == ITEM_BUCKET && cauldrons[cdIdx].fillLevel > 0) {
+                    cauldrons[cdIdx].fillLevel = 0;
+                    player.inventory[player.selectedSlot] = ITEM_WATER_BUCKET;
+                    PlaySoundSplash();
+                    return;
+                }
+                // Right-click with nothing -> drink water (restore oxygen)
+                if (cauldrons[cdIdx].fillLevel >= 2) {
+                    player.oxygen = MAX_OXYGEN;
+                    cauldrons[cdIdx].fillLevel = 1;
+                    PlaySoundEat();
+                    return;
+                }
+            }
+            return;
+        }
+
         // Water bucket: place water source
         if (selectedTool == ITEM_WATER_BUCKET) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
@@ -1179,7 +1324,9 @@ void PlayerBlockInteraction(void)
         }
 
         // Breeding: feed passive mobs with food
-        if (IsFood(selectedTool)) {
+        static float breedCooldownTimer = 0.0f;
+        breedCooldownTimer -= GetFrameTime();
+        if (breedCooldownTimer <= 0 && IsFood(selectedTool)) {
             for (int i = 0; i < MAX_MOBS; i++) {
                 if (!mobs[i].active || mobs[i].isBaby) continue;
                 if (mobs[i].type != MOB_PIG && mobs[i].type != MOB_COW &&
@@ -1216,6 +1363,7 @@ void PlayerBlockInteraction(void)
                                     baby->growTimer = 120.0f; // 2 minutes to grow
                                     baby->health = baby->maxHealth / 2;
                                     baby->maxHealth = baby->maxHealth / 2;
+                                    breedCooldownTimer = 5.0f; // 5 second global cooldown
                                 }
                                 mobs[i].loveTimer = 0;
                                 mobs[j].loveTimer = 0;

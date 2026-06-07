@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
 
 // Mob globals defined in main.c
 
@@ -36,7 +37,7 @@ void InitProjectiles(void)
     }
 }
 
-void SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer)
+int SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer)
 {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         if (!projectiles[i].active) {
@@ -45,9 +46,10 @@ void SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer)
             projectiles[i].lifetime = PROJECTILE_LIFETIME;
             projectiles[i].active = true;
             projectiles[i].fromPlayer = fromPlayer;
-            return;
+            return i;
         }
     }
+    return -1;
 }
 
 void UpdateProjectiles(float dt)
@@ -55,6 +57,46 @@ void UpdateProjectiles(float dt)
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         if (!projectiles[i].active) continue;
         Projectile *p = &projectiles[i];
+
+        if (p->isFishing) {
+            // Fishing bobber physics
+            p->velocity.x *= 0.9f;
+            p->velocity.y *= 0.9f;
+
+            p->position.x += p->velocity.x * dt;
+            p->position.y += p->velocity.y * dt;
+            p->lifetime -= dt;
+
+            if (p->lifetime <= 0) {
+                p->active = false;
+                continue;
+            }
+
+            // Check collision with world (ground)
+            int bx = (int)(p->position.x) / BLOCK_SIZE;
+            int by = (int)(p->position.y) / BLOCK_SIZE;
+            if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                if (IsBlockSolid(bx, by)) {
+                    p->position.y = (float)(by * BLOCK_SIZE);
+                    p->velocity.x = 0;
+                    p->velocity.y = 0;
+                }
+            }
+
+            // Bob up and down gently once landed
+            if (fabsf(p->velocity.x) < 5.0f && fabsf(p->velocity.y) < 5.0f) {
+                p->position.y += sinf((float)GetTime() * 2.0f) * 0.3f;
+
+                // Countdown to bite
+                p->fishTimer -= dt;
+                if (p->fishTimer <= 0 && !p->hasBite) {
+                    p->hasBite = true;
+                    TriggerCameraShake(2.0f, 0.5f);
+                }
+            }
+
+            continue; // Don't check mob/player collision for fishing bobber
+        }
 
         // Apply gravity (arrows arc)
         p->velocity.y += ARROW_GRAVITY * dt;
@@ -69,10 +111,10 @@ void UpdateProjectiles(float dt)
         }
 
         // Check collision with world
-        int bx = (int)(p->position.x) / BLOCK_SIZE;
-        int by = (int)(p->position.y) / BLOCK_SIZE;
-        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-            if (IsBlockSolid(bx, by)) {
+        int bbx = (int)(p->position.x) / BLOCK_SIZE;
+        int bby = (int)(p->position.y) / BLOCK_SIZE;
+        if (bbx >= 0 && bbx < WORLD_WIDTH && bby >= 0 && bby < WORLD_HEIGHT) {
+            if (IsBlockSolid(bbx, bby)) {
                 p->active = false;
                 continue;
             }
@@ -122,6 +164,24 @@ void DrawProjectiles(void)
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         if (!projectiles[i].active) continue;
         Projectile *p = &projectiles[i];
+
+        if (p->isFishing) {
+            // Draw fishing line (thin line from player to bobber)
+            float plx = player.position.x + PLAYER_WIDTH / 2;
+            float ply = player.position.y + PLAYER_HEIGHT / 2;
+            DrawLine((int)plx, (int)ply, (int)p->position.x, (int)p->position.y, (Color){180, 180, 180, 80});
+            // Draw bobber
+            Color bobberColor = p->hasBite ? (Color){255, 50, 50, 255} : (Color){200, 100, 50, 255};
+            DrawCircle((int)p->position.x, (int)p->position.y, 4, bobberColor);
+            // Bite indicator: pulsing red ring
+            if (p->hasBite) {
+                float pulse = sinf((float)GetTime() * 6.0f) * 0.5f + 0.5f;
+                DrawCircle((int)p->position.x, (int)p->position.y, 6 + pulse * 4,
+                           (Color){255, 80, 80, (unsigned char)(100 * pulse)});
+            }
+            continue;
+        }
+
         // Draw arrow as a small line
         float angle = atan2f(p->velocity.y, p->velocity.x);
         float len = 6.0f;
@@ -130,6 +190,116 @@ void DrawProjectiles(void)
         DrawLine((int)p->position.x, (int)p->position.y, (int)ex, (int)ey, (Color){180, 160, 120, 255});
         // Arrowhead
         DrawRectangle((int)p->position.x - 1, (int)p->position.y - 1, 3, 3, (Color){200, 200, 200, 255});
+    }
+}
+
+//----------------------------------------------------------------------------------
+// XP Orb System
+//----------------------------------------------------------------------------------
+XpOrb xpOrbs[MAX_XP_ORBS];
+
+void InitXpOrbs(void)
+{
+    for (int i = 0; i < MAX_XP_ORBS; i++) {
+        xpOrbs[i].active = false;
+    }
+}
+
+void SpawnXpOrb(float x, float y, int value)
+{
+    if (value <= 0) return;
+    for (int i = 0; i < MAX_XP_ORBS; i++) {
+        if (!xpOrbs[i].active) {
+            xpOrbs[i].position = (Vector2){ x, y };
+            xpOrbs[i].velocity = (Vector2){ (float)(rand() % 40 - 20), -(float)(rand() % 80 + 40) };
+            xpOrbs[i].lifetime = 60.0f;
+            xpOrbs[i].active = true;
+            xpOrbs[i].xpValue = value;
+            xpOrbs[i].bobPhase = (float)(rand() % 100) / 100.0f * 6.28f;
+            xpOrbs[i].attractTimer = 2.0f;
+            return;
+        }
+    }
+}
+
+void UpdateXpOrbs(float dt)
+{
+    for (int i = 0; i < MAX_XP_ORBS; i++) {
+        XpOrb *o = &xpOrbs[i];
+        if (!o->active) continue;
+
+        o->lifetime -= dt;
+        if (o->lifetime <= 0) { o->active = false; continue; }
+
+        // Gravity (lighter than regular items)
+        o->velocity.y += PARTICLE_GRAVITY * 0.3f * dt;
+
+        o->position.x += o->velocity.x * dt;
+        o->position.y += o->velocity.y * dt;
+        o->velocity.x *= 0.95f; // friction
+
+        // Bobbing once settled
+        o->bobPhase += dt * 2.0f;
+
+        // Magnetic attraction after delay
+        o->attractTimer -= dt;
+        if (o->attractTimer <= 0.0f) {
+            float dx = (player.position.x + PLAYER_WIDTH / 2) - o->position.x;
+            float dy = (player.position.y + PLAYER_HEIGHT / 2) - o->position.y;
+            float dist = sqrtf(dx * dx + dy * dy);
+            if (dist < XP_ORB_ATTRACT_DIST && dist > 1.0f) {
+                float speed = 200.0f;
+                float nx = dx / dist, ny = dy / dist;
+                o->velocity.x = o->velocity.x * 0.8f + nx * speed * 0.2f;
+                o->velocity.y = o->velocity.y * 0.8f + ny * speed * 0.2f - 20.0f;
+            }
+        }
+
+        // Ground collision
+        int bx = (int)(o->position.x) / BLOCK_SIZE;
+        int by = (int)(o->position.y) / BLOCK_SIZE;
+        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+            if (IsBlockSolid(bx, by)) {
+                o->position.y = (float)(by * BLOCK_SIZE);
+                o->velocity.y = 0;
+                o->velocity.x *= 0.9f;
+            }
+        }
+
+        // Pickup by player
+        {
+            float dx = (player.position.x + PLAYER_WIDTH / 2) - o->position.x;
+            float dy = (player.position.y + PLAYER_HEIGHT / 2) - o->position.y;
+            if (dx * dx + dy * dy < 256.0f) { // 16px radius
+                player.xp += o->xpValue;
+                if (player.xp > MAX_XP) player.xp = MAX_XP;
+                PlaySoundXP();
+                o->active = false;
+            }
+        }
+    }
+}
+
+void DrawXpOrbs(void)
+{
+    for (int i = 0; i < MAX_XP_ORBS; i++) {
+        XpOrb *o = &xpOrbs[i];
+        if (!o->active) continue;
+
+        float bob = sinf(o->bobPhase) * 1.5f;
+        int drawX = (int)o->position.x;
+        int drawY = (int)(o->position.y + bob);
+
+        // Fade in last 5 seconds
+        unsigned char alpha = 255;
+        if (o->lifetime < 5.0f) {
+            float blink = sinf(o->lifetime * 6.0f) * 0.5f + 0.5f;
+            alpha = (unsigned char)(blink * 255);
+        }
+
+        int radius = (o->xpValue == 7) ? 5 : (o->xpValue == 3) ? 4 : 3;
+        DrawCircle(drawX, drawY, radius, (Color){60, 220, 80, alpha});
+        DrawCircle(drawX - 1, drawY - 1, radius - 1, (Color){100, 255, 120, alpha});
     }
 }
 
@@ -451,7 +621,7 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                 mob->deathTimer = MOB_DEATH_TIME;
                 mob->velocity.x = 0;
                 PlaySoundDeath();
-                player.xp += 5;
+                SpawnXpOrb(mob->position.x + mobWidth[MOB_CREEPER] / 2, mob->position.y, 3);
                 if (player.xp > MAX_XP) player.xp = MAX_XP;
             }
         } else {
@@ -757,7 +927,11 @@ void DamageMob(Mob *mob, int damage)
             SpawnItemEntity(ITEM_FEATHER, 1 + rand() % 2, baseDropX + (rand() % 10 - 5), baseDropY);
         }
         PlaySoundDeath();
-        player.xp += (mob->type == MOB_PIG || mob->type == MOB_COW || mob->type == MOB_SHEEP || mob->type == MOB_CHICKEN) ? 3 : 5;
+        // Spawn XP orb
+        int passive = (mob->type == MOB_PIG || mob->type == MOB_COW ||
+                       mob->type == MOB_SHEEP || mob->type == MOB_CHICKEN);
+        int orbValue = passive ? 1 : 3;
+        SpawnXpOrb(baseDropX, baseDropY, orbValue);
         if (player.xp > MAX_XP) player.xp = MAX_XP;
     }
 }
@@ -1520,12 +1694,19 @@ void DrawMobs(void)
 
         // Love mode hearts
         if (mob->loveTimer > 0) {
-            float heartTime = (float)GetTime() * 3.0f;
-            for (int h = 0; h < 3; h++) {
-                float hx = mob->position.x + mobWidth[mob->type] / 2 + sinf(heartTime + h * 2.0f) * 8;
-                float hy = mob->position.y - 5 + cosf(heartTime * 0.7f + h * 1.5f) * 3;
-                DrawGameText("+", (int)hx, (int)hy, 10, (Color){255, 80, 120, 200});
+            float heartTime = (float)GetTime() * 2.5f;
+            for (int h = 0; h < 5; h++) {
+                float hx = mob->position.x + mobWidth[mob->type] / 2 + sinf(heartTime + h * 1.3f) * 12;
+                float hy = mob->position.y - 8 + cosf(heartTime * 0.6f + h * 1.1f) * 5;
+                DrawCircle((int)hx, (int)hy, 3, (Color){255, 80, 120, 200});
             }
+        }
+
+        // Baby growth timer indicator
+        if (mob->isBaby && mob->growTimer > 0) {
+            char timerStr[16];
+            snprintf(timerStr, sizeof(timerStr), "%ds", (int)mob->growTimer);
+            DrawGameText(timerStr, (int)mob->position.x, (int)mob->position.y - 18, 10, (Color){255, 255, 100, 180});
         }
     }
 }

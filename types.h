@@ -129,7 +129,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        10
+#define SAVE_VERSION        11
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -183,6 +183,8 @@ void InitWin32WheelHook(void);
 #define FOOD_COOKED_MUTTON_VALUE 8
 #define FOOD_RAW_CHICKEN_VALUE    2
 #define FOOD_COOKED_CHICKEN_VALUE 6
+#define FOOD_RAW_FISH_VALUE       2
+#define FOOD_COOKED_FISH_VALUE    5
 
 // Mob system
 #define MAX_MOBS            64
@@ -207,6 +209,9 @@ void InitWin32WheelHook(void);
 #define MAX_PROJECTILES     32
 #define PROJECTILE_SPEED    200.0f
 #define PROJECTILE_DAMAGE   3
+#define FISHING_ROD_MAX_RANGE   300.0f
+#define FISHING_MIN_DELAY       5.0f
+#define FISHING_MAX_DELAY       30.0f
 #define PROJECTILE_LIFETIME 3.0f
 #define ARROW_GRAVITY       400.0f
 
@@ -403,6 +408,12 @@ typedef enum {
     ITEM_LAVA_BUCKET,
     // Enchanting
     BLOCK_ENCHANTING_TABLE,
+    // Fishing
+    ITEM_FISHING_ROD,
+    ITEM_RAW_FISH,
+    ITEM_COOKED_FISH,
+    // Cauldron
+    BLOCK_CAULDRON,
     BLOCK_COUNT
 } BlockType;
 
@@ -880,6 +891,7 @@ typedef enum {
     STR_SMELT_BEEF,
     STR_SMELT_MUTTON,
     STR_SMELT_CHICKEN,
+    STR_SMELT_FISH,
 
     // Furnace messages
     STR_MSG_NO_FUEL,
@@ -896,6 +908,7 @@ typedef enum {
     STR_ENCH_PROTECTION,
     STR_ENCH_FORTUNE,
     STR_ENCH_UNBREAKING,
+    STR_ENCH_SILK_TOUCH,
     STR_ENCHANTED,
 
     // Enchanting messages
@@ -928,6 +941,20 @@ typedef enum {
     STR_RECIPE_GOLD_HOE,
     STR_RECIPE_DIAMOND_HOE,
     STR_RECIPE_HAY_BALE,
+    // Fishing
+    STR_ITEM_FISHING_ROD,
+    STR_ITEM_RAW_FISH,
+    STR_ITEM_COOKED_FISH,
+    STR_RECIPE_FISHING_ROD,
+    STR_FISH_CAST,
+    STR_FISH_BITE,
+    STR_FISH_CATCH,
+    STR_FISH_RETRACT,
+    // Cauldron
+    STR_BLOCK_CAULDRON,
+    STR_MSG_CAULDRON_FILLED,
+    STR_MSG_CAULDRON_EMPTY,
+    STR_MSG_CAULDRON_DRINK,
 
     STR_COUNT
 } StringId;
@@ -1008,6 +1035,10 @@ typedef struct {
     float lifetime;
     bool active;
     bool fromPlayer;
+    bool isFishing;
+    float fishTimer;
+    bool hasBite;
+    int catchValue;
 } Projectile;
 
 //----------------------------------------------------------------------------------
@@ -1086,6 +1117,26 @@ typedef struct {
 } ItemEntity;
 
 //----------------------------------------------------------------------------------
+// XP Orb System
+//----------------------------------------------------------------------------------
+#define MAX_XP_ORBS       64
+#define XP_ORB_ATTRACT_DIST 48.0f
+typedef struct {
+    Vector2 position;
+    Vector2 velocity;
+    float lifetime;
+    bool active;
+    int xpValue;        // 1, 3, or 7
+    float bobPhase;
+    float attractTimer;
+} XpOrb;
+extern XpOrb xpOrbs[MAX_XP_ORBS];
+void InitXpOrbs(void);
+void SpawnXpOrb(float x, float y, int value);
+void UpdateXpOrbs(float dt);
+void DrawXpOrbs(void);
+
+//----------------------------------------------------------------------------------
 // Game State
 //----------------------------------------------------------------------------------
 typedef enum {
@@ -1123,6 +1174,7 @@ typedef enum {
     ENCH_PROTECTION,        // +2% damage reduction per level (armor)
     ENCH_FORTUNE,           // +15% chance per level for extra drop (pickaxes)
     ENCH_UNBREAKING,        // 1/(level+1) chance to skip durability loss (all)
+    ENCH_SILK_TOUCH,        // Mine blocks in their original form
     ENCH_COUNT
 } EnchantmentType;
 
@@ -1130,6 +1182,19 @@ typedef enum {
 #define ENCH_TYPE(e)        ((e) & 0xFF)
 #define ENCH_LEVEL(e)       (((e) >> 8) & 0xF)
 #define ENCH_PACK(t, l)     ((uint16_t)(((t) & 0xFF) | (((l) & 0xF) << 8)))
+
+typedef struct {
+    EnchantmentType type;
+    int level;           // 1-3
+    int xpCost;
+} EnchantOption;
+
+#define MAX_ENCHANT_OPTIONS 3
+extern EnchantOption enchantOptions[MAX_ENCHANT_OPTIONS];
+extern int enchantOptionCount;
+extern uint8_t enchantHeldItem;
+extern int enchantHeldItemSlot;
+extern int enchantTableBlockX, enchantTableBlockY;
 
 typedef struct {
     bool exists;
@@ -1308,6 +1373,15 @@ extern int chestBlockX, chestBlockY;
 extern ChestData chestData[MAX_CHESTS];
 extern int chestCount;
 
+// Cauldron data
+typedef struct {
+    int x, y;
+    uint8_t fillLevel; // 0=empty, 1, 2, 3=full
+} CauldronData;
+#define MAX_CAULDRONS 64
+extern CauldronData cauldrons[MAX_CAULDRONS];
+extern int cauldronCount;
+
 // Smelting recipes
 extern SmeltRecipe smeltRecipes[MAX_SMELT_RECIPES];
 extern int smeltRecipeCount;
@@ -1316,6 +1390,9 @@ extern int smeltRecipeCount;
 extern Trade trades[MAX_TRADES];
 extern int tradeCount;
 extern bool tradeOpen;
+
+// Enchanting UI
+extern bool enchantOpen;
 extern int villagerTradeIndex;
 
 // Weather
@@ -1475,6 +1552,7 @@ void InitSmeltingRecipes(void);
 int FindSmeltRecipe(BlockType input);
 void InitTrades(void);
 void DrawTradeUI(void);
+void DrawEnchantingTableUI(void);
 void DrawFurnaceUI(void);
 void ReturnFurnaceItems(void);
 float GetFuelBurnTime(uint8_t item);
@@ -1485,7 +1563,7 @@ void UpdateMobs(float dt);
 void DrawMobs(void);
 Mob* SpawnMob(MobType type, float x, float y);
 void InitProjectiles(void);
-void SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer);
+int SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer);
 void UpdateProjectiles(float dt);
 void DrawProjectiles(void);
 void DamageMob(Mob *mob, int damage);
