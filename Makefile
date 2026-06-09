@@ -6,12 +6,13 @@ CXX      = g++
 WINDRES  = windres
 
 INCS     = -I./include
-CFLAGS   = $(INCS) -O2 -pipe -mwindows
+CFLAGS   = $(INCS) -MMD -MP -O2 -pipe -mwindows
 LIBS     = -L./lib -Wl,--stack,12582912 -s -lraylib -lopengl32 -lgdi32 -lwinmm -lws2_32 -static
 
 BUILDDIR = build
 SRCS     = main.c noise.c world.c player.c daynight.c rendering.c save.c game.c crafting.c sound.c mob.c light.c particles.c entities.c i18n.c weather.c net.c
 OBJS     = $(SRCS:%.c=$(BUILDDIR)/%.o)
+DEPS     = $(OBJS:%.o=%.d)
 RES      = $(BUILDDIR)/MyWorld_private.res
 BIN      = MyWorld.exe
 
@@ -20,13 +21,13 @@ all: $(BIN)
 $(BIN): $(OBJS) $(RES)
 	$(CXX) $(OBJS) $(RES) -o $@ $(LIBS)
 
-$(BUILDDIR)/%.o: %.c types.h | $(BUILDDIR)
+$(BUILDDIR)/%.o: %.c | $(BUILDDIR)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(BUILDDIR)/sound.o: sound.c sound.h types.h | $(BUILDDIR)
+$(BUILDDIR)/sound.o: sound.c sound.h | $(BUILDDIR)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-$(BUILDDIR)/net.o: net.c net.h types.h | $(BUILDDIR)
+$(BUILDDIR)/net.o: net.c net.h | $(BUILDDIR)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
 $(BUILDDIR)/MyWorld_private.res: MyWorld_private.rc | $(BUILDDIR)
@@ -36,6 +37,8 @@ $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
 
 clean:
-	-rm -rf $(BUILDDIR) $(BIN)
+	-rm -rf $(BUILDDIR) $(BIN) *.o
+
+-include $(DEPS)
 
 .PHONY: all clean

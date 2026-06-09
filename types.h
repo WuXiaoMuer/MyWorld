@@ -627,6 +627,8 @@ typedef enum {
     STR_MSG_TOOL_WEARING,
     STR_MSG_FALL_DAMAGE,
     STR_MSG_SPAWN_SET,
+    STR_MSG_SLEEP,
+    STR_MSG_SLEEP_ONLY_NIGHT,
     STR_MSG_HUNGRY,
     STR_MSG_STARVING,
     STR_MSG_ATE,
@@ -1506,6 +1508,7 @@ float GetAttackSpeed(BlockType tool);
 // daynight.c
 void InitDayNight(void);
 void UpdateDayNight(float dt);
+bool TrySleep(void);
 Color GetSkyColor(void);
 
 // rendering.c

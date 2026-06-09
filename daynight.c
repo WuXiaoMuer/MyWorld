@@ -25,6 +25,16 @@ void UpdateDayNight(float dt)
     if (dayNight.lightLevel < 0.05f) dayNight.lightLevel = 0.05f;
 }
 
+bool TrySleep(void)
+{
+    float t = dayNight.timeOfDay;
+    if (t < 0.2f || t >= 0.8f) {
+        dayNight.timeOfDay = 0.25f;
+        return true;
+    }
+    return false;
+}
+
 Color GetSkyColor(void)
 {
     float l = dayNight.lightLevel;

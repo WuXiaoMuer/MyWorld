@@ -583,7 +583,7 @@ void PlayerPhysics(float dt)
     float maxFall = inWater ? WATER_MAX_FALL : 800.0f;
     if (player.velocity.y > maxFall) player.velocity.y = maxFall;
 
-    // Horizontal collision
+    // Horizontal collision with step-up
     float newX = player.position.x + player.velocity.x * dt;
     float left = newX;
     float right = newX + PLAYER_WIDTH;
@@ -597,6 +597,7 @@ void PlayerPhysics(float dt)
     int maxBY = (int)(bottom - 0.01f) / BLOCK_SIZE;
 
     for (int bx = minBX; bx <= maxBX; bx++) {
+        if (bx < 0 || bx >= WORLD_WIDTH) { blocked = true; break; }
         for (int by = minBY; by <= maxBY; by++) {
             if (IsBlockSolid(bx, by)) {
                 blocked = true;
@@ -607,12 +608,40 @@ void PlayerPhysics(float dt)
     }
 
     if (blocked) {
-        if (player.velocity.x > 0) {
-            newX = (int)(right / BLOCK_SIZE) * BLOCK_SIZE - PLAYER_WIDTH - 0.01f;
-        } else if (player.velocity.x < 0) {
-            newX = (int)(left / BLOCK_SIZE) * BLOCK_SIZE + BLOCK_SIZE;
+        // Step-up: try climbing a 1-block step when on ground
+        if (player.onGround && player.velocity.x != 0.0f) {
+            float stepY = player.position.y - (BLOCK_SIZE + 4);
+            int stepMinBY = (int)(stepY) / BLOCK_SIZE;
+            int stepMaxBY = (int)(stepY + PLAYER_HEIGHT - 0.01f) / BLOCK_SIZE;
+            bool stepBlocked = false;
+            for (int bx = minBX; bx <= maxBX; bx++) {
+                if (bx < 0 || bx >= WORLD_WIDTH) { stepBlocked = true; break; }
+                for (int by = stepMinBY; by <= stepMaxBY; by++) {
+                    if (IsBlockSolid(bx, by)) {
+                        stepBlocked = true;
+                        break;
+                    }
+                }
+                if (stepBlocked) break;
+            }
+            if (!stepBlocked) {
+                player.position.y = stepY;
+                player.onGround = false;
+                player.coyoteTimer = COYOTE_TIME; // grace time after step
+                // proceed with horizontal movement below
+            } else {
+                blocked = true; // keep wall snap
+            }
         }
-        player.velocity.x = 0;
+
+        if (blocked) {
+            if (player.velocity.x > 0) {
+                newX = (int)(right / BLOCK_SIZE) * BLOCK_SIZE - PLAYER_WIDTH - 0.01f;
+            } else if (player.velocity.x < 0) {
+                newX = (int)(left / BLOCK_SIZE) * BLOCK_SIZE + BLOCK_SIZE;
+            }
+            player.velocity.x = 0;
+        }
     }
     player.position.x = newX;
 
@@ -630,6 +659,7 @@ void PlayerPhysics(float dt)
     maxBY = (int)(bottom - 0.01f) / BLOCK_SIZE;
 
     for (int bx = minBX; bx <= maxBX; bx++) {
+        if (bx < 0 || bx >= WORLD_WIDTH) { blocked = true; break; }
         for (int by = minBY; by <= maxBY; by++) {
             if (IsBlockSolid(bx, by)) {
                 blocked = true;
@@ -941,12 +971,17 @@ void PlayerBlockInteraction(void)
 
     // Place block or eat food (right click, instant)
     if (Win32IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-        // Interact with bed (set spawn point)
+        // Interact with bed (set spawn point or sleep)
         if (blockX >= 0 && blockX < WORLD_WIDTH && blockY >= 0 && blockY < WORLD_HEIGHT) {
             if (world[blockX][blockY] == BLOCK_BED) {
                 player.spawnX = blockX;
                 player.spawnY = blockY - 1;
-                ShowMessage(S(STR_MSG_SPAWN_SET), (Color){100, 220, 100, 255});
+                if (TrySleep()) {
+                    ShowMessage(S(STR_MSG_SLEEP), (Color){200, 150, 255, 255});
+                } else {
+                    ShowMessage(S(STR_MSG_SLEEP_ONLY_NIGHT), (Color){255, 200, 100, 255});
+                    ShowMessage(S(STR_MSG_SPAWN_SET), (Color){100, 220, 100, 255});
+                }
                 PlaySoundCraft();
                 return;
             }
@@ -1101,27 +1136,82 @@ void PlayerBlockInteraction(void)
             float py = player.position.y + PLAYER_HEIGHT / 2.0f;
             float dx = mouseWorld.x - px;
             float dy = mouseWorld.y - py;
-            float dist = sqrtf(dx * dx + dy * dy);
-            if (dist > 1.0f) {
+            float tpDist = sqrtf(dx * dx + dy * dy);
+            if (tpDist > 1.0f) {
                 // Limit teleport distance
                 float maxDist = 400.0f;
-                if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; }
-                // Teleport
-                player.position.x += dx - PLAYER_WIDTH / 2.0f;
-                player.position.y += dy - PLAYER_HEIGHT / 2.0f;
-                player.velocity.x = 0;
-                player.velocity.y = 0;
-                // Consume pearl
-                player.inventoryCount[player.selectedSlot]--;
-                if (player.inventoryCount[player.selectedSlot] <= 0) {
-                    player.inventory[player.selectedSlot] = BLOCK_AIR;
+                if (tpDist > maxDist) { dx = dx / tpDist * maxDist; dy = dy / tpDist * maxDist; }
+                // Check if target position is safe (not inside solid blocks)
+                float targetX = player.position.x + dx - PLAYER_WIDTH / 2.0f;
+                float targetY = player.position.y + dy - PLAYER_HEIGHT / 2.0f;
+                // Check AABB collision at target with bounds clamp
+                int tlx = (int)(targetX) / BLOCK_SIZE;
+                int trx = (int)(targetX + PLAYER_WIDTH - 0.01f) / BLOCK_SIZE;
+                int tty = (int)(targetY) / BLOCK_SIZE;
+                int tby = (int)(targetY + PLAYER_HEIGHT - 0.01f) / BLOCK_SIZE;
+                if (tlx < 0) tlx = 0;
+                if (trx >= WORLD_WIDTH) trx = WORLD_WIDTH - 1;
+                if (tty < 0) tty = 0;
+                if (tby >= WORLD_HEIGHT) tby = WORLD_HEIGHT - 1;
+                bool safe = true;
+                for (int bx = tlx; bx <= trx && safe; bx++) {
+                    for (int by = tty; by <= tby && safe; by++) {
+                        if (IsBlockSolid(bx, by)) safe = false;
+                    }
                 }
-                // Small fall damage on landing
-                player.health -= 2;
-                if (player.health < 0) player.health = 0;
-                player.damageFlashTimer = 0.3f;
-                PlaySoundHurt();
-                ShowMessage(S(STR_MSG_ENDER_PEARL), (Color){100, 200, 255, 255});
+                if (!safe) {
+                    // Try to find nearest safe spot by scanning outward
+                    Vector2 best = { targetX, targetY };
+                    float bestDist = 1e9f;
+                    for (int ox = -2; ox <= 2; ox++) {
+                        for (int oy = -2; oy <= 2; oy++) {
+                            int nx = (int)(targetX) / BLOCK_SIZE + ox;
+                            int ny = (int)(targetY) / BLOCK_SIZE + oy;
+                            if (nx < 0 || nx >= WORLD_WIDTH - 1 || ny < 0 || ny >= WORLD_HEIGHT - 2) continue;
+                            // Check if this block column has space for the player
+                            float sx = nx * BLOCK_SIZE;
+                            float sy = ny * BLOCK_SIZE;
+                            int sminBX = (int)(sx) / BLOCK_SIZE;
+                            int smaxBX = (int)(sx + PLAYER_WIDTH - 0.01f) / BLOCK_SIZE;
+                            int sminBY = (int)(sy) / BLOCK_SIZE;
+                            int smaxBY = (int)(sy + PLAYER_HEIGHT - 0.01f) / BLOCK_SIZE;
+                            bool free = true;
+                            for (int bx = sminBX; bx <= smaxBX && free; bx++) {
+                                if (bx < 0 || bx >= WORLD_WIDTH) { free = false; break; }
+                                for (int by = sminBY; by <= smaxBY && free; by++) {
+                                    if (IsBlockSolid(bx, by)) free = false;
+                                }
+                            }
+                            if (free) {
+                                float dist2 = (sx - targetX) * (sx - targetX) + (sy - targetY) * (sy - targetY);
+                                if (dist2 < bestDist) { bestDist = dist2; best.x = sx; best.y = sy; }
+                            }
+                        }
+                    }
+                    if (bestDist < 1e8f) {
+                        targetX = best.x;
+                        targetY = best.y;
+                        safe = true;
+                    }
+                }
+                if (safe) {
+                    // Teleport
+                    player.position.x = targetX;
+                    player.position.y = targetY;
+                    player.velocity.x = 0;
+                    player.velocity.y = 0;
+                    // Consume pearl
+                    player.inventoryCount[player.selectedSlot]--;
+                    if (player.inventoryCount[player.selectedSlot] <= 0) {
+                        player.inventory[player.selectedSlot] = BLOCK_AIR;
+                    }
+                    // Small fall damage on landing
+                    player.health -= 2;
+                    if (player.health < 0) player.health = 0;
+                    player.damageFlashTimer = 0.3f;
+                    PlaySoundHurt();
+                    ShowMessage(S(STR_MSG_ENDER_PEARL), (Color){100, 200, 255, 255});
+                }
             }
             return;
         }
@@ -1142,16 +1232,16 @@ void PlayerBlockInteraction(void)
                 float py = player.position.y + PLAYER_HEIGHT / 2.0f;
                 float dx = mouseWorld.x - px;
                 float dy = mouseWorld.y - py;
-                float dist = sqrtf(dx * dx + dy * dy);
-                if (dist > 1.0f) {
+                float aimDist = sqrtf(dx * dx + dy * dy);
+                if (aimDist > 1.0f) {
                     float speed = PROJECTILE_SPEED * 1.5f;
-                    SpawnProjectile(px, py, (dx / dist) * speed, (dy / dist) * speed, true);
+                    SpawnProjectile(px, py, (dx / aimDist) * speed, (dy / aimDist) * speed, true);
                     // Sync projectile to network
                     if (NetIsClient()) {
                         uint8_t buf[64];
                         PktProjectileSpawn ps;
                         ps.x = px; ps.y = py;
-                        ps.vx = (dx / dist) * speed; ps.vy = (dy / dist) * speed;
+                        ps.vx = (dx / aimDist) * speed; ps.vy = (dy / aimDist) * speed;
                         ps.fromPlayer = true; ps.playerId = (uint8_t)localPlayerId;
                         buf[0] = PKT_PROJECTILE_SPAWN;
                         memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
@@ -1212,6 +1302,7 @@ void PlayerBlockInteraction(void)
                     } else {
                         // Just retract with nothing
                         projectiles[i].active = false;
+                        ShowMessage(S(STR_FISH_RETRACT), (Color){150, 150, 150, 255});
                     }
                     return;
                 }
@@ -1221,12 +1312,12 @@ void PlayerBlockInteraction(void)
             float py = player.position.y + PLAYER_HEIGHT / 2.0f;
             float dx = mouseWorld.x - px;
             float dy = mouseWorld.y - py;
-            float dist = sqrtf(dx * dx + dy * dy);
-            if (dist > 1.0f) {
+            float castDist = sqrtf(dx * dx + dy * dy);
+            if (castDist > 1.0f) {
                 float speed = PROJECTILE_SPEED * 1.2f;
                 float maxDist = FISHING_ROD_MAX_RANGE;
-                if (dist > maxDist) { dx = dx / dist * maxDist; dy = dy / dist * maxDist; dist = maxDist; }
-                int projIdx = SpawnProjectile(px, py, (dx / dist) * speed, (dy / dist) * speed, true);
+                if (castDist > maxDist) { dx = dx / castDist * maxDist; dy = dy / castDist * maxDist; castDist = maxDist; }
+                int projIdx = SpawnProjectile(px, py, (dx / castDist) * speed, (dy / castDist) * speed, true);
                 // Mark the newly spawned projectile as fishing line
                 if (projIdx >= 0 && projIdx < MAX_PROJECTILES) {
                     projectiles[projIdx].isFishing = true;
@@ -1234,6 +1325,7 @@ void PlayerBlockInteraction(void)
                     projectiles[projIdx].hasBite = false;
                     projectiles[projIdx].lifetime = 120.0f; // 2 minute total lifetime
                 }
+                ShowMessage(S(STR_FISH_CAST), (Color){150, 200, 255, 255});
                 PlaySoundSplash();
             }
             return;
@@ -1260,6 +1352,7 @@ void PlayerBlockInteraction(void)
                     cauldrons[cdIdx].fillLevel = 3;
                     player.inventory[player.selectedSlot] = ITEM_BUCKET;
                     PlaySoundSplash();
+                    ShowMessage(S(STR_MSG_CAULDRON_FILLED), (Color){100, 150, 255, 255});
                     return;
                 }
                 // Right-click with empty bucket -> empty
@@ -1267,6 +1360,7 @@ void PlayerBlockInteraction(void)
                     cauldrons[cdIdx].fillLevel = 0;
                     player.inventory[player.selectedSlot] = ITEM_WATER_BUCKET;
                     PlaySoundSplash();
+                    ShowMessage(S(STR_MSG_CAULDRON_EMPTY), (Color){100, 150, 255, 255});
                     return;
                 }
                 // Right-click with nothing -> drink water (restore oxygen)
@@ -1274,6 +1368,7 @@ void PlayerBlockInteraction(void)
                     player.oxygen = MAX_OXYGEN;
                     cauldrons[cdIdx].fillLevel = 1;
                     PlaySoundEat();
+                    ShowMessage(S(STR_MSG_CAULDRON_DRINK), (Color){100, 200, 255, 255});
                     return;
                 }
             }
@@ -1580,7 +1675,7 @@ void UpdatePlayerStatus(float dt)
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
         if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_LAVA) {
-            player.health -= 4; // 4 hearts/sec in lava
+            player.health -= 4.0f * dt; // 4 hearts/sec in lava
             if (player.health < 0) player.health = 0;
             if (!player.netControlled) pendingDeathCause = STR_DEATH_LAVA;
             player.damageFlashTimer = 0.3f;
@@ -1784,6 +1879,23 @@ void UpdateHotbar(void)
         if (item != BLOCK_AIR) {
             ShowMessage(GetBlockName(item), (Color){220, 220, 220, 255});
             messageTimer = 0.8f;
+        }
+    }
+
+    // Q to drop selected hotbar item
+    if (Win32IsKeyPressed(KEY_Q)) {
+        int slot = player.selectedSlot;
+        uint8_t item = player.inventory[slot];
+        if (item != BLOCK_AIR) {
+            int count = player.inventoryCount[slot];
+            float px = player.position.x + PLAYER_WIDTH / 2;
+            float py = player.position.y + PLAYER_HEIGHT / 2;
+            SpawnItemEntity(item, count, px, py);
+            player.inventory[slot] = BLOCK_AIR;
+            player.inventoryCount[slot] = 0;
+            player.toolDurability[slot] = 0;
+            player.itemEnchantments[slot] = 0;
+            PlaySoundDrop();
         }
     }
 }

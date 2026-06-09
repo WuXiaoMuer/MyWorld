@@ -99,6 +99,7 @@ typedef struct {
 
 // PKT_MOB_STATE - sent as array
 typedef struct {
+    uint8_t index;          // Mob's index in the server mobs[] array
     uint8_t type;
     float x, y;
     float vx, vy;

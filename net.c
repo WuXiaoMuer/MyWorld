@@ -6,7 +6,9 @@
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#ifdef _MSC_VER
 #pragma comment(lib, "ws2_32.lib")
+#endif
 typedef int socklen_t;
 #else
 #include <sys/socket.h>
@@ -426,12 +428,12 @@ void NetPoll(void)
 
         // Duplicate detection: skip if we already received this sequence
         if (hdr->seq > 0) {
-            bool duplicate = false;
-            // Check if this seq is older than or equal to what we've seen
-            if (hdr->seq <= netClients[fromId].lastRecvSeq - 32) {
-                duplicate = true; // Too old, likely duplicate
+            uint16_t last = netClients[fromId].lastRecvSeq;
+            // Handle wraparound: compare using modular arithmetic
+            int16_t diff = (int16_t)(hdr->seq - last);
+            if (diff <= 0 && diff > -32) {
+                continue; // Already received or too old
             }
-            if (duplicate) continue;
         }
 
         // Store in receive buffer

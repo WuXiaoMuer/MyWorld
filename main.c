@@ -162,15 +162,6 @@ static int charQueueHead = 0;
 static int charQueueTail = 0;
 static bool charKeyPrev[256] = {0};
 
-static void PushChar(int c)
-{
-    int next = (charQueueHead + 1) % CHAR_QUEUE_SIZE;
-    if (next != charQueueTail) {
-        charQueue[charQueueHead] = c;
-        charQueueHead = next;
-    }
-}
-
 int Win32GetCharPressed(void)
 {
     if (!g_windowForeground) return 0;

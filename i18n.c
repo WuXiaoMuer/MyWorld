@@ -185,6 +185,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_TOOL_WEARING] = "Tool is wearing out!",
     [STR_MSG_FALL_DAMAGE] = "Ouch! Fall damage!",
     [STR_MSG_SPAWN_SET] = "Spawn point set!",
+    [STR_MSG_SLEEP] = "Good morning!",
+    [STR_MSG_SLEEP_ONLY_NIGHT] = "You can only sleep at night",
     [STR_MSG_HUNGRY] = "Hungry!",
     [STR_MSG_STARVING] = "Starving!",
     [STR_MSG_ATE] = "Ate %s (+%d hunger)",
@@ -456,6 +458,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
 
     // Ender pearl
     [STR_MSG_ENDER_PEARL] = "Teleported!",
+    [STR_FISH_CAST] = "Cast line!",
+    [STR_FISH_BITE] = "Fish biting!",
+    [STR_FISH_CATCH] = "Caught something!",
+    [STR_FISH_RETRACT] = "Line retracted",
+    [STR_MSG_CAULDRON_FILLED] = "Cauldron filled!",
+    [STR_MSG_CAULDRON_EMPTY] = "Cauldron emptied!",
+    [STR_MSG_CAULDRON_DRINK] = "Drank from cauldron",
     [STR_TYPE_TOOL] = "Tool",
     [STR_TYPE_ARMOR] = "Armor",
     [STR_TYPE_FOOD] = "Food",
@@ -480,6 +489,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_DIAMOND_HOE] = "Diamond Hoe",
     [STR_RECIPE_BREAD] = "Bread",
     [STR_RECIPE_HAY_BALE] = "Hay Bale",
+    [STR_RECIPE_FISHING_ROD] = "3 Sticks + 2 String -> Fishing Rod",
 
     // New mob deaths
     [STR_DEATH_MOB_COW] = " was kicked by a cow",
@@ -658,6 +668,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_TOOL_WEARING] = "工具快坏了!",  // 工具快坏了!
     [STR_MSG_FALL_DAMAGE] = "哎哟! 摔伤了!", // 哎哟! 摔伤了!
     [STR_MSG_SPAWN_SET] = "已设置生成点!", // 已设置生成点!
+    [STR_MSG_SLEEP] = "早安！",
+    [STR_MSG_SLEEP_ONLY_NIGHT] = "只能在夜晚睡觉",
     [STR_MSG_HUNGRY] = "饥饿!",                           // 饥饿!
     [STR_MSG_STARVING] = "饥饿难耐!",            // 饥饿难耐!
     [STR_MSG_ATE] = "吃了 %s (+%d饥饿度)",   // 吃了 %s (+%d饥饿度)
@@ -925,6 +937,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
 
     // Ender pearl
     [STR_MSG_ENDER_PEARL] = "已传送！",
+    [STR_FISH_CAST] = "抛竿！",
+    [STR_FISH_BITE] = "鱼上钩了！",
+    [STR_FISH_CATCH] = "钓到东西了！",
+    [STR_FISH_RETRACT] = "收线",
+    [STR_MSG_CAULDRON_FILLED] = "炼药锅已装满！",
+    [STR_MSG_CAULDRON_EMPTY] = "炼药锅已倒空！",
+    [STR_MSG_CAULDRON_DRINK] = "从炼药锅喝了水",
     [STR_TYPE_TOOL] = "工具",
     [STR_TYPE_ARMOR] = "盔甲",
     [STR_TYPE_FOOD] = "食物",
@@ -949,6 +968,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_DIAMOND_HOE] = "钻石锄",
     [STR_RECIPE_BREAD] = "面包",
     [STR_RECIPE_HAY_BALE] = "干草块",
+    [STR_RECIPE_FISHING_ROD] = "3根木棒+2根线 -> 钓鱼竿",
 
     // New mob deaths
     [STR_DEATH_MOB_COW] = "被牛踢死了",
@@ -1127,6 +1147,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_TOOL_WEARING] = "道具がほぼ壊れ!",  // 道具がほぼ壊れ!
     [STR_MSG_FALL_DAMAGE] = "いったっ! 落下ダメージ!",  // いたっ! 落下ダメージ!
     [STR_MSG_SPAWN_SET] = "スポーンポイントを設定!",  // スポーンポイントを設定!
+    [STR_MSG_SLEEP] = "おはよう！",
+    [STR_MSG_SLEEP_ONLY_NIGHT] = "夜しか寝られない",
     [STR_MSG_HUNGRY] = "腹が空いた!",        // 腹が空いた!
     [STR_MSG_STARVING] = "餓死!",                          // 餓死!
     [STR_MSG_ATE] = "%sを食べた (+%d満腹度)",  // %sを食べた (+%d満腹度)
@@ -1394,6 +1416,13 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
 
     // Ender pearl
     [STR_MSG_ENDER_PEARL] = "テレポート！",
+    [STR_FISH_CAST] = "竿を投げた！",
+    [STR_FISH_BITE] = "魚がかかった！",
+    [STR_FISH_CATCH] = "何か釣れた！",
+    [STR_FISH_RETRACT] = "竿を回収",
+    [STR_MSG_CAULDRON_FILLED] = "大釜が満たされた！",
+    [STR_MSG_CAULDRON_EMPTY] = "大釜を空にした！",
+    [STR_MSG_CAULDRON_DRINK] = "大釜から水を飲んだ",
     [STR_TYPE_TOOL] = "道具",
     [STR_TYPE_ARMOR] = "防具",
     [STR_TYPE_FOOD] = "食べ物",
@@ -1418,6 +1447,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_DIAMOND_HOE] = "ダイヤのクワ",
     [STR_RECIPE_BREAD] = "パン",
     [STR_RECIPE_HAY_BALE] = "干草の俵",
+    [STR_RECIPE_FISHING_ROD] = "棒3本+糸2本 -> 釣り竿",
 
     // New mob deaths
     [STR_DEATH_MOB_COW] = "は牛に蹴られた",

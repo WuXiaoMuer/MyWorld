@@ -3,6 +3,9 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wdouble-promotion"
 #include <string.h>
 
 //----------------------------------------------------------------------------------
@@ -705,7 +708,6 @@ void DrawInventoryScreen(void)
 
         // Chest grid (3 rows x 9 cols)
         int chestGridX = contX + 14;
-        int tooltipId = -1;
         const char *tooltipText = NULL;
         uint16_t tooltipEnchant = 0;
         int tooltipX = 0, tooltipY = 0;
@@ -850,7 +852,6 @@ void DrawInventoryScreen(void)
                     DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
                     if (cnt > 1) DrawGameText(TextFormat("%d", cnt), sx + slotSize - 20, sy + slotSize - 16, 12, WHITE);
                     if (hover && heldItem == BLOCK_AIR) {
-                        tooltipId = item;
                         tooltipText = GetBlockName((BlockType)item);
                         tooltipEnchant = player.itemEnchantments[si];
                         tooltipX = (int)mouse.x;
@@ -1375,18 +1376,18 @@ void DrawInventoryScreen(void)
                     if (player.inventory[idx] != BLOCK_AIR) {
                         bool transferred = false;
                         if (furnaceOpen) {
-                            uint8_t item = player.inventory[idx];
+                            uint8_t slotItem = player.inventory[idx];
                             int count = player.inventoryCount[idx];
-                            if (GetFuelBurnTime(item) > 0.0f) {
+                            if (GetFuelBurnTime(slotItem) > 0.0f) {
                                 // Transfer fuel to fuel slot
                                 if (furnaceFuel == BLOCK_AIR) {
-                                    furnaceFuel = item;
+                                    furnaceFuel = slotItem;
                                     furnaceFuelCount = count;
                                     player.inventory[idx] = BLOCK_AIR;
                                     player.inventoryCount[idx] = 0;
                                     player.toolDurability[idx] = 0;
                                     transferred = true;
-                                } else if (furnaceFuel == item) {
+                                } else if (furnaceFuel == slotItem) {
                                     int space = 64 - furnaceFuelCount;
                                     int toAdd = count > space ? space : count;
                                     furnaceFuelCount += toAdd;
@@ -1397,16 +1398,16 @@ void DrawInventoryScreen(void)
                                     }
                                     transferred = true;
                                 }
-                            } else if (FindSmeltRecipe((BlockType)item) >= 0) {
+                            } else if (FindSmeltRecipe((BlockType)slotItem) >= 0) {
                                 // Transfer smeltable to input slot
                                 if (furnaceInput == BLOCK_AIR) {
-                                    furnaceInput = item;
+                                    furnaceInput = slotItem;
                                     furnaceInputCount = count;
                                     player.inventory[idx] = BLOCK_AIR;
                                     player.inventoryCount[idx] = 0;
                                     player.toolDurability[idx] = 0;
                                     transferred = true;
-                                } else if (furnaceInput == item) {
+                                } else if (furnaceInput == slotItem) {
                                     int space = 64 - furnaceInputCount;
                                     int toAdd = count > space ? space : count;
                                     furnaceInputCount += toAdd;
@@ -2034,8 +2035,8 @@ void DrawPlayerSprite(void)
     }
 
     // Draw held item
-    int heldItem = player.inventory[player.selectedSlot];
-    if (heldItem != BLOCK_AIR && heldItem < BLOCK_COUNT && blockAtlas.id > 0) {
+    int slotItem = player.inventory[player.selectedSlot];
+    if (slotItem != BLOCK_AIR && slotItem < BLOCK_COUNT && blockAtlas.id > 0) {
         int itemX, itemY;
         if (facing) {
             itemX = (int)(px + 12);
@@ -2044,7 +2045,7 @@ void DrawPlayerSprite(void)
             itemX = (int)(px - 6);
             itemY = (int)(py + 6 - armSwing);
         }
-        Rectangle src = { (float)(heldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+        Rectangle src = { (float)(slotItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)itemX, (float)itemY, 8, 8 };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
     }
@@ -2274,8 +2275,6 @@ void DrawPlayerStatus(void)
             c.b = (unsigned char)(c.b * brightness > 255 ? 255 : c.b * brightness);
         }
         // Diamond shape for hearts
-        int cx = x + iconSize / 2;
-        int cy = barY + iconSize / 2;
         DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
         DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){100, 35, 35, 160});
     }
@@ -2353,16 +2352,16 @@ void DrawCrosshair(void)
         int mBlockY = GetMiningBlockY();
 
         // Block placement preview (ghost block)
-        int heldItem = player.inventory[player.selectedSlot];
+        int selItem = player.inventory[player.selectedSlot];
         BlockType cursorBlock = (BlockType)world[blockX][blockY];
         float playerCX = player.position.x + PLAYER_WIDTH / 2.0f;
         float playerCY = player.position.y + PLAYER_HEIGHT / 2.0f;
         float distBlocks = sqrtf(powf((blockX * BLOCK_SIZE + BLOCK_SIZE / 2.0f) - playerCX, 2) +
                                  powf((blockY * BLOCK_SIZE + BLOCK_SIZE / 2.0f) - playerCY, 2)) / BLOCK_SIZE;
         bool inRange = distBlocks <= PLACE_RANGE + 0.5f;
-        if (heldItem != BLOCK_AIR && heldItem < BLOCK_COUNT && !IsTool((BlockType)heldItem) && !IsFood((BlockType)heldItem)
+        if (selItem != BLOCK_AIR && selItem < BLOCK_COUNT && !IsTool((BlockType)selItem) && !IsFood((BlockType)selItem)
             && (cursorBlock == BLOCK_AIR || cursorBlock == BLOCK_WATER) && blockAtlas.id > 0 && inRange) {
-            Rectangle src = { (float)(heldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+            Rectangle src = { (float)(selItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
             Rectangle dst = { px, py, (float)BLOCK_SIZE, (float)BLOCK_SIZE };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, (Color){255, 255, 255, 100});
         }
@@ -2479,7 +2478,6 @@ void DrawPauseMenu(void)
     pauseAnim += (target - pauseAnim) * 25.0f * dt;
     if (pauseAnim < 0.01f && !gamePaused) return;
     if (pauseAnim > 0.99f) pauseAnim = 1.0f;
-    float time = (float)GetTime();
 
     // Dark overlay with scan lines
     unsigned char pauseOA = (unsigned char)(170 * pauseAnim);
@@ -2592,82 +2590,62 @@ void DrawPauseMenu(void)
         ctrlY += 15;
     }
 
-    // --- Buttons ---
-    int btnW = 110;
-    int btnH = 34;
-    int btnY = boxY + boxH - 52;
-    int btnGap = 12;
-    int totalBtnW = btnW * 3 + btnGap * 2;
-    int btnStartX = boxX + (boxW - totalBtnW) / 2;
-
-    // Continue
+    // --- Buttons (styled like main menu) ---
     {
-        int bx = btnStartX;
-        Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
-        bool hover = CheckCollisionPointRec(mouse, r);
-        float h = GetHoverAlpha(50, hover, dt);
-        if (h > 0.01f) DrawRectangle(bx - 1, btnY - 1, btnW + 2, btnH + 2, (Color){50, 130, 110, (unsigned char)(15 * h * pauseAnim)});
-        DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
-        unsigned char r1 = (unsigned char)((22 + (int)(20 * h)) * pauseAnim);
-        unsigned char g1 = (unsigned char)((38 + (int)(60 * h)) * pauseAnim);
-        unsigned char b1 = (unsigned char)((32 + (int)(40 * h)) * pauseAnim);
-        DrawRectangle(bx, btnY, btnW, btnH, (Color){r1, g1, b1, (unsigned char)(220 * pauseAnim)});
-        DrawRectangle(bx, btnY, btnW, btnH / 3, (Color){(unsigned char)(r1 + 8), (unsigned char)(g1 + 8), (unsigned char)(b1 + 8), (unsigned char)(220 * pauseAnim)});
-        DrawRectangleLinesEx(r, 1, (Color){60, 140, 120, (unsigned char)(140 * pauseAnim)});
-        const char *label = S(STR_CONTINUE);
-        int tw = MeasureGameTextWidth(label, 16);
-        DrawGameText(label, bx + (btnW - tw) / 2, btnY + 8, 16, (Color){210, 220, 215, (unsigned char)(240 * pauseAnim)});
-        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) { PlaySoundUIClick(); gamePaused = false; }
-    }
+        int btnW = 110;
+        int btnH = 34;
+        int btnY = boxY + boxH - 52;
+        int btnGap = 12;
+        int totalBtnW = btnW * 3 + btnGap * 2;
+        int btnStartX = boxX + (boxW - totalBtnW) / 2;
 
-    // Main Menu
-    {
-        int bx = btnStartX + btnW + btnGap;
-        Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
-        bool hover = CheckCollisionPointRec(mouse, r);
-        float h = GetHoverAlpha(51, hover, dt);
-        if (h > 0.01f) DrawRectangle(bx - 1, btnY - 1, btnW + 2, btnH + 2, (Color){40, 100, 150, (unsigned char)(15 * h * pauseAnim)});
-        DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
-        unsigned char r1 = (unsigned char)((20 + (int)(15 * h)) * pauseAnim);
-        unsigned char g1 = (unsigned char)((30 + (int)(50 * h)) * pauseAnim);
-        unsigned char b1 = (unsigned char)((45 + (int)(70 * h)) * pauseAnim);
-        DrawRectangle(bx, btnY, btnW, btnH, (Color){r1, g1, b1, (unsigned char)(220 * pauseAnim)});
-        DrawRectangle(bx, btnY, btnW, btnH / 3, (Color){(unsigned char)(r1 + 8), (unsigned char)(g1 + 8), (unsigned char)(b1 + 8), (unsigned char)(220 * pauseAnim)});
-        DrawRectangleLinesEx(r, 1, (Color){50, 120, 170, (unsigned char)(140 * pauseAnim)});
-        const char *label = S(STR_MAIN_MENU);
-        int tw = MeasureGameTextWidth(label, 16);
-        DrawGameText(label, bx + (btnW - tw) / 2, btnY + 8, 16, (Color){210, 215, 225, (unsigned char)(240 * pauseAnim)});
-        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            PlaySoundUIClick();
-            if (currentSavePath[0]) SaveWorld(currentSavePath);
-            if (NetIsHost()) NetHostStop();
-            else if (NetIsClient()) NetClientDisconnect();
-            gamePaused = false; inventoryOpen = false;
-            StartTransition(STATE_MENU); menuSelection = 0;
-        }
-    }
+        const char *pauseLabels[] = { S(STR_CONTINUE), S(STR_MAIN_MENU), S(STR_BTN_QUIT) };
+        const Color pauseAccent[] = {
+            {100, 200, 130, 255},  // Continue — green
+            {72, 162, 232, 255},   // Main Menu — blue
+            {240, 90, 80, 255},    // Quit — rose
+        };
+        for (int pi = 0; pi < 3; pi++) {
+            int bx = btnStartX + pi * (btnW + btnGap);
+            Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
+            bool hover = CheckCollisionPointRec(mouse, r);
+            float h = GetHoverAlpha(50 + pi, hover, dt);
+            Color ac = pauseAccent[pi];
 
-    // Quit
-    {
-        int bx = btnStartX + (btnW + btnGap) * 2;
-        Rectangle r = {(float)bx, (float)btnY, (float)btnW, (float)btnH};
-        bool hover = CheckCollisionPointRec(mouse, r);
-        float h = GetHoverAlpha(52, hover, dt);
-        if (h > 0.01f) DrawRectangle(bx - 1, btnY - 1, btnW + 2, btnH + 2, (Color){150, 50, 55, (unsigned char)(15 * h * pauseAnim)});
-        DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
-        unsigned char r1 = (unsigned char)((42 + (int)(50 * h)) * pauseAnim);
-        unsigned char g1 = (unsigned char)((22 + (int)(20 * h)) * pauseAnim);
-        unsigned char b1 = (unsigned char)((24 + (int)(20 * h)) * pauseAnim);
-        DrawRectangle(bx, btnY, btnW, btnH, (Color){r1, g1, b1, (unsigned char)(220 * pauseAnim)});
-        DrawRectangle(bx, btnY, btnW, btnH / 3, (Color){(unsigned char)(r1 + 8), (unsigned char)(g1 + 8), (unsigned char)(b1 + 8), (unsigned char)(220 * pauseAnim)});
-        DrawRectangleLinesEx(r, 1, (Color){160, 60, 65, (unsigned char)(140 * pauseAnim)});
-        const char *label = S(STR_BTN_QUIT);
-        int tw = MeasureGameTextWidth(label, 16);
-        DrawGameText(label, bx + (btnW - tw) / 2, btnY + 8, 16, (Color){220, 210, 210, (unsigned char)(240 * pauseAnim)});
-        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            PlaySoundUIClick();
-            if (currentSavePath[0]) SaveWorld(currentSavePath);
-            CloseWindow(); exit(0);
+            // Outer glow on hover
+            if (h > 0.01f) {
+                DrawRoundedRect(bx - 2, btnY - 2, btnW + 4, btnH + 4, 0.1f,
+                    (Color){ac.r, ac.g, ac.b, (unsigned char)(12 * h * pauseAnim)});
+            }
+            // Shadow
+            DrawRectangle(bx + 2, btnY + 2, btnW, btnH, (Color){0, 0, 0, (unsigned char)(35 * pauseAnim)});
+            // Body
+            unsigned char br = (unsigned char)((18 + (int)(ac.r * 0.12f * h)) * pauseAnim);
+            unsigned char bg = (unsigned char)((18 + (int)(ac.g * 0.12f * h)) * pauseAnim);
+            unsigned char bb = (unsigned char)((24 + (int)(ac.b * 0.12f * h)) * pauseAnim);
+            DrawRoundedRect(bx, btnY, btnW, btnH, 0.1f, (Color){br, bg, bb, (unsigned char)(230 * pauseAnim)});
+            // Border
+            DrawRectangleLinesEx(r, 1, (Color){ac.r, ac.g, ac.b, (unsigned char)(150 * pauseAnim)});
+            // Label
+            int tw = MeasureGameTextWidth(pauseLabels[pi], 16);
+            DrawGameText(pauseLabels[pi], bx + (btnW - tw) / 2, btnY + 8, 16, (Color){255, 255, 255, (unsigned char)(230 * pauseAnim)});
+
+            // Click actions
+            if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                PlaySoundUIClick();
+                if (pi == 0) {
+                    gamePaused = false;
+                } else if (pi == 1) {
+                    if (currentSavePath[0]) SaveWorld(currentSavePath);
+                    if (NetIsHost()) NetHostStop();
+                    else if (NetIsClient()) NetClientDisconnect();
+                    gamePaused = false; inventoryOpen = false;
+                    StartTransition(STATE_MENU); menuSelection = 0;
+                } else {
+                    if (currentSavePath[0]) SaveWorld(currentSavePath);
+                    CloseWindow(); exit(0);
+                }
+            }
         }
     }
 }
@@ -3040,10 +3018,10 @@ void DrawMainMenu(void)
     for (int y = 0; y < SCREEN_HEIGHT; y += 2) {
         float t = (float)y / SCREEN_HEIGHT;
         float shift = sinf(time * 0.1f) * 0.5f + 0.5f;
-        // Deep navy → near-black
-        unsigned char r = (unsigned char)(4 + t * 10 + shift * 3);
-        unsigned char g = (unsigned char)(5 + t * 7 + sinf(time * 0.08f + 1.0f) * 2);
-        unsigned char b = (unsigned char)(14 + t * 22 + sinf(time * 0.06f + 2.0f) * 6);
+        // Deep indigo → rich navy gradient
+        unsigned char r = (unsigned char)(8 + t * 16 + shift * 4 + sinf(time * 0.07f) * 3);
+        unsigned char g = (unsigned char)(4 + t * 10 + sinf(time * 0.09f + 1.0f) * 3 + (1.0f - t) * 6);
+        unsigned char b = (unsigned char)(22 + t * 32 + sinf(time * 0.05f + 2.0f) * 10);
         DrawRectangle(0, y, SCREEN_WIDTH, 2, (Color){r, g, b, 255});
     }
 
@@ -3117,13 +3095,39 @@ void DrawMainMenu(void)
     }
 
     // ================================================================
-    // Title — golden gradient with layered glow
+    // Elegant mountain silhouette at bottom
+    // ================================================================
+    if (elapsed > 0.6f) {
+        float terrFade = (elapsed - 0.6f) / 0.5f;
+        if (terrFade > 1.0f) terrFade = 1.0f;
+        // Far mountains (darker, subtle)
+        {
+            int baseY = SCREEN_HEIGHT - 20;
+            unsigned char ma = (unsigned char)(terrFade * 45);
+            for (int x = -20; x < SCREEN_WIDTH + 20; x += 3) {
+                float h = 25.0f + 18.0f * sinf(x * 0.006f + 1.2f) + 10.0f * sinf(x * 0.013f + 3.5f);
+                DrawRectangle(x, baseY - (int)h, 3, (int)h, (Color){0, 0, 0, ma});
+            }
+        }
+        // Near hills (slightly higher, more opaque)
+        {
+            int baseY = SCREEN_HEIGHT - 6;
+            unsigned char ha = (unsigned char)(terrFade * 60);
+            for (int x = -20; x < SCREEN_WIDTH + 20; x += 3) {
+                float h = 12.0f + 10.0f * sinf(x * 0.008f + 0.5f) + 7.0f * sinf(x * 0.017f + 2.8f);
+                DrawRectangle(x, baseY - (int)h, 3, (int)h, (Color){6, 4, 14, ha});
+            }
+        }
+    }
+
+    // ================================================================
+    // Title — block-themed with decorative icons and sparkles
     // ================================================================
     const char *title = S(STR_TITLE);
-    int titleSize = 68;
+    int titleSize = 72;
     int titleW = MeasureGameTextWidth(title, titleSize);
     int titleX = (SCREEN_WIDTH - titleW) / 2;
-    int titleY = 72;
+    int titleY = 62;
     int titleLen = (int)strlen(title);
 
     float titleTotalDur = 0.4f + titleLen * 0.055f;
@@ -3137,7 +3141,63 @@ void DrawMainMenu(void)
         runX += charWidths[k];
     }
 
-    // Bounce-in animation (same as before)
+    // Background glow aura
+    if (elapsed > 0.5f) {
+        float auraPulse = sinf(time * 0.9f) * 0.3f + 0.7f;
+        unsigned char auraA = (unsigned char)(40 * auraPulse);
+        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 80, (Color){100, 180, 120, auraA}, 0.3f);
+        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 55, (Color){210, 160, 70, (unsigned char)(auraA * 1.5f)}, 0.35f);
+    }
+
+    // Sparkle particles around title
+    {
+        static float sparkleX[16], sparkleY[16], sparklePhase[16], sparkleSpeed[16];
+        static bool sparkleInit = false;
+        if (!sparkleInit) {
+            for (int s = 0; s < 12; s++) {
+                sparkleX[s] = (float)(-60 + rand() % (titleW + 120));
+                sparkleY[s] = (float)(-30 + rand() % 70);
+                sparklePhase[s] = (float)(rand() % 100) * 0.1f;
+                sparkleSpeed[s] = 0.5f + (float)(rand() % 10) * 0.15f;
+            }
+            sparkleInit = true;
+        }
+        if (elapsed > 0.8f) {
+            for (int s = 0; s < 12; s++) {
+                float sAlpha = sinf(time * sparkleSpeed[s] + sparklePhase[s]) * 0.5f + 0.5f;
+                sAlpha = sAlpha * sAlpha;
+                float fadeIn = (elapsed - 0.8f - s * 0.05f);
+                if (fadeIn < 0.0f) continue;
+                if (fadeIn > 1.0f) fadeIn = 1.0f;
+                unsigned char sa = (unsigned char)(sAlpha * 160 * fadeIn);
+                int sx = titleX + (int)sparkleX[s];
+                int sy = titleY + (int)sparkleY[s];
+                // Small cross sparkle
+                int sz = 2 + (s % 3);
+                DrawRectangle(sx - 1, sy - sz, 3, sz * 2 + 1, (Color){255, 240, 180, sa});
+                DrawRectangle(sx - sz, sy - 1, sz * 2 + 1, 3, (Color){255, 240, 180, sa});
+                DrawRectangle(sx, sy, 1, 1, (Color){255, 255, 255, (unsigned char)(sa * 1.5f)});
+            }
+        }
+    }
+
+    // Block icons flanking title
+    if (elapsed > 0.25f && blockAtlas.id > 0) {
+        int iconSize = 30;
+        int iconY = titleY + (titleSize - iconSize) / 2;
+        float iconAlpha = (elapsed - 0.25f) / 0.35f;
+        if (iconAlpha > 1.0f) iconAlpha = 1.0f;
+        // Left: grass + dirt stacked
+        Rectangle grassSrc = { BLOCK_GRASS * BLOCK_SIZE, 0, BLOCK_SIZE, BLOCK_SIZE };
+        Rectangle grassDst = { (float)(titleX - 36), (float)(iconY - 2), (float)iconSize, (float)iconSize };
+        DrawTexturePro(blockAtlas, grassSrc, grassDst, (Vector2){0, 0}, -8.0f, (Color){255, 255, 255, (unsigned char)(iconAlpha * 200)});
+        // Right: gold ore + diamond ore stacked
+        Rectangle goldSrc = { BLOCK_GOLD_ORE * BLOCK_SIZE, 0, BLOCK_SIZE, BLOCK_SIZE };
+        Rectangle goldDst = { (float)(titleX + titleW + 6), (float)(iconY - 2), (float)iconSize, (float)iconSize };
+        DrawTexturePro(blockAtlas, goldSrc, goldDst, (Vector2){0, 0}, 8.0f, (Color){255, 255, 255, (unsigned char)(iconAlpha * 200)});
+    }
+
+    // Bounce-in animation
     for (int ci = 0; ci < titleLen; ci++) {
         float letterStart = ci * 0.055f;
         float lt = elapsed - letterStart;
@@ -3154,19 +3214,20 @@ void DrawMainMenu(void)
         int cx = charPositions[ci];
         int cy = titleY + (int)offsetY;
         unsigned char ca = (unsigned char)(alpha * 255);
-        DrawGameText(chBuf, cx + 1, cy + 2, titleSize, (Color){0, 0, 0, (unsigned char)(100 * alpha)});
-        DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 210, 160, ca});
+        DrawGameText(chBuf, cx + 2, cy + 3, titleSize, (Color){0, 0, 0, (unsigned char)(120 * alpha)});
+        DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 215, 165, ca});
     }
 
-    // Final title — golden glow
+    // Final title — vibrant gradient with pulsing shadow
     if (elapsed > titleTotalDur) {
-        float breathe = sinf(time * 0.7f) * 0.25f + 0.75f;
-        unsigned char glowA = (unsigned char)(50 * breathe);
-        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 55, (Color){210, 160, 70, glowA}, 0.35f);
-        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 35, (Color){245, 200, 100, glowA}, 0.3f);
-        DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){0, 0, 0, 130});
-        Color titleLeft = (Color){210, 160, 70, 255};   // warm gold
-        Color titleRight = (Color){245, 208, 128, 255};  // light gold
+        float breathe = sinf(time * 0.6f) * 0.2f + 0.8f;
+        unsigned char glowA = (unsigned char)(55 * breathe);
+        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 50, (Color){100, 200, 130, glowA}, 0.3f);
+        DrawGlowCircle(titleX + titleW / 2, titleY + titleSize / 2, 30, (Color){245, 200, 100, glowA}, 0.35f);
+        DrawGameText(title, titleX + 2, titleY + 3, titleSize, (Color){0, 0, 0, 140});
+        // Minecraft-inspired gradient: warm gold → bright center → light gold
+        Color titleLeft = (Color){100, 200, 130, 255};   // emerald tint
+        Color titleRight = (Color){245, 210, 130, 255};   // warm gold
         DrawGradientText(title, titleX, titleY, titleSize, titleLeft, titleRight);
     }
 
@@ -3229,22 +3290,24 @@ void DrawMainMenu(void)
     }
     bool btnEnabled[] = { true, hasAnySave, true, true, true, true };
 
-    // Color palette
-    // Default: dark card with subtle border
-    static const Color btnBgDefault  = {14, 15, 22, 240};
-    // Selected: warm dark with gold glow
-    static const Color btnBgSelected = {26, 22, 16, 250};
-    // Hover: slightly brighter
-    static const Color btnBgHover    = {20, 21, 30, 250};
-    // Borders
-    static const Color btnBorderDef  = {42, 45, 58, 180};
-    static const Color btnBorderSel  = {200, 149, 108, 230};  // gold
-    static const Color btnBorderHov  = {232, 168, 76, 255};    // bright gold
+    // Per-button accent colors (each button gets its own theme)
+    static const Color btnAccent[] = {
+        {94, 210, 120, 255},   // 0: New Game  — Emerald
+        {72, 162, 232, 255},   // 1: Load Game — Sky Blue
+        {240, 156, 52, 255},   // 2: Host Game — Amber
+        {56, 208, 176, 255},   // 3: Join Game — Teal
+        {170, 108, 200, 255},  // 4: Settings  — Lavender
+        {240, 90, 80, 255},    // 5: Quit      — Rose
+    };
+    // Base: dark card with subtle border
+    static const Color btnBgBase    = {14, 15, 22, 240};
+    static const Color btnBgHover   = {22, 23, 32, 250};
+    static const Color btnBorderDef = {42, 45, 58, 180};
     // Text
-    static const Color btnTextDef    = {210, 210, 220, 240};
-    static const Color btnTextSel    = {255, 245, 220, 255};  // warm white
-    static const Color btnTextHov    = {255, 250, 235, 255};
-    static const Color btnTextDis    = {60, 62, 75, 140};
+    static const Color btnTextDef   = {210, 210, 220, 240};
+    static const Color btnTextSel   = {255, 252, 245, 255};
+    static const Color btnTextHov   = {255, 250, 235, 255};
+    static const Color btnTextDis   = {60, 62, 75, 140};
 
     for (int i = 0; i < btnCount; i++) {
         // Staggered entrance
@@ -3269,16 +3332,21 @@ void DrawMainMenu(void)
         bool isSel = sel && enabled;
         bool isHover = hover && enabled;
 
+        Color ac = btnAccent[i];
+
         // Background
         Color bg;
         if (!enabled) {
             bg = (Color){10, 10, 16, (unsigned char)(130 * btnAlpha)};
         } else if (isSel) {
-            bg = (Color){(unsigned char)(btnBgSelected.r * btnAlpha), (unsigned char)(btnBgSelected.g * btnAlpha), (unsigned char)(btnBgSelected.b * btnAlpha), (unsigned char)(btnBgSelected.a * btnAlpha)};
+            float sr = btnBgBase.r * 0.6f + ac.r * 0.4f;
+            float sg = btnBgBase.g * 0.6f + ac.g * 0.4f;
+            float sb = btnBgBase.b * 0.6f + ac.b * 0.4f;
+            bg = (Color){(unsigned char)(sr * btnAlpha), (unsigned char)(sg * btnAlpha), (unsigned char)(sb * btnAlpha), 250};
         } else if (isHover) {
             bg = (Color){(unsigned char)(btnBgHover.r * btnAlpha), (unsigned char)(btnBgHover.g * btnAlpha), (unsigned char)(btnBgHover.b * btnAlpha), (unsigned char)(btnBgHover.a * btnAlpha)};
         } else {
-            bg = (Color){(unsigned char)(btnBgDefault.r * btnAlpha), (unsigned char)(btnBgDefault.g * btnAlpha), (unsigned char)(btnBgDefault.b * btnAlpha), (unsigned char)(btnBgDefault.a * btnAlpha)};
+            bg = (Color){(unsigned char)(btnBgBase.r * btnAlpha), (unsigned char)(btnBgBase.g * btnAlpha), (unsigned char)(btnBgBase.b * btnAlpha), (unsigned char)(btnBgBase.a * btnAlpha)};
         }
 
         // Drop shadow
@@ -3287,17 +3355,17 @@ void DrawMainMenu(void)
         // Outer glow for selected
         if (isSel) {
             float pulse = sinf(time * 1.8f) * 0.2f + 0.8f;
-            unsigned char ga = (unsigned char)(12 * pulse * btnAlpha);
+            unsigned char ga = (unsigned char)(18 * pulse * btnAlpha);
             DrawRoundedRect(drawX - 5, by - 5, btnW + 10, btnH + 10, 0.1f,
-                (Color){btnBorderSel.r, btnBorderSel.g, btnBorderSel.b, ga});
+                (Color){ac.r, ac.g, ac.b, ga});
             DrawRoundedRect(drawX - 3, by - 3, btnW + 6, btnH + 6, 0.1f,
-                (Color){232, 168, 76, (unsigned char)(ga * 2)});
+                (Color){(unsigned char)(ac.r * 1.2f), (unsigned char)(ac.g * 1.2f), (unsigned char)(ac.b * 1.2f), (unsigned char)(ga * 2)});
         }
         // Outer glow on hover
         else if (hAlpha > 0.01f) {
-            unsigned char ga = (unsigned char)(8 * hAlpha * btnAlpha);
+            unsigned char ga = (unsigned char)(10 * hAlpha * btnAlpha);
             DrawRoundedRect(drawX - 2, by - 2, btnW + 4, btnH + 4, 0.1f,
-                (Color){232, 168, 76, ga});
+                (Color){ac.r, ac.g, ac.b, ga});
         }
 
         // Button body
@@ -3311,9 +3379,12 @@ void DrawMainMenu(void)
         if (!enabled) {
             border = (Color){28, 28, 38, (unsigned char)(60 * btnAlpha)};
         } else if (isSel) {
-            border = (Color){btnBorderSel.r, btnBorderSel.g, btnBorderSel.b, (unsigned char)(btnBorderSel.a * btnAlpha)};
+            float br = ac.r * 1.1f;
+            float bg_ = ac.g * 1.1f;
+            float bb = ac.b * 1.1f;
+            border = (Color){(unsigned char)(br * btnAlpha), (unsigned char)(bg_ * btnAlpha), (unsigned char)(bb * btnAlpha), 255};
         } else if (isHover) {
-            border = (Color){btnBorderHov.r, btnBorderHov.g, btnBorderHov.b, (unsigned char)(btnBorderHov.a * btnAlpha)};
+            border = (Color){(unsigned char)(ac.r * btnAlpha), (unsigned char)(ac.g * btnAlpha), (unsigned char)(ac.b * btnAlpha), 240};
         } else {
             border = (Color){btnBorderDef.r, btnBorderDef.g, btnBorderDef.b, (unsigned char)(btnBorderDef.a * btnAlpha)};
         }
@@ -3325,10 +3396,18 @@ void DrawMainMenu(void)
             DrawRoundedRect(drawX, by, btnW, btnH, 0.1f, (Color){255, 255, 255, 35});
         }
 
-        // Left accent line (for selected)
-        if (isSel) {
-            float linePulse = sinf(time * 2.5f) * 0.2f + 0.8f;
-            DrawRectangle(drawX + 3, by + 8, 3, btnH - 16, (Color){245, 200, 100, (unsigned char)(180 * linePulse * btnAlpha)});
+        // Left accent line — always visible, color per button
+        {
+            unsigned char la;
+            if (isSel) {
+                float linePulse = sinf(time * 2.5f) * 0.2f + 0.8f;
+                la = (unsigned char)(220 * linePulse * btnAlpha);
+            } else if (isHover) {
+                la = (unsigned char)(120 * btnAlpha);
+            } else {
+                la = (unsigned char)(50 * btnAlpha);
+            }
+            DrawRectangle(drawX + 3, by + 8, 3, btnH - 16, (Color){ac.r, ac.g, ac.b, la});
         }
 
         // Button label
@@ -3374,21 +3453,23 @@ void DrawSlotSelectScreen(void)
 {
     float time = (float)GetTime();
 
-    // Background gradient
+    // Background gradient (richer)
     for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
         float t = (float)y / SCREEN_HEIGHT;
-        unsigned char r = (unsigned char)(15 + t * 20);
-        unsigned char g = (unsigned char)(18 + t * 15);
-        unsigned char b = (unsigned char)(35 + t * 25);
+        unsigned char r = (unsigned char)(12 + t * 22 + sinf(time * 0.05f + y * 0.01f) * 3);
+        unsigned char g = (unsigned char)(15 + t * 18 + sinf(time * 0.07f + y * 0.008f) * 3);
+        unsigned char b = (unsigned char)(32 + t * 30 + sinf(time * 0.04f + y * 0.006f) * 6);
         DrawRectangle(0, y, SCREEN_WIDTH, 4, (Color){r, g, b, 255});
     }
 
-    // Title
+    // Title with gradient
     const char *title = (slotSelectMode == 0) ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
     int titleSize = 48;
     int titleW = MeasureGameTextWidth(title, titleSize);
+    float titlePulse = sinf(time * 0.8f) * 0.2f + 0.8f;
+    DrawGlowCircle(SCREEN_WIDTH / 2, 60, 60, (Color){80, 120, 200, (unsigned char)(25 * titlePulse)}, 0.3f);
     DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 2, 42, titleSize, (Color){0, 0, 0, 100});
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 40, titleSize, (Color){220, 215, 240, 255});
+    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 40, titleSize, (Color){180, 200, 240, 255});
 
     // Subtitle
     const char *sub = (slotSelectMode == 0) ? S(STR_NEW_GAME_SUB) : S(STR_LOAD_GAME_SUB);
@@ -3446,14 +3527,18 @@ void DrawSlotSelectScreen(void)
         // Determine if this slot is usable
         bool usable = (slotSelectMode == 0) || info.exists;
 
-        // Background
+        // Background with per-slot accent tint
+        Color slotAc = {72, 162, 232, 255};  // blue accent
         Color bg, border;
         if (!usable) {
             bg = (Color){35, 33, 40, 150};
             border = (Color){50, 48, 55, 120};
         } else if (sel) {
-            bg = (Color){55, 70, 90, 230};
-            border = (Color){120, 170, 230, 255};
+            float sr = 38 * 0.5f + slotAc.r * 0.5f;
+            float sg = 42 * 0.5f + slotAc.g * 0.5f;
+            float sb = 55 * 0.5f + slotAc.b * 0.5f;
+            bg = (Color){(unsigned char)sr, (unsigned char)sg, (unsigned char)sb, 240};
+            border = (Color){slotAc.r, slotAc.g, slotAc.b, 255};
         } else {
             bg = (Color){
                 (unsigned char)(38 + (int)(10 * hA)),
@@ -3471,12 +3556,14 @@ void DrawSlotSelectScreen(void)
 
         // Selection glow
         if (sel && usable) {
-            DrawRectangle(slotX - 2, sy - 2, slotW + 4, slotH + 4, (Color){100, 150, 220, 35});
+            float pulse = sinf(time * 1.8f) * 0.3f + 0.7f;
+            DrawRoundedRect(slotX - 3, sy - 3, slotW + 6, slotH + 6, 0.05f,
+                (Color){slotAc.r, slotAc.g, slotAc.b, (unsigned char)(20 * pulse)});
         }
         // Hover glow (smooth)
         if (hA > 0.01f && !sel && usable) {
-            unsigned char glowA = (unsigned char)(30 * hA);
-            DrawRectangle(slotX - 1, sy - 1, slotW + 2, slotH + 2, (Color){90, 100, 130, glowA});
+            unsigned char glowA = (unsigned char)(25 * hA);
+            DrawRectangle(slotX - 1, sy - 1, slotW + 2, slotH + 2, (Color){slotAc.r, slotAc.g, slotAc.b, glowA});
         }
 
         DrawRectangle(slotX, sy, slotW, slotH, bg);
@@ -3536,12 +3623,21 @@ void DrawSlotSelectScreen(void)
     int backBtnY = slotY + SLOT_VISIBLE * spacing + 10;
     Rectangle backBtn = { (float)backBtnX, (float)backBtnY, (float)backBtnW, (float)backBtnH };
     bool backHover = CheckCollisionPointRec(mouse, backBtn);
-    Color backBg = backHover ? (Color){80, 75, 100, 240} : (Color){55, 50, 70, 220};
-    DrawRectangleRec(backBtn, backBg);
-    DrawRectangleLinesEx(backBtn, backHover ? 2 : 1, (Color){100, 95, 120, 200});
+    float backH = GetHoverAlpha(350, backHover, GetFrameTime());
+    Color backAc = {72, 162, 232, 255};
+    if (backH > 0.01f) {
+        DrawRoundedRect(backBtnX - 2, backBtnY - 2, backBtnW + 4, backBtnH + 4, 0.1f,
+            (Color){backAc.r, backAc.g, backAc.b, (unsigned char)(10 * backH)});
+    }
+    DrawRectangle(backBtnX + 2, backBtnY + 2, backBtnW, backBtnH, (Color){0, 0, 0, (unsigned char)(30 * backH)});
+    unsigned char sbr = (unsigned char)(42 + (int)(backAc.r * 0.12f * backH));
+    unsigned char sbg = (unsigned char)(40 + (int)(backAc.g * 0.12f * backH));
+    unsigned char sbb = (unsigned char)(56 + (int)(backAc.b * 0.12f * backH));
+    DrawRoundedRect(backBtnX, backBtnY, backBtnW, backBtnH, 0.1f, (Color){sbr, sbg, sbb, 230});
+    DrawRectangleLinesEx(backBtn, 1, (Color){backAc.r, backAc.g, backAc.b, (unsigned char)(140 + (int)(50 * backH))});
     const char *backText = S(STR_BACK);
     int backTextW = MeasureGameTextWidth(backText, 18);
-    DrawGameText(backText, backBtnX + (backBtnW - backTextW) / 2, backBtnY + 9, 18, WHITE);
+    DrawGameText(backText, backBtnX + (backBtnW - backTextW) / 2, backBtnY + 9, 18, (Color){230, 230, 245, 240});
 
     // Hints
     const char *hint = S(STR_HINT_SLOT);
@@ -3566,59 +3662,72 @@ void DrawConfirmDialog(void)
     int dlgX = (SCREEN_WIDTH - dlgW) / 2;
     int dlgY = (SCREEN_HEIGHT - dlgH) / 2;
 
-    // Dialog box
-    DrawRectangle(dlgX, dlgY, dlgW, dlgH, (Color){40, 38, 50, 245});
+    // Dialog box (rounded)
+    DrawRoundedRect(dlgX, dlgY, dlgW, dlgH, 0.08f, (Color){40, 38, 50, 250});
     DrawRectangleLinesEx((Rectangle){(float)dlgX, (float)dlgY, (float)dlgW, (float)dlgH}, 2,
-                         (Color){100, 90, 120, 255});
-    // Inner highlight
-    DrawRectangle(dlgX + 2, dlgY + 2, dlgW - 4, dlgH - 4, (Color){50, 48, 62, 200});
+                         (Color){110, 105, 130, 220});
+    // Top accent
+    DrawRectangle(dlgX, dlgY, dlgW, 2, (Color){170, 108, 200, 150});
 
     // Title
     bool isDelete = (confirmDialogMode == 1);
     const char *title = isDelete ? S(STR_DELETE_SAVE) : S(STR_OVERWRITE_SAVE);
-    Color titleColor = isDelete ? (Color){230, 100, 100, 255} : (Color){230, 180, 80, 255};
+    Color titleColor = isDelete ? (Color){240, 100, 90, 255} : (Color){240, 190, 90, 255};
     int titleW = MeasureGameTextWidth(title,24);
+    DrawGlowCircle(dlgX + dlgW / 2, dlgY + 26, 30, (Color){titleColor.r, titleColor.g, titleColor.b, 20}, 0.3f);
     DrawGameText(title, dlgX + (dlgW - titleW) / 2, dlgY + 18,24, titleColor);
 
     // Message
     char msg[64];
     snprintf(msg, sizeof(msg), S(STR_SLOT_HAS_DATA), confirmDialogSlot + 1);
     int msgW = MeasureGameTextWidth(msg,16);
-    DrawGameText(msg, dlgX + (dlgW - msgW) / 2, dlgY + 52,16, (Color){190, 185, 200, 255});
+    DrawGameText(msg, dlgX + (dlgW - msgW) / 2, dlgY + 52,16, (Color){200, 195, 215, 255});
 
     const char *warn = S(STR_CANNOT_UNDO);
     int warnW = MeasureGameTextWidth(warn,14);
-    DrawGameText(warn, dlgX + (dlgW - warnW) / 2, dlgY + 72,14, (Color){200, 120, 100, 220});
+    DrawGameText(warn, dlgX + (dlgW - warnW) / 2, dlgY + 74,14, (Color){210, 130, 110, 220});
 
     // Buttons
     Vector2 mouse = Win32GetMousePosition();
     int btnW = 130, btnH = 34;
     int btnY = dlgY + dlgH - 50;
 
-    // Yes button
-    Rectangle yesBtn = { (float)(dlgX + 30), (float)btnY, (float)btnW, (float)btnH };
-    bool yesHover = CheckCollisionPointRec(mouse, yesBtn);
-    Color yesBg = yesHover ? (Color){180, 60, 50, 255} : (Color){140, 50, 40, 230};
-    DrawRectangleRec(yesBtn, yesBg);
-    DrawRectangleLinesEx(yesBtn, 1, (Color){200, 80, 70, 200});
-    const char *yesText = isDelete ? S(STR_YES_DELETE) : S(STR_YES_OVERWRITE);
-    int yesTextW = MeasureGameTextWidth(yesText,16);
-    DrawGameText(yesText, (int)(yesBtn.x + (btnW - yesTextW) / 2), btnY + 9,16, WHITE);
+    // Yes button (red accent)
+    {
+        Rectangle r = { (float)(dlgX + 30), (float)btnY, (float)btnW, (float)btnH };
+        bool hover = CheckCollisionPointRec(mouse, r);
+        Color ac = {240, 90, 80, 255};
+        if (hover) DrawRoundedRect((int)r.x - 2, (int)r.y - 2, (int)r.width + 4, (int)r.height + 4, 0.1f, (Color){ac.r, ac.g, ac.b, 15});
+        DrawRoundedRect((int)r.x + 2, (int)r.y + 2, (int)r.width, (int)r.height, 0.1f, (Color){0, 0, 0, 30});
+        unsigned char ybr = (unsigned char)(50 + (hover ? 40 : 0));
+        DrawRoundedRect((int)r.x, (int)r.y, (int)r.width, (int)r.height, 0.1f, (Color){ybr, (unsigned char)(20 + (hover ? 15 : 0)), (unsigned char)(18 + (hover ? 12 : 0)), 230});
+        DrawRectangleLinesEx(r, 1, (Color){ac.r, ac.g, ac.b, (unsigned char)(hover ? 220 : 150)});
+        const char *t = isDelete ? S(STR_YES_DELETE) : S(STR_YES_OVERWRITE);
+        int tw = MeasureGameTextWidth(t,16);
+        DrawGameText(t, (int)(r.x + (r.width - tw) / 2), btnY + 9,16, (Color){255, 240, 240, 240});
+    }
 
-    // No button
-    Rectangle noBtn = { (float)(dlgX + dlgW - btnW - 30), (float)btnY, (float)btnW, (float)btnH };
-    bool noHover = CheckCollisionPointRec(mouse, noBtn);
-    Color noBg = noHover ? (Color){80, 80, 100, 255} : (Color){60, 58, 75, 230};
-    DrawRectangleRec(noBtn, noBg);
-    DrawRectangleLinesEx(noBtn, 1, (Color){90, 85, 110, 200});
-    const char *noText = S(STR_CANCEL);
-    int noTextW = MeasureGameTextWidth(noText,16);
-    DrawGameText(noText, (int)(noBtn.x + (btnW - noTextW) / 2), btnY + 9,16, WHITE);
+    // No button (blue accent)
+    {
+        Rectangle r = { (float)(dlgX + dlgW - btnW - 30), (float)btnY, (float)btnW, (float)btnH };
+        bool hover = CheckCollisionPointRec(mouse, r);
+        Color ac = {72, 162, 232, 255};
+        if (hover) DrawRoundedRect((int)r.x - 2, (int)r.y - 2, (int)r.width + 4, (int)r.height + 4, 0.1f, (Color){ac.r, ac.g, ac.b, 15});
+        DrawRoundedRect((int)r.x + 2, (int)r.y + 2, (int)r.width, (int)r.height, 0.1f, (Color){0, 0, 0, 30});
+        unsigned char nbr = (unsigned char)(38 + (hover ? 15 : 0));
+        unsigned char nbg = (unsigned char)(42 + (hover ? 20 : 0));
+        unsigned char nbb = (unsigned char)(58 + (hover ? 25 : 0));
+        DrawRoundedRect((int)r.x, (int)r.y, (int)r.width, (int)r.height, 0.1f, (Color){nbr, nbg, nbb, 230});
+        DrawRectangleLinesEx(r, 1, (Color){ac.r, ac.g, ac.b, (unsigned char)(hover ? 220 : 150)});
+        const char *t = S(STR_CANCEL);
+        int tw = MeasureGameTextWidth(t,16);
+        DrawGameText(t, (int)(r.x + (r.width - tw) / 2), btnY + 9,16, (Color){230, 230, 245, 240});
+    }
 
     // Key hints
     const char *keyHint = S(STR_CONFIRM_KEYS);
     int keyHintW = MeasureGameTextWidth(keyHint,13);
-    DrawGameText(keyHint, dlgX + (dlgW - keyHintW) / 2, dlgY + dlgH - 14,13, (Color){130, 125, 145, 180});
+    DrawGameText(keyHint, dlgX + (dlgW - keyHintW) / 2, dlgY + dlgH - 14,13, (Color){140, 135, 155, 180});
 }
 
 //----------------------------------------------------------------------------------
@@ -3626,20 +3735,23 @@ void DrawConfirmDialog(void)
 //----------------------------------------------------------------------------------
 void DrawSettingsScreen(void)
 {
-    // Background gradient
+    // Background gradient (richer)
+    float stime = (float)GetTime();
     for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
         float t = (float)y / SCREEN_HEIGHT;
-        unsigned char r = (unsigned char)(12 + t * 14);
-        unsigned char g = (unsigned char)(14 + t * 10);
-        unsigned char b = (unsigned char)(25 + t * 18);
+        unsigned char r = (unsigned char)(12 + t * 18 + sinf(stime * 0.06f + y * 0.008f) * 3);
+        unsigned char g = (unsigned char)(14 + t * 14 + sinf(stime * 0.08f + y * 0.006f) * 2);
+        unsigned char b = (unsigned char)(28 + t * 26 + sinf(stime * 0.05f + y * 0.005f) * 6);
         DrawRectangle(0, y, SCREEN_WIDTH, 4, (Color){r, g, b, 255});
     }
 
-    // Title
+    // Title with gradient
     const char *title = S(STR_SETTINGS);
     int titleW = MeasureGameTextWidth(title, 42);
+    float titlePulse = sinf(stime * 0.7f) * 0.2f + 0.8f;
+    DrawGlowCircle(SCREEN_WIDTH / 2, 35, 50, (Color){130, 90, 170, (unsigned char)(25 * titlePulse)}, 0.3f);
     DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 1, 20, 42, (Color){0, 0, 0, 80});
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 18, 42, (Color){190, 195, 210, 255});
+    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 18, 42, (Color){200, 190, 220, 255});
     // Subtle line under title
     DrawRectangle((SCREEN_WIDTH - 120) / 2, 65, 120, 1, (Color){80, 85, 100, 100});
 
@@ -3662,7 +3774,6 @@ void DrawSettingsScreen(void)
 
     int leftX = panelX + 30;
     int rightX = panelX + panelW / 2 + 10;
-    int sliderW = 180;
     char volText[16];
 
     // ============================================================
@@ -3823,7 +3934,7 @@ void DrawSettingsScreen(void)
         int bx = leftX + i * (langBtnW + langBtnGap);
         Rectangle btn = { (float)bx, (float)sectionY, (float)langBtnW, (float)langBtnH };
         bool hover = CheckCollisionPointRec(mouse, btn);
-        bool sel = (language == i);
+        bool sel = (language == (Language)i);
         float hA = GetHoverAlpha(310 + i, hover && !sel, GetFrameTime());
 
         Color bg;
@@ -3925,7 +4036,7 @@ void DrawSettingsScreen(void)
         int bx = leftX + i * (diffBtnW + diffBtnGap);
         Rectangle btn = { (float)bx, (float)sectionY, (float)diffBtnW, (float)diffBtnH };
         bool hover = CheckCollisionPointRec(mouse, btn);
-        bool sel = (gameDifficulty == i);
+        bool sel = (gameDifficulty == (Difficulty)i);
         float hA = GetHoverAlpha(340 + i, hover && !sel, GetFrameTime());
 
         Color bg = sel ? diffColorsSel[i] : (Color){
@@ -3987,7 +4098,7 @@ void DrawSettingsScreen(void)
         sectionY += 14;
     }
 
-    // Back button
+    // Back button (lavender accent, matching main menu Settings color)
     int backBtnW = 130;
     int backBtnH = 30;
     int backBtnX = (SCREEN_WIDTH - backBtnW) / 2;
@@ -3995,21 +4106,21 @@ void DrawSettingsScreen(void)
     Rectangle backBtn = { (float)backBtnX, (float)backBtnY, (float)backBtnW, (float)backBtnH };
     bool backHover = CheckCollisionPointRec(mouse, backBtn);
     float hBack = GetHoverAlpha(330, backHover, GetFrameTime());
+    Color backAc = {170, 108, 200, 255};
+    // Outer glow on hover
+    if (hBack > 0.01f) {
+        DrawRoundedRect(backBtnX - 2, backBtnY - 2, backBtnW + 4, backBtnH + 4, 0.1f,
+            (Color){backAc.r, backAc.g, backAc.b, (unsigned char)(10 * hBack)});
+    }
     DrawRectangle(backBtnX + 2, backBtnY + 2, backBtnW, backBtnH, (Color){0, 0, 0, (unsigned char)(30 * hBack)});
-    DrawRectangle(backBtnX, backBtnY, backBtnW, backBtnH, (Color){
-        (unsigned char)(40 + (int)(18 * hBack)),
-        (unsigned char)(38 + (int)(18 * hBack)),
-        (unsigned char)(52 + (int)(22 * hBack)),
-        230});
-    DrawRectangle(backBtnX, backBtnY, backBtnW, backBtnH / 3, (Color){
-        (unsigned char)(48 + (int)(18 * hBack)),
-        (unsigned char)(46 + (int)(18 * hBack)),
-        (unsigned char)(60 + (int)(22 * hBack)),
-        230});
-    DrawRectangleLinesEx(backBtn, 1, (Color){80, 78, 95, (unsigned char)(160 + (int)(30 * hBack))});
+    unsigned char bbr = (unsigned char)(38 + (int)(backAc.r * 0.12f * hBack));
+    unsigned char bbg = (unsigned char)(36 + (int)(backAc.g * 0.12f * hBack));
+    unsigned char bbb = (unsigned char)(50 + (int)(backAc.b * 0.12f * hBack));
+    DrawRoundedRect(backBtnX, backBtnY, backBtnW, backBtnH, 0.1f, (Color){bbr, bbg, bbb, 230});
+    DrawRectangleLinesEx(backBtn, 1, (Color){backAc.r, backAc.g, backAc.b, (unsigned char)(140 + (int)(50 * hBack))});
     const char *backText = S(STR_BACK);
     int backTextW = MeasureGameTextWidth(backText, 15);
-    DrawGameText(backText, backBtnX + (backBtnW - backTextW) / 2, backBtnY + 7, 15, (Color){200, 200, 210, 240});
+    DrawGameText(backText, backBtnX + (backBtnW - backTextW) / 2, backBtnY + 7, 15, (Color){230, 225, 240, 240});
 
     // ESC to go back
     if (Win32IsKeyPressed(KEY_ESCAPE) || (backHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT))) {
@@ -4259,7 +4370,7 @@ void DrawBackground(void)
 
     // Rain (heavier at night, occasional during day)
     {
-        static float rainDrops[60][2]; // x, y positions
+        static float bgRainDrops[60][2]; // x, y positions
         static bool rainInit = false;
         static float rainIntensity = 0.0f;
         float time = (float)GetTime();
@@ -4276,8 +4387,8 @@ void DrawBackground(void)
 
         if (!rainInit) {
             for (int i = 0; i < 60; i++) {
-                rainDrops[i][0] = (float)(rand() % SCREEN_WIDTH);
-                rainDrops[i][1] = (float)(rand() % SCREEN_HEIGHT);
+                bgRainDrops[i][0] = (float)(rand() % SCREEN_WIDTH);
+                bgRainDrops[i][1] = (float)(rand() % SCREEN_HEIGHT);
             }
             rainInit = true;
         }
@@ -4286,14 +4397,14 @@ void DrawBackground(void)
             int dropCount = (int)(rainIntensity * 60);
             unsigned char rainA = (unsigned char)(rainIntensity * 120);
             for (int i = 0; i < dropCount; i++) {
-                rainDrops[i][1] += 8.0f + rainIntensity * 4.0f; // fall speed
-                rainDrops[i][0] += sinf(time * 3.0f + i) * 0.5f; // slight wind
-                if (rainDrops[i][1] > SCREEN_HEIGHT) {
-                    rainDrops[i][0] = (float)(rand() % SCREEN_WIDTH);
-                    rainDrops[i][1] = -5.0f;
+                bgRainDrops[i][1] += 8.0f + rainIntensity * 4.0f; // fall speed
+                bgRainDrops[i][0] += sinf(time * 3.0f + i) * 0.5f; // slight wind
+                if (bgRainDrops[i][1] > SCREEN_HEIGHT) {
+                    bgRainDrops[i][0] = (float)(rand() % SCREEN_WIDTH);
+                    bgRainDrops[i][1] = -5.0f;
                 }
-                DrawLine((int)rainDrops[i][0], (int)rainDrops[i][1],
-                         (int)(rainDrops[i][0] - 1), (int)(rainDrops[i][1] + 6),
+                DrawLine((int)bgRainDrops[i][0], (int)bgRainDrops[i][1],
+                         (int)(bgRainDrops[i][0] - 1), (int)(bgRainDrops[i][1] + 6),
                          (Color){150, 170, 220, rainA});
             }
         }

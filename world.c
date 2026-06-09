@@ -1,4 +1,4 @@
-#include "types.h"
+﻿#include "types.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -2230,7 +2230,7 @@ static void PropagateLavaBFS(int startX, int startY, int level)
 void SetLavaSource(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    // Check for water contact → obsidian
+    // Check for water contact 鈫?obsidian
     static const int dx[] = {0, 0, 1, -1};
     static const int dy[] = {1, -1, 0, 0};
     for (int d = 0; d < 4; d++) {
@@ -2404,7 +2404,7 @@ static uint8_t redstonePower[WORLD_WIDTH][WORLD_HEIGHT];
 static bool leverState[WORLD_WIDTH][WORLD_HEIGHT];
 static uint8_t cropGrowth[WORLD_WIDTH][WORLD_HEIGHT]; // 0-7 growth stage for crops
 
-// Pressure plate tracking — avoids O(524K) scan in UpdateRedstoneTick
+// Pressure plate tracking 鈥?avoids O(524K) scan in UpdateRedstoneTick
 #define MAX_PRESSURE_PLATES 256
 static int pressurePlatesX[MAX_PRESSURE_PLATES];
 static int pressurePlatesY[MAX_PRESSURE_PLATES];
@@ -2467,11 +2467,6 @@ void ToggleLever(int bx, int by)
     UpdateRedstoneAt(bx, by);
 }
 
-static int GetRedstonePower(int bx, int by)
-{
-    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
-    return redstonePower[bx][by];
-}
 
 static bool IsRedstoneSource(uint8_t block, int bx, int by)
 {
@@ -3370,7 +3365,7 @@ void GenerateWorld(unsigned int seed)
         }
         if (surfaceY < 10 || surfaceY >= SEA_LEVEL) continue;
 
-        // Check flatness: scan ±20 blocks for consistent surface
+        // Check flatness: scan 卤20 blocks for consistent surface
         bool flat = true;
         for (int dx = -20; dx <= 20; dx += 4) {
             int cx = vx + dx;
@@ -3400,11 +3395,9 @@ void GenerateWorld(unsigned int seed)
         // Place buildings
         int numBuildings = 3 + (int)(hash2D(v, 1, seed + 20100) % 4);
         int buildX = vx - (numBuildings * 10) / 2;
-        int villagerSpawnCount = 0;
 
         for (int b = 0; b < numBuildings && b < MAX_VILLAGE_BUILDINGS; b++) {
             int bx = buildX + b * 10 + (int)(hash2D(v, b + 10, seed + 20200) % 3);
-            int by = surfaceY;
 
             // Find surface at this building position
             int buildSurface = -1;
@@ -3619,11 +3612,22 @@ void GenerateWorld(unsigned int seed)
             int btype = (int)(hash2D(v, b, seed + 20300) % 4);
             if (btype != 0 && btype != 3) continue; // Only houses and blacksmiths
             int bx = buildX + b * 10 + (int)(hash2D(v, b + 10, seed + 20200) % 3);
+            int w = (btype == 3) ? 8 : 7;
+            // Scan for intact grass outside building (right side)
             int buildSurface = -1;
             for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
-                if (world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) {
+                if (world[bx + w][y] == BLOCK_GRASS || world[bx + w][y] == BLOCK_SNOWY_GRASS) {
                     buildSurface = y;
                     break;
+                }
+            }
+            if (buildSurface < 5) {
+                // Fallback: scan left side
+                for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
+                    if (bx > 0 && (world[bx - 1][y] == BLOCK_GRASS || world[bx - 1][y] == BLOCK_SNOWY_GRASS)) {
+                        buildSurface = y;
+                        break;
+                    }
                 }
             }
             if (buildSurface < 5) continue;
@@ -3751,6 +3755,7 @@ void GenerateChunkTexture(Chunk *chunk)
 
 void InvalidateChunkAt(int worldBlockX, int worldBlockY)
 {
+    (void)worldBlockY;
     int cx = worldBlockX / CHUNK_SIZE;
     Chunk *c = GetChunk(cx);
     if (c) {

@@ -91,6 +91,9 @@ void UpdateProjectiles(float dt)
                 p->fishTimer -= dt;
                 if (p->fishTimer <= 0 && !p->hasBite) {
                     p->hasBite = true;
+                    if (p->fromPlayer) {
+                        ShowMessage(S(STR_FISH_BITE), (Color){255, 100, 100, 255});
+                    }
                     TriggerCameraShake(2.0f, 0.5f);
                 }
             }
@@ -608,8 +611,8 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                 float ecy = mob->position.y + mobHeight[MOB_CREEPER] / 2;
                 for (int p = 0; p < 20; p++) {
                     float angle = (float)(rand() % 628) / 100.0f;
-                    float dist = 5.0f + (float)(rand() % 20);
-                    SpawnDamageParticles(ecx + cosf(angle) * dist,
+                    float pDist = 5.0f + (float)(rand() % 20);
+                    SpawnDamageParticles(ecx + cosf(angle) * pDist,
                                          ecy + sinf(angle) * dist,
                                          (Color){255, 150, 50, 255});
                 }
@@ -1043,7 +1046,6 @@ static void TrySpawnMobs(float dt)
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
-        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
 
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
@@ -1064,7 +1066,6 @@ static void TrySpawnMobs(float dt)
         float angle = (float)(rand() % 628) / 100.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
-        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
 
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
@@ -1085,7 +1086,6 @@ static void TrySpawnMobs(float dt)
         float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
-        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
 
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
@@ -1109,7 +1109,6 @@ static void TrySpawnMobs(float dt)
         float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
-        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
 
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
@@ -1130,7 +1129,6 @@ static void TrySpawnMobs(float dt)
         float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
         float spawnX = playerCX + cosf(angle) * dist;
-        float spawnY = playerCY + sinf(angle) * dist * 0.5f;
 
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
@@ -1583,7 +1581,6 @@ static void DrawSlimeSprite(Mob *mob)
 {
     float x = mob->position.x;
     float y = mob->position.y;
-    float time = (float)GetTime();
     int w = mobWidth[MOB_SLIME];
     int h = mobHeight[MOB_SLIME];
 
@@ -1617,8 +1614,6 @@ static void DrawEndermanSprite(Mob *mob)
     float x = mob->position.x;
     float y = mob->position.y;
     float time = (float)GetTime();
-    int w = mobWidth[MOB_ENDERMAN];
-    int h = mobHeight[MOB_ENDERMAN];
     bool moving = fabsf(mob->velocity.x) > 5.0f;
     float armSwing = moving ? sinf(time * 6.0f) * 4.0f : 0;
     float bob = sinf(time * 3.0f) * 1.5f;

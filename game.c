@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
+
+#pragma GCC diagnostic ignored "-Wdouble-promotion"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #include <string.h>
 #include <math.h>
 
@@ -527,7 +530,7 @@ static void UpdateSlotSelect(float dt)
         Vector2 mouse = Win32GetMousePosition();
         int slotW = 340, slotH = 80;
         int slotX = (SCREEN_WIDTH - slotW) / 2;
-        int slotY = 160;
+        int slotY = (slotSelectMode == 0) ? 185 : 160;
         int spacing = 96;
 
         // Scroll wheel on the slot area
@@ -642,10 +645,10 @@ static void UpdateMainMenu(float dt)
     // Mouse hover + click
     {
         Vector2 mouse = Win32GetMousePosition();
-        int btnW = 260, btnH = 48;
+        int btnW = 280, btnH = 46;
         int btnX = (SCREEN_WIDTH - btnW) / 2;
-        int btnY = 220;
-        int spacing = 60;
+        int btnY = 225;
+        int spacing = 66;
 
         Rectangle btns[6];
         for (int i = 0; i < 6; i++) {
@@ -1057,8 +1060,18 @@ void UpdateGame(float dt)
 
     // Death respawn input
     if (player.playerDead) {
-        if (GetDeathFadeTimer() > 1.0f && Win32IsKeyPressed(KEY_SPACE)) {
-            RespawnPlayer();
+        if (GetDeathFadeTimer() > 1.0f) {
+            if (Win32IsKeyPressed(KEY_SPACE)) {
+                RespawnPlayer();
+            }
+            // Mouse click on respawn text
+            Vector2 mpos = Win32GetMousePosition();
+            const char *rsText = S(STR_PRESS_SPACE_RESPAWN);
+            int rsW = MeasureGameTextWidth(rsText, 18);
+            Rectangle rsRect = { (float)(SCREEN_WIDTH - rsW) / 2, (float)(SCREEN_HEIGHT / 2 + 40), (float)rsW, 30.0f };
+            if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos, rsRect)) {
+                RespawnPlayer();
+            }
         }
         // ESC during death: return to main menu
         if (Win32IsKeyPressed(KEY_ESCAPE)) {
@@ -1194,19 +1207,33 @@ void UpdateGame(float dt)
                     wbuf[0] = PKT_WELCOME;
                     memcpy(wbuf + 1, &welcome, sizeof(welcome));
                     NetSendTo(fromId, wbuf, 1 + sizeof(welcome), true);
-                    // Initialize remote player
+                    // Initialize remote player with starter inventory
                     memset(&players[fromId], 0, sizeof(Player));
                     players[fromId].netControlled = true;
                     players[fromId].health = MAX_HEALTH;
                     players[fromId].hunger = 20;
                     players[fromId].facingRight = true;
+                    players[fromId].inventory[0] = TOOL_WOOD_SWORD;
+                    players[fromId].inventoryCount[0] = 1;
+                    players[fromId].inventory[1] = TOOL_WOOD_PICKAXE;
+                    players[fromId].inventoryCount[1] = 1;
+                    players[fromId].inventory[2] = TOOL_WOOD_AXE;
+                    players[fromId].inventoryCount[2] = 1;
+                    players[fromId].inventory[3] = TOOL_WOOD_SHOVEL;
+                    players[fromId].inventoryCount[3] = 1;
+                    players[fromId].inventory[4] = TOOL_WOOD_HOE;
+                    players[fromId].inventoryCount[4] = 1;
+                    players[fromId].inventory[5] = BLOCK_PLANKS;
+                    players[fromId].inventoryCount[5] = 64;
+                    players[fromId].inventory[6] = BLOCK_COBBLESTONE;
+                    players[fromId].inventoryCount[6] = 64;
                     remotePlayers[fromId].active = true;
                     remotePlayers[fromId].interpX = players[fromId].position.x;
                     remotePlayers[fromId].interpY = players[fromId].position.y;
                     // Send modified blocks to new client
                     NetSendWorldToClient(fromId);
                     ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
-                } else if (type == PKT_INPUT && fromId > 0 && fromId < MAX_NET_PLAYERS) {
+                } else if (type == PKT_INPUT && size >= 1 + (int)sizeof(PktInput) && fromId > 0 && fromId < MAX_NET_PLAYERS) {
                     const PktInput *input = (const PktInput *)((const uint8_t *)data + 1);
                     // Apply remote player input
                     Player *rp = &players[fromId];
@@ -1261,7 +1288,6 @@ void UpdateGame(float dt)
                         if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
                             BlockType tool = (BlockType)rp->inventory[rp->selectedSlot];
                             if (tool != BLOCK_AIR && (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER)) {
-                                bool wasWater = (world[bx][by] == BLOCK_WATER);
                                 world[bx][by] = tool;
                                 rp->inventoryCount[rp->selectedSlot]--;
                                 if (rp->inventoryCount[rp->selectedSlot] <= 0) {
@@ -1334,6 +1360,12 @@ void UpdateGame(float dt)
                             NetSendTo(r, relayBuf, 1 + sizeof(PktProjectileSpawn), false);
                         }
                     }
+                } else if (type == PKT_PING && size >= 1 + (int)sizeof(PktPing)) {
+                    // Respond to ping (keep-alive)
+                    uint8_t pongBuf[NET_PACKET_MAX];
+                    pongBuf[0] = PKT_PING;
+                    memcpy(pongBuf + 1, (const uint8_t *)data + 1, sizeof(PktPing));
+                    NetSendTo(fromId, pongBuf, 1 + sizeof(PktPing), false);
                 }
             }
             // Timeout check for remote players
@@ -1391,7 +1423,7 @@ void UpdateGame(float dt)
                     PktPlayerState ps;
                     ps.count = 0;
                     for (int i = 0; i < MAX_NET_PLAYERS; i++) {
-                        if (i == 0 || (players[i].position.x != 0 || players[i].position.y != 0)) {
+                        if (i == 0 || players[i].netControlled) {
                             PktPlayerInfo *pi = &ps.players[ps.count++];
                             pi->playerId = (uint8_t)i;
                             pi->x = players[i].position.x;
@@ -1416,6 +1448,7 @@ void UpdateGame(float dt)
                     for (int i = 0; i < MAX_MOBS && ms.count < 32; i++) {
                         if (mobs[i].active) {
                             PktMobInfo *mi = &ms.mobs[ms.count++];
+                            mi->index = (uint8_t)i;
                             mi->type = (uint8_t)mobs[i].type;
                             mi->x = mobs[i].position.x;
                             mi->y = mobs[i].position.y;
@@ -1530,16 +1563,21 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_MOB_STATE && size >= 1 + (int)sizeof(PktMobState)) {
                     const PktMobState *ms = (const PktMobState *)((const uint8_t *)data + 1);
-                    for (int j = 0; j < ms->count && j < MAX_MOBS; j++) {
+                    // First deactivate all mobs, then activate those in the packet
+                    for (int j = 0; j < MAX_MOBS; j++) mobs[j].active = false;
+                    for (int j = 0; j < ms->count && j < 32; j++) {
                         const PktMobInfo *mi = &ms->mobs[j];
-                        mobs[j].type = (MobType)mi->type;
-                        mobs[j].position.x = mi->x;
-                        mobs[j].position.y = mi->y;
-                        mobs[j].velocity.x = mi->vx;
-                        mobs[j].velocity.y = mi->vy;
-                        mobs[j].health = mi->health;
-                        mobs[j].active = mi->active;
-                        mobs[j].facingRight = mi->facingRight;
+                        int idx = mi->index;
+                        if (idx >= 0 && idx < MAX_MOBS) {
+                            mobs[idx].type = (MobType)mi->type;
+                            mobs[idx].position.x = mi->x;
+                            mobs[idx].position.y = mi->y;
+                            mobs[idx].velocity.x = mi->vx;
+                            mobs[idx].velocity.y = mi->vy;
+                            mobs[idx].health = mi->health;
+                            mobs[idx].active = mi->active;
+                            mobs[idx].facingRight = mi->facingRight;
+                        }
                     }
                 } else if (type == PKT_BLOCK_CHANGE) {
                     // Support batch block changes (multiple PktBlockChange per packet)
@@ -1547,19 +1585,6 @@ void UpdateGame(float dt)
                     for (int j = 0; j < count; j++) {
                         const PktBlockChange *bc = (const PktBlockChange *)((const uint8_t *)data + 1 + j * sizeof(PktBlockChange));
                         if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
-                            // Spawn item if block was broken (new type is AIR)
-                            if (bc->blockType == BLOCK_AIR) {
-                                uint8_t oldBlock = world[bc->x][bc->y];
-                                if (oldBlock != BLOCK_AIR && oldBlock != BLOCK_WATER) {
-                                    uint8_t dropItem = oldBlock;
-                                    if (oldBlock == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
-                                    else if (oldBlock == BLOCK_COAL_ORE) dropItem = ITEM_COAL;
-                                    else if (oldBlock == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
-                                    else if (oldBlock == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
-                                    else if (oldBlock == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
-                                    SpawnItemEntity(dropItem, 1, bc->x * BLOCK_SIZE + 3, bc->y * BLOCK_SIZE + 3);
-                                }
-                            }
                             world[bc->x][bc->y] = bc->blockType;
                             UpdateLightAt(bc->x, bc->y);
                             InvalidateChunkAt(bc->x, bc->y);
@@ -1567,7 +1592,17 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_ENTITY_SPAWN && size >= 1 + (int)sizeof(PktEntitySpawn)) {
                     const PktEntitySpawn *es = (const PktEntitySpawn *)((const uint8_t *)data + 1);
-                    SpawnItemEntity((BlockType)es->itemType, es->count, es->x, es->y);
+                    // Dedup: skip if an entity of same type already exists nearby (can happen when client
+                    // already spawned the item from PKT_BLOCK_CHANGE processing)
+                    bool found = false;
+                    for (int ei = 0; ei < MAX_ENTITIES; ei++) {
+                        if (!entities[ei].active) continue;
+                        if (entities[ei].itemType != es->itemType) continue;
+                        float dx = entities[ei].position.x - es->x;
+                        float dy = entities[ei].position.y - es->y;
+                        if (dx * dx + dy * dy < 64.0f) { found = true; break; }
+                    }
+                    if (!found) SpawnItemEntity((BlockType)es->itemType, es->count, es->x, es->y);
                 } else if (type == PKT_ENTITY_PICKUP && size >= 1 + (int)sizeof(PktEntityPickup)) {
                     const PktEntityPickup *ep = (const PktEntityPickup *)((const uint8_t *)data + 1);
                     if (ep->entityIndex < MAX_ENTITIES) {
@@ -1593,8 +1628,35 @@ void UpdateGame(float dt)
                         player.velocity.y += dp->knockbackY;
                         player.damageFlashTimer = 0.3f;
                     }
-                } else if (type == PKT_DISCONNECT) {
+                } else if (type == PKT_DISCONNECT && size >= 2) {
                     // Host disconnected, return to menu
+                    NetClientDisconnect();
+                    ShowMessage(S(STR_NET_HOST_DISCONNECTED), (Color){240, 100, 100, 255});
+                    StartTransition(STATE_MENU);
+                    menuSelection = 0;
+                    return;
+                } else if (type == PKT_PING && size >= 1 + (int)sizeof(PktPing)) {
+                    // Server ping response — just counts as keepalive
+                }
+            }
+            // Client-side keep-alive: send ping every 3s, detect host timeout
+            {
+                static float clientPingTimer = 0.0f;
+                static float lastServerPacket = 0.0f;
+                clientPingTimer += dt;
+                if (clientPingTimer >= 3.0f) {
+                    clientPingTimer = 0.0f;
+                    PktPing pp;
+                    pp.timestamp = (uint32_t)(NetGetTime() * 1000.0f);
+                    uint8_t pbuf[NET_PACKET_MAX];
+                    pbuf[0] = PKT_PING;
+                    memcpy(pbuf + 1, &pp, sizeof(PktPing));
+                    NetSendToServer(pbuf, 1 + sizeof(PktPing), false);
+                }
+                // Any received packet keeps connection alive
+                if (NetGetReceivedCount() > 0) lastServerPacket = NetGetTime();
+                // Timeout: no packets from server for 15s
+                if (lastServerPacket > 0.1f && NetGetTime() - lastServerPacket > NET_TIMEOUT) {
                     NetClientDisconnect();
                     ShowMessage(S(STR_NET_HOST_DISCONNECTED), (Color){240, 100, 100, 255});
                     StartTransition(STATE_MENU);

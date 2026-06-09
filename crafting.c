@@ -284,7 +284,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 
     if (craftSearchLen > 0) {
         DrawGameText(craftSearchBuf, panelX + 4, panelY + 3, 11, (Color){200, 200, 220, 255});
-        if (searchFocused && ((int)(GetTime() * 2.0f) % 2 == 0)) {
+        if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
             int cursorX = panelX + 4 + MeasureGameTextWidth(craftSearchBuf, 11);
             DrawRectangle(cursorX, panelY + 3, 1, 11, (Color){200, 200, 220, 200});
         }
@@ -298,7 +298,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         }
     } else {
         DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){100, 95, 115, 150});
-        if (searchFocused && ((int)(GetTime() * 2.0f) % 2 == 0)) {
+        if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
             DrawRectangle(panelX + 4, panelY + 3, 1, 11, (Color){150, 145, 165, 150});
         }
     }

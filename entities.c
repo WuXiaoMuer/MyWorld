@@ -1,5 +1,7 @@
 #include "types.h"
+#include "net.h"
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 
 void InitEntities(void)
@@ -31,6 +33,19 @@ void SpawnItemEntity(uint8_t itemType, int count, float x, float y)
     e->lifetime = ENTITY_LIFETIME;
     e->pickupDelay = ENTITY_PICKUP_DELAY;
     e->active = true;
+
+    // Broadcast to clients if host
+    if (NetIsHost()) {
+        uint8_t buf[NET_PACKET_MAX];
+        PktEntitySpawn es;
+        es.itemType = itemType;
+        es.count = count;
+        es.x = x;
+        es.y = y;
+        buf[0] = PKT_ENTITY_SPAWN;
+        memcpy(buf + 1, &es, sizeof(PktEntitySpawn));
+        NetSendToAll(buf, 1 + sizeof(PktEntitySpawn), false);
+    }
 }
 
 void UpdateEntities(float dt)

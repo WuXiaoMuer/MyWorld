@@ -1,10 +1,11 @@
 #include "types.h"
 #include <string.h>
 
-// BFS queue for light propagation
-static int queueX[WORLD_WIDTH * 4];
-static int queueY[WORLD_WIDTH * 4];
-static int queueLevel[WORLD_WIDTH * 4];
+// BFS queue for light propagation (circular buffer)
+#define LIGHT_QUEUE_SIZE (WORLD_WIDTH * 4)
+static int queueX[LIGHT_QUEUE_SIZE];
+static int queueY[LIGHT_QUEUE_SIZE];
+static int queueLevel[LIGHT_QUEUE_SIZE];
 
 static bool IsTransparent(int bx, int by)
 {
@@ -39,21 +40,32 @@ void CalculateSunlight(void)
     }
 }
 
+static void PushLightQueue(int x, int y, int level, int *tail)
+{
+    int next = (*tail + 1) % LIGHT_QUEUE_SIZE;
+    if (next == *tail % LIGHT_QUEUE_SIZE) return; // queue full
+    queueX[*tail % LIGHT_QUEUE_SIZE] = x;
+    queueY[*tail % LIGHT_QUEUE_SIZE] = y;
+    queueLevel[*tail % LIGHT_QUEUE_SIZE] = level;
+    (*tail)++;
+}
+
 void PropagateLight(int startX, int startY, int level)
 {
     if (level <= 0) return;
 
     int qHead = 0, qTail = 0;
 
-    queueX[qTail] = startX;
-    queueY[qTail] = startY;
-    queueLevel[qTail] = level;
+    queueX[qTail % LIGHT_QUEUE_SIZE] = startX;
+    queueY[qTail % LIGHT_QUEUE_SIZE] = startY;
+    queueLevel[qTail % LIGHT_QUEUE_SIZE] = level;
     qTail++;
 
     while (qHead < qTail) {
-        int cx = queueX[qHead];
-        int cy = queueY[qHead];
-        int cl = queueLevel[qHead];
+        int idx = qHead % LIGHT_QUEUE_SIZE;
+        int cx = queueX[idx];
+        int cy = queueY[idx];
+        int cl = queueLevel[idx];
         qHead++;
 
         if (cl <= 0) continue;
@@ -62,14 +74,14 @@ void PropagateLight(int startX, int startY, int level)
         // Don't propagate into solid blocks (except the source itself)
         if (qHead > 1 && !IsTransparent(cx, cy)) continue;
 
-        lightMap[cx][cy] = cl;
+        lightMap[cx][cy] = (uint8_t)cl;
 
         int nextL = cl - 1;
         if (nextL > 0) {
-            queueX[qTail] = cx - 1; queueY[qTail] = cy; queueLevel[qTail] = nextL; qTail++;
-            queueX[qTail] = cx + 1; queueY[qTail] = cy; queueLevel[qTail] = nextL; qTail++;
-            queueX[qTail] = cx; queueY[qTail] = cy - 1; queueLevel[qTail] = nextL; qTail++;
-            queueX[qTail] = cx; queueY[qTail] = cy + 1; queueLevel[qTail] = nextL; qTail++;
+            PushLightQueue(cx - 1, cy, nextL, &qTail);
+            PushLightQueue(cx + 1, cy, nextL, &qTail);
+            PushLightQueue(cx, cy - 1, nextL, &qTail);
+            PushLightQueue(cx, cy + 1, nextL, &qTail);
         }
     }
 }
