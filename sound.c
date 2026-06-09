@@ -124,6 +124,18 @@ static float eatGen(float t, float freq, unsigned int *rng) {
     return (phase1 + noise * 0.4f) * env * (0.5f + 0.5f * mod);
 }
 
+// Drinking - bubbling/gurgling
+static float drinkGen(float t, float freq, unsigned int *rng) {
+    (void)freq;
+    float env = expf(-t * 6.0f);
+    *rng = *rng * 1103515245 + 12345;
+    float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
+    float bubble1 = fast_sine(t * 400.0f + fast_sine(t * 50.0f) * 0.3f);
+    float bubble2 = fast_sine(t * 650.0f + fast_sine(t * 70.0f) * 0.2f) * 0.5f;
+    float mod = fast_sine(t * 15.0f) * 0.5f + 0.5f;
+    return (bubble1 * 0.4f + bubble2 * 0.3f + noise * 0.3f) * env * mod;
+}
+
 // UI click - soft
 static float clickGen(float t, float freq, unsigned int *rng) {
     (void)freq; (void)rng;
@@ -542,6 +554,10 @@ void InitSounds(void)
     sndEat = LoadSoundFromWave(w);
     UnloadWave(w);
 
+    w = GenerateWave(0.35f, sr, drinkGen);
+    sndDrink = LoadSoundFromWave(w);
+    UnloadWave(w);
+
     w = GenerateWave(0.05f, sr, clickGen);
     sndClick = LoadSoundFromWave(w);
     UnloadWave(w);
@@ -659,6 +675,7 @@ void UnloadSounds(void)
     UnloadSound(sndHurt);
     UnloadSound(sndDeath);
     UnloadSound(sndEat);
+    UnloadSound(sndDrink);
     UnloadSound(sndClick);
     UnloadSound(sndCraft);
     UnloadSound(sndXP);
@@ -741,6 +758,12 @@ void PlaySoundEat(void) {
     if (!IsAudioDeviceReady()) return;
     SetSoundVolume(sndEat, sfxVolume);
     PlaySound(sndEat);
+}
+
+void PlaySoundDrink(void) {
+    if (!IsAudioDeviceReady()) return;
+    SetSoundVolume(sndDrink, sfxVolume);
+    PlaySound(sndDrink);
 }
 
 void PlaySoundUIClick(void) {

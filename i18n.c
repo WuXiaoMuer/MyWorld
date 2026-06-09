@@ -190,6 +190,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_HUNGRY] = "Hungry!",
     [STR_MSG_STARVING] = "Starving!",
     [STR_MSG_ATE] = "Ate %s (+%d hunger)",
+    [STR_MSG_TRADE] = "Traded %s for %s",
+    [STR_MSG_NOT_ENOUGH_ITEMS] = "Not enough items!",
     [STR_MSG_BROKE] = "%s broke!",
     [STR_MSG_CRIT_HIT] = "Critical Hit!",
 
@@ -353,7 +355,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_COBBLE] = "4 Gravel -> 4 Cobblestone",
     [STR_RECIPE_BED] = "6 Planks -> Bed",
     [STR_RECIPE_CRAFTING_TABLE] = "8 Planks -> Crafting Table",
-    [STR_RECIPE_BREAD] = "8 Planks -> Bread",
+    // Bread recipe name
     [STR_RECIPE_APPLE] = "8 Leaves -> Apple",
     // Advanced armor
     [STR_RECIPE_WOOD_HELMET] = "5 Planks -> Wood Helmet",
@@ -455,6 +457,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Missing messages
     [STR_MSG_NO_ARROWS] = "No arrows!",
     [STR_DEATH_LAVA] = " tried to swim in lava",
+    [STR_DEATH_CACTUS] = " was pricked by a cactus",
 
     // Ender pearl
     [STR_MSG_ENDER_PEARL] = "Teleported!",
@@ -465,6 +468,27 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_CAULDRON_FILLED] = "Cauldron filled!",
     [STR_MSG_CAULDRON_EMPTY] = "Cauldron emptied!",
     [STR_MSG_CAULDRON_DRINK] = "Drank from cauldron",
+    [STR_BLOCK_OAK_STAIRS] = "Oak Stairs",
+    [STR_BLOCK_COBBLESTONE_STAIRS] = "Cobblestone Stairs",
+    [STR_BLOCK_STONE_BRICKS] = "Stone Bricks",
+    [STR_BLOCK_CHISELED_STONE_BRICKS] = "Chiseled Stone Bricks",
+    [STR_BLOCK_OAK_SLAB] = "Oak Slab",
+    [STR_BLOCK_COBBLESTONE_SLAB] = "Cobblestone Slab",
+    [STR_RECIPE_OAK_STAIRS] = "4 Planks + -> 4 Oak Stairs",
+    [STR_RECIPE_COBBLESTONE_STAIRS] = "4 Cobblestone + -> 4 Cobblestone Stairs",
+    [STR_RECIPE_STONE_BRICKS] = "4 Stone -> 4 Stone Bricks",
+    [STR_RECIPE_CHISELED_STONE_BRICKS] = "2 Stone Brick Slab -> Chiseled Stone Bricks",
+    [STR_RECIPE_OAK_SLAB] = "3 Planks -> 6 Oak Slabs",
+    [STR_RECIPE_COBBLESTONE_SLAB] = "3 Cobblestone -> 6 Cobblestone Slabs",
+    [STR_BLOCK_CACTUS] = "Cactus",
+    [STR_BLOCK_SUGAR_CANE] = "Sugar Cane",
+    [STR_ITEM_PAPER] = "Paper",
+    [STR_ITEM_BOOK] = "Book",
+    [STR_ITEM_SUGAR] = "Sugar",
+    [STR_RECIPE_PAPER] = "3 Sugar Cane -> 3 Paper",
+    [STR_RECIPE_BOOK] = "2 Paper + 1 Leather -> 1 Book",
+    [STR_RECIPE_SUGAR] = "1 Sugar Cane -> 1 Sugar",
+    [STR_MSG_CACTUS_DAMAGE] = "Ouch! Cactus hurts!",
     [STR_TYPE_TOOL] = "Tool",
     [STR_TYPE_ARMOR] = "Armor",
     [STR_TYPE_FOOD] = "Food",
@@ -490,6 +514,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BREAD] = "Bread",
     [STR_RECIPE_HAY_BALE] = "Hay Bale",
     [STR_RECIPE_FISHING_ROD] = "3 Sticks + 2 String -> Fishing Rod",
+    [STR_RECIPE_MOSSY_COBBLESTONE] = "Cobblestone -> Mossy Cobblestone",
+    [STR_RECIPE_COARSE_DIRT] = "2 Dirt -> 2 Coarse Dirt",
 
     // New mob deaths
     [STR_DEATH_MOB_COW] = " was kicked by a cow",
@@ -673,6 +699,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_HUNGRY] = "饥饿!",                           // 饥饿!
     [STR_MSG_STARVING] = "饥饿难耐!",            // 饥饿难耐!
     [STR_MSG_ATE] = "吃了 %s (+%d饥饿度)",   // 吃了 %s (+%d饥饿度)
+    [STR_MSG_TRADE] = "用 %s 换 %s",
+    [STR_MSG_NOT_ENOUGH_ITEMS] = "物品不够！",
     [STR_MSG_BROKE] = "%s 坏了!",                         // %s 坏了!
     [STR_MSG_CRIT_HIT] = "暴击!",
 
@@ -834,7 +862,6 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_COBBLE] = "4砂砾 -> 4圆石",
     [STR_RECIPE_BED] = "6木板 -> 床",
     [STR_RECIPE_CRAFTING_TABLE] = "8木板 -> 合成台",
-    [STR_RECIPE_BREAD] = "8木板 -> 面包",
     [STR_RECIPE_APPLE] = "8树叶 -> 苹果",
     [STR_RECIPE_WOOD_HELMET] = "5木板 -> 木头盔",
     [STR_RECIPE_WOOD_CHEST] = "8木板 -> 木胸甲",
@@ -934,6 +961,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Missing messages
     [STR_MSG_NO_ARROWS] = "没有箭！",
     [STR_DEATH_LAVA] = " 在岩浆中游泳了",
+    [STR_DEATH_CACTUS] = " 被仙人掌扎死了",
 
     // Ender pearl
     [STR_MSG_ENDER_PEARL] = "已传送！",
@@ -944,6 +972,27 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_CAULDRON_FILLED] = "炼药锅已装满！",
     [STR_MSG_CAULDRON_EMPTY] = "炼药锅已倒空！",
     [STR_MSG_CAULDRON_DRINK] = "从炼药锅喝了水",
+    [STR_BLOCK_OAK_STAIRS] = "橡木楼梯",
+    [STR_BLOCK_COBBLESTONE_STAIRS] = "圆石楼梯",
+    [STR_BLOCK_STONE_BRICKS] = "石砖",
+    [STR_BLOCK_CHISELED_STONE_BRICKS] = "錾制石砖",
+    [STR_BLOCK_OAK_SLAB] = "橡木台阶",
+    [STR_BLOCK_COBBLESTONE_SLAB] = "圆石台阶",
+    [STR_RECIPE_OAK_STAIRS] = "4 木板 -> 4 橡木楼梯",
+    [STR_RECIPE_COBBLESTONE_STAIRS] = "4 圆石 -> 4 圆石楼梯",
+    [STR_RECIPE_STONE_BRICKS] = "4 石头 -> 4 石砖",
+    [STR_RECIPE_CHISELED_STONE_BRICKS] = "2 石砖台阶 -> 錾制石砖",
+    [STR_RECIPE_OAK_SLAB] = "3 木板 -> 6 橡木台阶",
+    [STR_RECIPE_COBBLESTONE_SLAB] = "3 圆石 -> 6 圆石台阶",
+    [STR_BLOCK_CACTUS] = "仙人掌",
+    [STR_BLOCK_SUGAR_CANE] = "甘蔗",
+    [STR_ITEM_PAPER] = "纸",
+    [STR_ITEM_BOOK] = "书",
+    [STR_ITEM_SUGAR] = "糖",
+    [STR_RECIPE_PAPER] = "3 甘蔗 -> 3 纸",
+    [STR_RECIPE_BOOK] = "2 纸 + 1 皮革 -> 1 书",
+    [STR_RECIPE_SUGAR] = "1 甘蔗 -> 1 糖",
+    [STR_MSG_CACTUS_DAMAGE] = "哎哟！仙人掌扎手！",
     [STR_TYPE_TOOL] = "工具",
     [STR_TYPE_ARMOR] = "盔甲",
     [STR_TYPE_FOOD] = "食物",
@@ -969,6 +1018,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BREAD] = "面包",
     [STR_RECIPE_HAY_BALE] = "干草块",
     [STR_RECIPE_FISHING_ROD] = "3根木棒+2根线 -> 钓鱼竿",
+    [STR_RECIPE_MOSSY_COBBLESTONE] = "圆石 -> 苔石砖",
+    [STR_RECIPE_COARSE_DIRT] = "2泥土 -> 2粗泥",
 
     // New mob deaths
     [STR_DEATH_MOB_COW] = "被牛踢死了",
@@ -1152,6 +1203,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_HUNGRY] = "腹が空いた!",        // 腹が空いた!
     [STR_MSG_STARVING] = "餓死!",                          // 餓死!
     [STR_MSG_ATE] = "%sを食べた (+%d満腹度)",  // %sを食べた (+%d満腹度)
+    [STR_MSG_TRADE] = "%sと%sを交換した",
+    [STR_MSG_NOT_ENOUGH_ITEMS] = "アイテムが足りない！",
     [STR_MSG_BROKE] = "%sが壊れた!",              // %sが壊れた!
     [STR_MSG_CRIT_HIT] = "会心の一撃!",
 
@@ -1313,7 +1366,6 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_COBBLE] = "砂利×4 -> コブル×4",
     [STR_RECIPE_BED] = "板×6 -> ベッド",
     [STR_RECIPE_CRAFTING_TABLE] = "板×8 -> クラフティングテーブル",
-    [STR_RECIPE_BREAD] = "板×8 -> パン",
     [STR_RECIPE_APPLE] = "葉×8 -> リンゴ",
     [STR_RECIPE_WOOD_HELMET] = "板×5 -> 木のヘルメット",
     [STR_RECIPE_WOOD_CHEST] = "板×8 -> 木のチェスト",
@@ -1413,6 +1465,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Missing messages
     [STR_MSG_NO_ARROWS] = "矢がありません！",
     [STR_DEATH_LAVA] = "は溶岩で泳ごうとした",
+    [STR_DEATH_CACTUS] = "はサボテンに刺された",
 
     // Ender pearl
     [STR_MSG_ENDER_PEARL] = "テレポート！",
@@ -1423,6 +1476,27 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_CAULDRON_FILLED] = "大釜が満たされた！",
     [STR_MSG_CAULDRON_EMPTY] = "大釜を空にした！",
     [STR_MSG_CAULDRON_DRINK] = "大釜から水を飲んだ",
+    [STR_BLOCK_OAK_STAIRS] = "オークの階段",
+    [STR_BLOCK_COBBLESTONE_STAIRS] = "コブルストーンの階段",
+    [STR_BLOCK_STONE_BRICKS] = "石レンガ",
+    [STR_BLOCK_CHISELED_STONE_BRICKS] = "模様入りの石レンガ",
+    [STR_BLOCK_OAK_SLAB] = "オークのハーフブロック",
+    [STR_BLOCK_COBBLESTONE_SLAB] = "コブルストーンのハーフブロック",
+    [STR_RECIPE_OAK_STAIRS] = "4 木材 -> 4 オークの階段",
+    [STR_RECIPE_COBBLESTONE_STAIRS] = "4 コブルストーン -> 4 コブルストーンの階段",
+    [STR_RECIPE_STONE_BRICKS] = "4 石 -> 4 石レンガ",
+    [STR_RECIPE_CHISELED_STONE_BRICKS] = "2 石レンガハーフブロック -> 模様入りの石レンガ",
+    [STR_RECIPE_OAK_SLAB] = "3 木材 -> 6 オークのハーフブロック",
+    [STR_RECIPE_COBBLESTONE_SLAB] = "3 コブルストーン -> 6 コブルストーンのハーフブロック",
+    [STR_BLOCK_CACTUS] = "サボテン",
+    [STR_BLOCK_SUGAR_CANE] = "サトウキビ",
+    [STR_ITEM_PAPER] = "紙",
+    [STR_ITEM_BOOK] = "本",
+    [STR_ITEM_SUGAR] = "砂糖",
+    [STR_RECIPE_PAPER] = "3 サトウキビ -> 3 紙",
+    [STR_RECIPE_BOOK] = "2 紙 + 1 革 -> 1 本",
+    [STR_RECIPE_SUGAR] = "1 サトウキビ -> 1 砂糖",
+    [STR_MSG_CACTUS_DAMAGE] = "痛い！サボテンが刺さった！",
     [STR_TYPE_TOOL] = "道具",
     [STR_TYPE_ARMOR] = "防具",
     [STR_TYPE_FOOD] = "食べ物",
@@ -1448,6 +1522,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_RECIPE_BREAD] = "パン",
     [STR_RECIPE_HAY_BALE] = "干草の俵",
     [STR_RECIPE_FISHING_ROD] = "棒3本+糸2本 -> 釣り竿",
+    [STR_RECIPE_MOSSY_COBBLESTONE] = "丸石 -> 苔むした丸石",
+    [STR_RECIPE_COARSE_DIRT] = "土2つ -> 粗い土",
 
     // New mob deaths
     [STR_DEATH_MOB_COW] = "は牛に蹴られた",

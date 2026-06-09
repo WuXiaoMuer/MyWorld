@@ -833,14 +833,21 @@ void PlayerBlockInteraction(void)
         BlockType bt = (BlockType)world[blockX][blockY];
         if (bt != BLOCK_AIR && bt != BLOCK_WATER && blockInfo[bt].breakable) {
             // Reset progress if target changed
+            static float lastParticleThreshold = 0.0f;
             if (blockX != miningBlockX || blockY != miningBlockY) {
                 miningBlockX = blockX;
                 miningBlockY = blockY;
                 miningProgress = 0.0f;
+                lastParticleThreshold = 0.0f;
             }
             float dt = GetFrameTime();
             float baseMineTime = 0.4f; // seconds for bare hands
             miningProgress += (dt * toolSpeed) / baseMineTime;
+
+            if (miningProgress - lastParticleThreshold >= 0.15f) {
+                lastParticleThreshold += 0.15f;
+                SpawnMiningParticles(blockX, blockY, bt);
+            }
 
             if (miningProgress >= 1.0f) {
                 // Return furnace items before destroying
@@ -1367,7 +1374,7 @@ void PlayerBlockInteraction(void)
                 if (cauldrons[cdIdx].fillLevel >= 2) {
                     player.oxygen = MAX_OXYGEN;
                     cauldrons[cdIdx].fillLevel = 1;
-                    PlaySoundEat();
+                    PlaySoundDrink();
                     ShowMessage(S(STR_MSG_CAULDRON_DRINK), (Color){100, 200, 255, 255});
                     return;
                 }
@@ -1684,6 +1691,27 @@ void UpdatePlayerStatus(float dt)
             SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
                                  player.position.y + PLAYER_HEIGHT / 2,
                                  (Color){255, 150, 30, 255});
+        }
+    }
+
+    // --- Cactus damage ---
+    {
+        static float cactusTimer = 0.0f;
+        int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
+        int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_CACTUS) {
+            cactusTimer += dt;
+            if (cactusTimer >= 0.5f) {
+                cactusTimer = 0.0f;
+                player.health -= 1.0f;
+                if (player.health < 0) player.health = 0;
+                if (!player.netControlled) pendingDeathCause = STR_DEATH_CACTUS;
+                player.damageFlashTimer = 0.3f;
+                if (!player.netControlled && player.health > 0) PlaySoundHurt();
+                ShowMessage(S(STR_MSG_CACTUS_DAMAGE), (Color){80, 220, 80, 255});
+            }
+        } else {
+            cactusTimer = 0.0f;
         }
     }
 

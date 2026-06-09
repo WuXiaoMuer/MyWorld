@@ -43,6 +43,31 @@ void SpawnBlockParticles(int blockX, int blockY, BlockType block)
     }
 }
 
+void SpawnMiningParticles(int blockX, int blockY, BlockType block)
+{
+    Color c = blockInfo[block].baseColor;
+    float cx = blockX * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
+    float cy = blockY * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
+
+    for (int i = 0; i < 2; i++) {
+        Particle *p = FindInactive();
+        if (!p) break;
+        p->position = (Vector2){ cx + (rand() % 10 - 5), cy + (rand() % 10 - 5) };
+        p->velocity = (Vector2){
+            (float)(rand() % 120 - 60),
+            -(float)(rand() % 100 + 30)
+        };
+        p->color = c;
+        p->color.r = (unsigned char)(c.r * (0.6f + (rand() % 80) / 100.0f));
+        p->color.g = (unsigned char)(c.g * (0.6f + (rand() % 80) / 100.0f));
+        p->color.b = (unsigned char)(c.b * (0.6f + (rand() % 80) / 100.0f));
+        p->lifetime = 0.3f + (rand() % 50) / 200.0f;
+        p->maxLifetime = p->lifetime;
+        p->size = 1.5f + (rand() % 2);
+        p->active = true;
+    }
+}
+
 void SpawnDamageParticles(float x, float y, Color color)
 {
     for (int i = 0; i < 6; i++) {

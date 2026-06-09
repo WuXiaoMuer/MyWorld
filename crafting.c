@@ -116,6 +116,22 @@ void InitCraftingRecipes(void)
     // Slimeball recipes
     ADD_RECIPE(ITEM_SLIMEBALL, 2, ITEM_STRING, 3, STR_RECIPE_SLIMEBALL_STRING, false);
 
+    // Decorative blocks
+    ADD_RECIPE(BLOCK_COBBLESTONE, 1, BLOCK_MOSSY_COBBLESTONE, 1, STR_RECIPE_MOSSY_COBBLESTONE, false);
+    ADD_RECIPE(BLOCK_DIRT, 2, BLOCK_COARSE_DIRT, 2, STR_RECIPE_COARSE_DIRT, false);
+
+    // Stairs & Slabs & Stone Bricks
+    ADD_RECIPE(BLOCK_PLANKS, 4, BLOCK_OAK_STAIRS, 4, STR_RECIPE_OAK_STAIRS, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 4, BLOCK_COBBLESTONE_STAIRS, 4, STR_RECIPE_COBBLESTONE_STAIRS, false);
+    ADD_RECIPE(BLOCK_STONE, 4, BLOCK_STONE_BRICKS, 4, STR_RECIPE_STONE_BRICKS, false);
+    ADD_RECIPE(BLOCK_PLANKS, 3, BLOCK_OAK_SLAB, 6, STR_RECIPE_OAK_SLAB, false);
+    ADD_RECIPE(BLOCK_COBBLESTONE, 3, BLOCK_COBBLESTONE_SLAB, 6, STR_RECIPE_COBBLESTONE_SLAB, false);
+
+    // Plants & items
+    ADD_RECIPE(BLOCK_SUGAR_CANE, 1, ITEM_SUGAR, 1, STR_RECIPE_SUGAR, false);
+    ADD_RECIPE(BLOCK_SUGAR_CANE, 3, ITEM_PAPER, 3, STR_RECIPE_PAPER, false);
+    ADD_RECIPE(ITEM_LEATHER, 3, ITEM_BOOK, 1, STR_RECIPE_BOOK, true);
+
     #undef ADD_RECIPE
 }
 
@@ -434,6 +450,24 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 
         // Recipe name
         DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){150, 145, 160, 220});
+
+        // Max craftable count
+        if (canCraft && r->inputCount > 0) {
+            int have = 0;
+            for (int s = 0; s < INVENTORY_SLOTS; s++) {
+                if (player.inventory[s] == r->input) have += player.inventoryCount[s];
+            }
+            int maxCraft = have / r->inputCount;
+            if (maxCraft > 0) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "x%d", maxCraft);
+                int bw = MeasureGameTextWidth(buf, 9) + 6;
+                int bx = panelX + panelW - bw - 8;
+                DrawRectangle(bx, textY - 1, bw, 14, (Color){40, 90, 40, 200});
+                DrawRectangleLines(bx, textY - 1, bw, 14, (Color){60, 140, 60, 180});
+                DrawGameText(buf, bx + 3, textY, 9, (Color){160, 255, 160, 220});
+            }
+        }
     }
 
     // Scrollbar
@@ -737,9 +771,9 @@ void DrawTradeUI(void)
                 // Add receive items
                 AddToInventoryCount((BlockType)trades[i].receiveItem, trades[i].receiveCount);
                 PlaySoundCraft();
-                ShowMessage(Sf(STR_MSG_ATE, GetBlockName((BlockType)trades[i].receiveItem), trades[i].receiveCount), (Color){100, 255, 100, 255});
+                ShowMessage(Sf(STR_MSG_TRADE, GetBlockName((BlockType)trades[i].giveItem), GetBlockName((BlockType)trades[i].receiveItem)), (Color){100, 255, 100, 255});
             } else {
-                ShowMessage(S(STR_MSG_NOT_ENOUGH_XP), (Color){240, 80, 80, 255});
+                ShowMessage(S(STR_MSG_NOT_ENOUGH_ITEMS), (Color){240, 80, 80, 255});
             }
         }
     }

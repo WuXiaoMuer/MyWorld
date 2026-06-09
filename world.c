@@ -171,7 +171,20 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Raw Fish",         {160,180,200,255}, {130,150,170,255}, false, false, false},
     {"Cooked Fish",      {180,120,80,255},  {150,100,60,255},  false, false, false},
     // Cauldron
-    {"Cauldron",         {100,95,110,255},  {80,75,90,255},    true,  false, true},
+    {"Cauldron",               {100,95,110,255},  {80,75,90,255},    true,  false, true},
+    // Decorative blocks
+    {"Oak Stairs",             {140,110,70,255},  {120,90,50,255},   true,  false, true},
+    {"Cobblestone Stairs",     {100,100,100,255}, {80,80,80,255},    true,  false, true},
+    {"Stone Bricks",           {115,115,120,255}, {95,95,100,255},   true,  false, true},
+    {"Chiseled Stone Bricks",  {115,115,120,255}, {130,110,70,255},  true,  false, true},
+    {"Oak Slab",               {140,110,70,255},  {120,90,50,255},   true,  false, true},
+    {"Cobblestone Slab",       {100,100,100,255}, {80,80,80,255},    true,  false, true},
+    // New plants & items
+    {"Cactus",                 {50,180,50,255},   {30,140,30,255},   true,  false, true},
+    {"Sugar Cane",             {80,200,50,255},   {60,160,35,255},   false, true,  true},
+    {"Paper",                  {230,225,210,255}, {200,195,180,255},  false, false, false},
+    {"Book",                   {180,120,60,255},  {150,100,50,255},  false, false, false},
+    {"Sugar",                  {240,235,230,255}, {200,195,190,255},  false, false, false},
 };
 
 //----------------------------------------------------------------------------------
@@ -2094,6 +2107,127 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
         break;
     }
 
+    // Oak Stairs: sawtooth pattern
+    case BLOCK_OAK_STAIRS: {
+        for (int y = 0; y < 16; y++) {
+            int step = 15 - y;
+            for (int x = step; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 90);
+                Color c = base;
+                if (h % 5 == 0) c = detail;
+                else if (h % 9 == 0) c = (Color){(unsigned char)(base.r + 20), (unsigned char)(base.g + 15), (unsigned char)(base.b + 10), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        }
+        break;
+    }
+
+    // Cobblestone Stairs: sawtooth with cobblestone texture
+    case BLOCK_COBBLESTONE_STAIRS: {
+        for (int y = 0; y < 16; y++) {
+            int step = 15 - y;
+            for (int x = step; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 33);
+                Color c = (h % 2 == 0) ? base : detail;
+                if (h % 7 == 0) c = (Color){(unsigned char)(base.r + 15), (unsigned char)(base.g + 10), (unsigned char)(base.b + 10), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        }
+        break;
+    }
+
+    // Stone Bricks: grid pattern
+    case BLOCK_STONE_BRICKS: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 45);
+                Color c = base;
+                bool edge = (x % 8 == 0 || y % 8 == 0 || x == 15 || y == 15);
+                if (edge) c = detail;
+                else if (h % 7 == 0) c = (Color){(unsigned char)(base.r + 10), (unsigned char)(base.g + 10), (unsigned char)(base.b + 15), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
+    // Chiseled Stone Bricks: ornate carved pattern
+    case BLOCK_CHISELED_STONE_BRICKS: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 67);
+                Color c = base;
+                bool border = (x < 2 || x >= 14 || y < 2 || y >= 14);
+                bool innerBorder = (x >= 4 && x < 12 && y >= 4 && y < 12 && (x == 4 || x == 11 || y == 4 || y == 11));
+                if (border) c = detail;
+                else if (innerBorder) c = (Color){(unsigned char)(detail.r), (unsigned char)(detail.g), (unsigned char)(detail.b + 15), 255};
+                else if (h % 5 == 0) c = (Color){(unsigned char)(base.r + 15), (unsigned char)(base.g + 15), (unsigned char)(base.b + 20), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
+    // Oak Slab: half-height block
+    case BLOCK_OAK_SLAB: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 12);
+                bool bottomHalf = (y >= 8);
+                if (!bottomHalf) { ImageDrawPixel(img, px + x, py + y, (Color){0,0,0,0}); continue; }
+                Color c = base;
+                if (h % 5 == 0) c = detail;
+                else if (h % 9 == 0) c = (Color){(unsigned char)(base.r + 20), (unsigned char)(base.g + 15), (unsigned char)(base.b + 10), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
+    // Cobblestone Slab: half-height with stone texture
+    case BLOCK_COBBLESTONE_SLAB: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 27);
+                bool bottomHalf = (y >= 8);
+                if (!bottomHalf) { ImageDrawPixel(img, px + x, py + y, (Color){0,0,0,0}); continue; }
+                Color c = (h % 2 == 0) ? base : detail;
+                if (h % 7 == 0) c = (Color){(unsigned char)(base.r + 15), (unsigned char)(base.g + 10), (unsigned char)(base.b + 10), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
+    // Cactus: green block with spikes
+    case BLOCK_CACTUS: {
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 55);
+                Color c = base;
+                bool spike = ((x == 0 || x == 15) && (h % 3 == 0)) ||
+                             ((y == 0 || y == 15) && (x >= 6 && x <= 9 && h % 2 == 0));
+                if (spike) c = (Color){(unsigned char)(base.r + 40), (unsigned char)(base.g + 30), (unsigned char)(base.b + 20), 255};
+                else if (h % 7 == 0) c = detail;
+                else if (h % 11 == 0) c = (Color){(unsigned char)(base.r + 10), (unsigned char)(base.g + 15), (unsigned char)(base.b + 5), 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
+    // Sugar Cane: tall green stalk
+    case BLOCK_SUGAR_CANE: {
+        for (int y = 0; y < 16; y++) {
+            unsigned int h = hash2D(worldX * 16 + 3, y, 77);
+            ImageDrawPixel(img, px + 6, py + y, base);
+            ImageDrawPixel(img, px + 7, py + y, detail);
+            ImageDrawPixel(img, px + 8, py + y, (Color){(unsigned char)(base.r - 10), (unsigned char)(base.g + 5), (unsigned char)(base.b - 5), 255});
+            if (h % 3 == 0) ImageDrawPixel(img, px + 9, py + y - 1, (Color){(unsigned char)(base.r + 20), (unsigned char)(base.g + 15), (unsigned char)(base.b + 5), 255});
+        }
+        for (int y = 3; y < 13; y += 4)
+            for (int x = 3; x < 12; x++) {
+                unsigned int h = hash2D(x, y + worldY * 16, 33);
+                if (h % 2 == 0) ImageDrawPixel(img, px + x, py + y, (Color){(unsigned char)(base.r + 15), (unsigned char)(base.g + 10), (unsigned char)(base.b + 5), 255});
+            }
+        break;
+    }
+
     // Generic item rendering for any remaining items
     default:
         for (int y = 0; y < 16; y++)
@@ -3299,8 +3433,11 @@ void GenerateWorld(unsigned int seed)
 
             unsigned int h = hash2D(x, y, seed + 6000);
             switch (biome) {
-                case 1: // Desert: sparse tall grass
+                case 1: // Desert: sparse tall grass, cactus
                     if (h % 30 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    else if (h % 50 == 0 && world[x - 1][y] == BLOCK_SAND &&
+                             world[x + 1][y] == BLOCK_SAND && y > SEA_LEVEL + 2)
+                        world[x][y - 1] = BLOCK_CACTUS;
                     break;
                 case 2: // Forest: more flowers and grass
                     if (h % 12 == 0) world[x][y - 1] = BLOCK_FLOWER;
@@ -3328,6 +3465,41 @@ void GenerateWorld(unsigned int seed)
                     else if (h % 8 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
                     break;
             }
+        }
+    }
+
+    // ============================================================
+    // Pass 12b: Sugar cane near water (warm biomes)
+    // ============================================================
+    for (int x = 2; x < WORLD_WIDTH - 2; x++) {
+        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
+        int biome = 0;
+        if (biomeNoise > 0.55f) biome = 1;       // desert
+        else if (biomeNoise > 0.35f) biome = 6;   // taiga
+        else if (biomeNoise > 0.15f) biome = 0;   // plains
+        else if (biomeNoise > -0.05f) biome = 4;  // swamp
+        else if (biomeNoise > -0.25f) biome = 2;  // forest
+        else if (biomeNoise > -0.45f) biome = 5;  // jungle
+        else biome = 3;                            // tundra
+
+        if (biome == 3) continue; // No sugar cane in tundra
+
+        for (int y = 1; y < SEA_LEVEL + 6 && y < WORLD_HEIGHT - 1; y++) {
+            if (world[x][y] != BLOCK_AIR) continue;
+            // Must have sand or grass below
+            uint8_t below = world[x][y - 1];
+            if (below != BLOCK_SAND && below != BLOCK_GRASS && below != BLOCK_MUD) continue;
+            // Must have water nearby
+            bool hasWater = false;
+            for (int dx = -1; dx <= 1 && !hasWater; dx++)
+                for (int dy = 0; dy <= 1 && !hasWater; dy++) {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT && world[nx][ny] == BLOCK_WATER)
+                        hasWater = true;
+                }
+            if (!hasWater) continue;
+            unsigned int h = hash2D(x, y, seed + 7000);
+            if (h % 12 == 0) world[x][y] = BLOCK_SUGAR_CANE;
         }
     }
 

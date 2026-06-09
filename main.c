@@ -319,7 +319,7 @@ int craftRecipeCount = 0;
 
 // Sound globals
 Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
-Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
+Sound sndHurt, sndDeath, sndEat, sndDrink, sndClick, sndCraft, sndXP, sndDrop;
 Sound sndFootstep, sndZombie, sndPig, sndSplash, sndVillager;
 Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
 Sound sndRain, sndCreeperFuse, sndThunder;

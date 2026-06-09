@@ -8,6 +8,8 @@
 #pragma GCC diagnostic ignored "-Wdouble-promotion"
 #include <string.h>
 
+static const char* GetEnchantName(EnchantmentType type);
+
 //----------------------------------------------------------------------------------
 // Smooth hover animation system
 //----------------------------------------------------------------------------------
@@ -1251,10 +1253,28 @@ void DrawInventoryScreen(void)
                     snprintf(info, sizeof(info), S(STR_TOOLTIP_ARMOR), armorVal, pct);
                     int iw = MeasureGameTextWidth(info,13);
                     if (iw > tw) tw = iw;
+
+                    uint16_t aEnch = player.armorEnchantments[i];
+                    char enchBuf[32] = {0};
+                    if (ENCH_TYPE(aEnch) != ENCH_NONE) {
+                        snprintf(enchBuf, sizeof(enchBuf), "%s %d",
+                            GetEnchantName((EnchantmentType)ENCH_TYPE(aEnch)),
+                            ENCH_LEVEL(aEnch));
+                        int ew = MeasureGameTextWidth(enchBuf, 12);
+                        if (ew > tw) tw = ew;
+                    }
+
                     ty += 16;
                     DrawRectangle(tx - 4, ty - 2, tw + 8, 15, (Color){20, 18, 25, 230});
                     DrawRectangleLines(tx - 4, ty - 2, tw + 8, 15, (Color){80, 75, 90, 200});
                     DrawGameText(info, tx, ty,13, (Color){180, 200, 180, 255});
+
+                    if (enchBuf[0]) {
+                        ty += 16;
+                        DrawRectangle(tx - 4, ty - 2, tw + 8, 15, (Color){25, 22, 35, 230});
+                        DrawRectangleLines(tx - 4, ty - 2, tw + 8, 15, (Color){80, 60, 110, 200});
+                        DrawGameText(enchBuf, tx, ty, 12, (Color){180, 120, 255, 255});
+                    }
                 }
             }
         }
@@ -1619,8 +1639,19 @@ void DrawInventoryScreen(void)
                     int infoW = info[0] ? MeasureGameTextWidth(info, 13) : 0;
                     if (infoW > maxW) maxW = infoW;
 
+                    // Enchantment info
+                    uint16_t ench = player.itemEnchantments[idx];
+                    char enchBuf[32] = {0};
+                    if (ENCH_TYPE(ench) != ENCH_NONE) {
+                        snprintf(enchBuf, sizeof(enchBuf), "%s %d",
+                            GetEnchantName((EnchantmentType)ENCH_TYPE(ench)),
+                            ENCH_LEVEL(ench));
+                        int enchW = MeasureGameTextWidth(enchBuf, 12);
+                        if (enchW > maxW) maxW = enchW;
+                    }
+
                     // Tooltip background (multi-line)
-                    int ttH = 36 + (info[0] ? 16 : 0);
+                    int ttH = 36 + (info[0] ? 16 : 0) + (enchBuf[0] ? 16 : 0);
                     DrawRectangle(tx - 3, ty - 1, maxW + 10, ttH + 2, (Color){0, 0, 0, 60});
                     DrawRectangle(tx - 4, ty - 2, maxW + 10, ttH + 2, (Color){25, 22, 32, 240});
                     DrawRectangleLines(tx - 4, ty - 2, maxW + 10, ttH + 2, (Color){90, 85, 110, 220});
@@ -1633,6 +1664,12 @@ void DrawInventoryScreen(void)
                     // Info line
                     if (info[0]) {
                         DrawGameText(info, tx, ty + 30, 13, (Color){180, 200, 180, 255});
+                    }
+
+                    // Enchantment line
+                    if (enchBuf[0]) {
+                        int ety = ty + 30 + (info[0] ? 16 : 0);
+                        DrawGameText(enchBuf, tx, ety, 12, (Color){180, 120, 255, 255});
                     }
                 }
             }
@@ -2226,11 +2263,26 @@ void DrawHotbar(void)
     int selItem = player.inventory[player.selectedSlot];
     if (selItem != BLOCK_AIR && selItem < BLOCK_COUNT) {
         const char *selName = GetBlockName((BlockType)selItem);
+        uint16_t selEnch = player.itemEnchantments[player.selectedSlot];
+        bool hasEnchant = ENCH_TYPE(selEnch) != ENCH_NONE;
+        char enchBuf[32] = {0};
+        int enchW = 0;
+        if (hasEnchant) {
+            int etype = ENCH_TYPE(selEnch);
+            int elvl = ENCH_LEVEL(selEnch);
+            snprintf(enchBuf, sizeof(enchBuf), "%s %d", GetEnchantName((EnchantmentType)etype), elvl);
+            enchW = MeasureGameTextWidth(enchBuf, 11);
+        }
         int selW = MeasureGameTextWidth(selName, 13);
-        int selX = (SCREEN_WIDTH - selW) / 2;
+        int maxW = (enchW > selW) ? enchW : selW;
+        int selX = (SCREEN_WIDTH - maxW) / 2;
         int selY = startY - 18;
-        DrawRectangle(selX - 4, selY - 2, selW + 8, 16, (Color){25, 22, 32, 180});
+        int h = hasEnchant ? 32 : 16;
+        DrawRectangle(selX - 4, selY - 2, maxW + 8, h, (Color){25, 22, 32, 180});
         DrawGameText(selName, selX, selY, 13, (Color){220, 215, 240, 200});
+        if (hasEnchant) {
+            DrawGameText(enchBuf, selX, selY + 16, 11, (Color){180, 120, 255, 200});
+        }
     }
 }
 
@@ -2370,22 +2422,29 @@ void DrawCrosshair(void)
         DrawRectangleLines((int)px - 1, (int)py - 1, BLOCK_SIZE + 2, BLOCK_SIZE + 2, (Color){0, 0, 0, 120});
         DrawRectangleLines((int)px, (int)py, BLOCK_SIZE, BLOCK_SIZE, (Color){255, 255, 255, 200});
 
-        // Mining progress bar (color by tool effectiveness)
+        // Mining progress arc (circular ring around crosshair)
         if (progress > 0.0f) {
-            int barW = BLOCK_SIZE + 4;
-            int barH = 4;
-            int barX = (int)px - 2;
-            int barY = (int)py - 8;
-            // Determine bar color from mining speed
+            Vector2 center = { px + BLOCK_SIZE / 2.0f, py + BLOCK_SIZE / 2.0f };
+            float innerR = BLOCK_SIZE * 0.38f;
+            float outerR = BLOCK_SIZE * 0.48f;
+            int segs = 24;
+            Color bgRing = { 0, 0, 0, 100 };
+            DrawRing(center, innerR, outerR, 0, 360, segs, bgRing);
             BlockType heldTool = (BlockType)player.inventory[player.selectedSlot];
             BlockType minedBlock = (BlockType)world[mBlockX][mBlockY];
             float speed = GetToolMiningSpeed(heldTool, minedBlock);
-            Color barColor;
-            if (speed >= 3.0f) barColor = (Color){60, 220, 60, 240};       // green: fast
-            else if (speed >= 2.0f) barColor = (Color){200, 200, 60, 240}; // yellow: ok
-            else barColor = (Color){200, 80, 60, 240};                      // red: slow
-            DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, 200});
-            DrawRectangle(barX + 1, barY + 1, (int)((barW - 2) * progress), barH - 2, barColor);
+            Color arcColor;
+            if (speed >= 3.0f) arcColor = (Color){60, 220, 60, 240};
+            else if (speed >= 2.0f) arcColor = (Color){200, 200, 60, 240};
+            else arcColor = (Color){200, 80, 60, 240};
+            float startAngle = -90.0f;
+            float endAngle = startAngle + 360.0f * progress;
+            DrawRing(center, innerR, outerR, startAngle, endAngle, segs, arcColor);
+            // Thin white outline on leading edge
+            float rad = (innerR + outerR) * 0.5f;
+            float radA = endAngle * DEG2RAD;
+            Vector2 tip = { center.x + cosf(radA) * rad, center.y + sinf(radA) * rad };
+            DrawCircleV(tip, 2.0f, (Color){255, 255, 255, 200});
         }
     }
 }

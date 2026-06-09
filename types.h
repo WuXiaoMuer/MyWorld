@@ -414,6 +414,19 @@ typedef enum {
     ITEM_COOKED_FISH,
     // Cauldron
     BLOCK_CAULDRON,
+    // Decorative blocks
+    BLOCK_OAK_STAIRS,
+    BLOCK_COBBLESTONE_STAIRS,
+    BLOCK_STONE_BRICKS,
+    BLOCK_CHISELED_STONE_BRICKS,
+    BLOCK_OAK_SLAB,
+    BLOCK_COBBLESTONE_SLAB,
+    // New plants & items
+    BLOCK_CACTUS,
+    BLOCK_SUGAR_CANE,
+    ITEM_PAPER,
+    ITEM_BOOK,
+    ITEM_SUGAR,
     BLOCK_COUNT
 } BlockType;
 
@@ -632,6 +645,8 @@ typedef enum {
     STR_MSG_HUNGRY,
     STR_MSG_STARVING,
     STR_MSG_ATE,
+    STR_MSG_TRADE,
+    STR_MSG_NOT_ENOUGH_ITEMS,
     STR_MSG_BROKE,
 
     // Tooltips
@@ -926,6 +941,7 @@ typedef enum {
     // Missing messages
     STR_MSG_NO_ARROWS,
     STR_DEATH_LAVA,
+    STR_DEATH_CACTUS,
 
     // Ender pearl
     STR_MSG_ENDER_PEARL,
@@ -943,6 +959,8 @@ typedef enum {
     STR_RECIPE_GOLD_HOE,
     STR_RECIPE_DIAMOND_HOE,
     STR_RECIPE_HAY_BALE,
+    STR_RECIPE_MOSSY_COBBLESTONE,
+    STR_RECIPE_COARSE_DIRT,
     // Fishing
     STR_ITEM_FISHING_ROD,
     STR_ITEM_RAW_FISH,
@@ -957,6 +975,29 @@ typedef enum {
     STR_MSG_CAULDRON_FILLED,
     STR_MSG_CAULDRON_EMPTY,
     STR_MSG_CAULDRON_DRINK,
+    // Decorative blocks
+    STR_BLOCK_OAK_STAIRS,
+    STR_BLOCK_COBBLESTONE_STAIRS,
+    STR_BLOCK_STONE_BRICKS,
+    STR_BLOCK_CHISELED_STONE_BRICKS,
+    STR_BLOCK_OAK_SLAB,
+    STR_BLOCK_COBBLESTONE_SLAB,
+    STR_RECIPE_OAK_STAIRS,
+    STR_RECIPE_COBBLESTONE_STAIRS,
+    STR_RECIPE_STONE_BRICKS,
+    STR_RECIPE_CHISELED_STONE_BRICKS,
+    STR_RECIPE_OAK_SLAB,
+    STR_RECIPE_COBBLESTONE_SLAB,
+    // New plants & items
+    STR_BLOCK_CACTUS,
+    STR_BLOCK_SUGAR_CANE,
+    STR_ITEM_PAPER,
+    STR_ITEM_BOOK,
+    STR_ITEM_SUGAR,
+    STR_RECIPE_PAPER,
+    STR_RECIPE_BOOK,
+    STR_RECIPE_SUGAR,
+    STR_MSG_CACTUS_DAMAGE,
 
     STR_COUNT
 } StringId;
@@ -1326,7 +1367,7 @@ extern int confirmDialogSlot;
 extern int confirmDialogMode; // 0=overwrite, 1=delete
 
 extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
-extern Sound sndHurt, sndDeath, sndEat, sndClick, sndCraft, sndXP, sndDrop;
+extern Sound sndHurt, sndDeath, sndEat, sndDrink, sndClick, sndCraft, sndXP, sndDrop;
 extern Sound sndFootstep, sndZombie, sndPig, sndSplash, sndVillager;
 extern Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
 extern Sound sndRain, sndCreeperFuse, sndThunder;
@@ -1584,6 +1625,7 @@ void PlaySoundLand(void);
 void PlaySoundHurt(void);
 void PlaySoundDeath(void);
 void PlaySoundEat(void);
+void PlaySoundDrink(void);
 void PlaySoundUIClick(void);
 void PlaySoundCraft(void);
 void PlaySoundXP(void);
@@ -1605,6 +1647,7 @@ void SetBGMVolume(float volume);
 // particles.c
 void InitParticles(void);
 void SpawnBlockParticles(int blockX, int blockY, BlockType block);
+void SpawnMiningParticles(int blockX, int blockY, BlockType block);
 void SpawnDamageParticles(float x, float y, Color color);
 void SpawnSprintDust(float x, float y);
 void SpawnLandingDust(float x, float y, float intensity);
