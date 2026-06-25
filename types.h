@@ -129,7 +129,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        12
+#define SAVE_VERSION        13
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -427,6 +427,7 @@ typedef enum {
     ITEM_PAPER,
     ITEM_BOOK,
     ITEM_SUGAR,
+    BLOCK_TNT,          // explosive block; ignite by right-click or redstone
     BLOCK_COUNT
 } BlockType;
 
@@ -443,6 +444,8 @@ typedef struct {
     int x, y;
     uint8_t items[CHEST_SLOTS];
     int counts[CHEST_SLOTS];
+    int durability[CHEST_SLOTS];      // tool durability per slot (v13+)
+    uint16_t enchantments[CHEST_SLOTS]; // packed enchantment per slot (v13+)
 } ChestData;
 
 typedef struct {
@@ -494,6 +497,13 @@ typedef enum {
     STR_JOIN_TITLE,
     STR_JOIN_IP_HINT,
     STR_JOIN_CONNECTING,
+    STR_HOST_PLAYERS_COUNT,
+    STR_HOST_CANCEL_HINT,
+    STR_JOIN_HELP_HINT,
+    STR_OPEN_TO_LAN,
+    STR_LAN_OPENED,
+    STR_LAN_STATUS,
+    STR_LAN_FAILED,
     STR_OCCUPIED,
     STR_EMPTY_NEW,
     STR_EMPTY_LOAD,
@@ -999,6 +1009,8 @@ typedef enum {
     STR_ITEM_PAPER,
     STR_ITEM_BOOK,
     STR_ITEM_SUGAR,
+    STR_BLOCK_TNT,
+    STR_RECIPE_TNT,
     STR_RECIPE_PAPER,
     STR_RECIPE_BOOK,
     STR_RECIPE_SUGAR,
@@ -1504,6 +1516,13 @@ bool IsRedstoneLampPowered(int bx, int by);
 void RegisterPressurePlate(int bx, int by);
 void UnregisterPressurePlate(int bx, int by);
 void RebuildPressurePlateList(void);
+void RegisterCrop(int bx, int by);
+void RebuildCropList(void);
+// TNT explosives
+void InitPrimedTnt(void);
+void PrimeTnt(int bx, int by);
+void UpdatePrimedTnt(float dt);
+void ExplodeAt(float worldX, float worldY, int radius);
 
 // light.c
 void InitLightMap(void);

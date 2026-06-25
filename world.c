@@ -185,6 +185,7 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Paper",                  {230,225,210,255}, {200,195,180,255},  false, false, false},
     {"Book",                   {180,120,60,255},  {150,100,50,255},  false, false, false},
     {"Sugar",                  {240,235,230,255}, {200,195,190,255},  false, false, false},
+    {"TNT",                    {200,50,40,255},   {235,90,70,255},   true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -1915,6 +1916,28 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case BLOCK_TNT:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                // Red explosive body with a white "TNT" band across the middle
+                Color c = base;
+                if ((x + y) % 7 == 0) c = detail;            // subtle speckle
+                if (y >= 6 && y <= 9) {
+                    c = (Color){235, 235, 225, 255};          // white label band
+                    // crude "TNT" lettering in dark red
+                    bool letter =
+                        (x == 2 || x == 4) || (x == 3 && y == 6) ||                 // T
+                        (x == 6 && y >= 6 && y <= 9) || (x == 8 && y >= 6 && y <= 9) || // N sides
+                        (x == 7 && (y == 7 || y == 8)) ||                            // N diagonal
+                        (x == 11 || x == 13) || (x == 12 && y == 6);                 // T
+                    if (letter) c = (Color){150, 30, 25, 255};
+                }
+                // Dark banding top and bottom edges
+                if (y == 0 || y == 15) c = (Color){120, 30, 25, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     // Animal drop items (small icons)
     case ITEM_RAW_BEEF:
     case ITEM_COOKED_BEEF:
@@ -2552,12 +2575,18 @@ static int pressurePlatesX[MAX_PRESSURE_PLATES];
 static int pressurePlatesY[MAX_PRESSURE_PLATES];
 static int pressurePlateCount;
 
+#define MAX_CROP_CELLS 8192
+static int cropCellsX[MAX_CROP_CELLS];
+static int cropCellsY[MAX_CROP_CELLS];
+static int cropCellCount;
+
 void InitRedstone(void)
 {
     memset(redstonePower, 0, sizeof(redstonePower));
     memset(leverState, 0, sizeof(leverState));
     memset(cropGrowth, 0, sizeof(cropGrowth));
     pressurePlateCount = 0;
+    cropCellCount = 0;
 }
 
 void RegisterPressurePlate(int bx, int by)
@@ -2591,6 +2620,37 @@ void RebuildPressurePlateList(void)
         for (int y = 0; y < WORLD_HEIGHT; y++) {
             if (world[x][y] == BLOCK_STONE_PRESSURE_PLATE) {
                 RegisterPressurePlate(x, y);
+            }
+        }
+    }
+}
+
+// Crop cell tracking — UpdateCrops iterates this list instead of scanning the
+// whole 2048x256 world every 5s. Cells are registered on creation (plant / world
+// gen / load-rescan); stale cells (broken, exploded, flooded) are pruned lazily
+// during the scan, so no explicit unregister is needed on every destruction path.
+void RegisterCrop(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    for (int i = 0; i < cropCellCount; i++) {
+        if (cropCellsX[i] == bx && cropCellsY[i] == by) return; // already tracked
+    }
+    if (cropCellCount < MAX_CROP_CELLS) {
+        cropCellsX[cropCellCount] = bx;
+        cropCellsY[cropCellCount] = by;
+        cropCellCount++;
+    }
+}
+
+void RebuildCropList(void)
+{
+    cropCellCount = 0;
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_CROPS && cropCellCount < MAX_CROP_CELLS) {
+                cropCellsX[cropCellCount] = x;
+                cropCellsY[cropCellCount] = y;
+                cropCellCount++;
             }
         }
     }
@@ -2756,40 +2816,49 @@ void UpdateCrops(float dt)
     cropGrowTimer = 0.0f;
 
     bool grew = false;
-    for (int x = 0; x < WORLD_WIDTH; x++) {
-        for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
-            if (world[x][y] != BLOCK_CROPS) continue;
-            if (cropGrowth[x][y] >= 7) continue; // Already mature
+    for (int idx = 0; idx < cropCellCount; idx++) {
+        int x = cropCellsX[idx];
+        int y = cropCellsY[idx];
 
-            // Check if on farmland
-            if (world[x][y - 1] != BLOCK_FARMLAND) continue;
+        // Lazy prune: cell is no longer a crop (broken / exploded / flooded) or
+        // out of the growable range -> swap-remove and re-check the swapped entry.
+        if (x < 0 || x >= WORLD_WIDTH || y < 1 || y >= WORLD_HEIGHT - 1 ||
+            world[x][y] != BLOCK_CROPS) {
+            cropCellsX[idx] = cropCellsX[cropCellCount - 1];
+            cropCellsY[idx] = cropCellsY[cropCellCount - 1];
+            cropCellCount--;
+            idx--;
+            continue;
+        }
 
-            // Check for water nearby (within 4 blocks)
-            bool hasWater = false;
-            for (int dx = -4; dx <= 4 && !hasWater; dx++) {
-                for (int dy = -4; dy <= 4 && !hasWater; dy++) {
-                    int nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
-                        if (world[nx][ny] == BLOCK_WATER) hasWater = true;
-                    }
+        if (cropGrowth[x][y] >= 7) continue;        // Already mature (kept in list)
+        if (world[x][y - 1] != BLOCK_FARMLAND) continue;
+
+        // Check for water nearby (within 4 blocks)
+        bool hasWater = false;
+        for (int dx = -4; dx <= 4 && !hasWater; dx++) {
+            for (int dy = -4; dy <= 4 && !hasWater; dy++) {
+                int nx = x + dx, ny = y + dy;
+                if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
+                    if (world[nx][ny] == BLOCK_WATER) hasWater = true;
                 }
             }
+        }
 
-            // Check for light above
-            uint8_t light = GetLightLevel(x, y - 1);
-            if (light < 8) continue;
+        // Check for light above
+        uint8_t light = GetLightLevel(x, y - 1);
+        if (light < 8) continue;
 
-            // Growth chance: base 30%, +30% if near water
-            int chance = 30;
-            if (hasWater) chance += 30;
+        // Growth chance: base 30%, +30% if near water
+        int chance = 30;
+        if (hasWater) chance += 30;
 
-            if (rand() % 100 < chance) {
-                cropGrowth[x][y]++;
-                // Crops get taller with growth; mark the chunk so its baked
-                // texture is regenerated with the new stage (see DrawBlockPattern).
-                InvalidateChunkAt(x, y);
-                grew = true;
-            }
+        if (rand() % 100 < chance) {
+            cropGrowth[x][y]++;
+            // Crops get taller with growth; mark the chunk so its baked
+            // texture is regenerated with the new stage (see DrawBlockPattern).
+            InvalidateChunkAt(x, y);
+            grew = true;
         }
     }
 
@@ -2797,6 +2866,138 @@ void UpdateCrops(float dt)
     // invalidated chunks now — otherwise DrawWorld would skip them for one
     // frame and the crop chunk would flicker. UpdateChunks() is idempotent.
     if (grew) UpdateChunks();
+}
+
+//----------------------------------------------------------------------------------
+// TNT Explosives
+//   Primed TNT blocks count down a fuse, then ExplodeAt(): destroy blocks in a
+//   radius, damage the player and mobs by distance falloff, and chain-detonate any
+//   TNT caught in the blast. ExplodeAt is intentionally separate from the creeper's
+//   inline explosion so this feature can't regress creeper behaviour.
+//----------------------------------------------------------------------------------
+#define MAX_PRIMED_TNT      64
+#define TNT_FUSE_TIME       2.0f
+#define TNT_EXPLODE_RADIUS  4
+#define TNT_DAMAGE          34
+static int   primedTntX[MAX_PRIMED_TNT];
+static int   primedTntY[MAX_PRIMED_TNT];
+static float primedTntFuse[MAX_PRIMED_TNT];
+static int   primedTntCount;
+
+void InitPrimedTnt(void)
+{
+    primedTntCount = 0;
+}
+
+void PrimeTnt(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    if (world[bx][by] != BLOCK_TNT) return;
+    for (int i = 0; i < primedTntCount; i++)
+        if (primedTntX[i] == bx && primedTntY[i] == by) return; // already counting down
+    if (primedTntCount >= MAX_PRIMED_TNT) return;
+    primedTntX[primedTntCount] = bx;
+    primedTntY[primedTntCount] = by;
+    primedTntFuse[primedTntCount] = TNT_FUSE_TIME;
+    primedTntCount++;
+    PlaySoundCreeperFuse();
+}
+
+void ExplodeAt(float worldX, float worldY, int radius)
+{
+    int cx = (int)(worldX) / BLOCK_SIZE;
+    int cy = (int)(worldY) / BLOCK_SIZE;
+    float blastPix = radius * BLOCK_SIZE * 1.2f;
+
+    // Destroy blocks within the radius; chain-prime any TNT caught in the blast.
+    for (int bx = cx - radius; bx <= cx + radius; bx++) {
+        for (int by = cy - radius; by <= cy + radius; by++) {
+            if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) continue;
+            float ddx = (float)((bx - cx) * BLOCK_SIZE);
+            float ddy = (float)((by - cy) * BLOCK_SIZE);
+            float rPix = (float)(radius * BLOCK_SIZE);
+            if (ddx * ddx + ddy * ddy > rPix * rPix) continue;
+            BlockType bt = (BlockType)world[bx][by];
+            if (bt == BLOCK_AIR || bt == BLOCK_BEDROCK) continue;
+            if (bt == BLOCK_TNT) { PrimeTnt(bx, by); continue; } // chain reaction
+            SpawnBlockParticles(bx, by, bt);
+            world[bx][by] = BLOCK_AIR;
+            NetSyncBlockChange(bx, by, BLOCK_AIR);
+            InvalidateChunkAt(bx, by);
+            UpdateLightAt(bx, by);
+        }
+    }
+    for (int bx = cx - radius; bx <= cx + radius; bx++)
+        if (bx >= 0 && bx < WORLD_WIDTH) ApplyGravityAt(bx, cy + radius);
+
+    // Damage the player with distance falloff + knockback.
+    float pcx = player.position.x + PLAYER_WIDTH / 2.0f;
+    float pcy = player.position.y + PLAYER_HEIGHT / 2.0f;
+    float pdx = pcx - worldX, pdy = pcy - worldY;
+    float pdist = sqrtf(pdx * pdx + pdy * pdy);
+    if (pdist < blastPix) {
+        int dmg = (int)(TNT_DAMAGE * (1.0f - pdist / blastPix));
+        if (gameDifficulty == DIFFICULTY_EASY) dmg = dmg * 3 / 4;
+        else if (gameDifficulty == DIFFICULTY_HARD) dmg = dmg * 3 / 2;
+        dmg = (int)(dmg * (1.0f - GetArmorDamageReduction()));
+        if (dmg > 0) {
+            player.health -= dmg;
+            if (player.health < 0) player.health = 0;
+            if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_CREEPER);
+            DamageArmor();
+            player.damageFlashTimer = 0.5f;
+            player.knockbackTimer = 0.3f;
+            player.velocity.x = (pdx < 0 ? 1.0f : -1.0f) * 300.0f;
+            player.velocity.y = -250.0f;
+            PlaySoundHurt();
+        }
+    }
+
+    // Damage nearby mobs.
+    for (int m = 0; m < MAX_MOBS; m++) {
+        if (!mobs[m].active || mobs[m].deathTimer > 0) continue;
+        float mcx = mobs[m].position.x + GetMobWidth(mobs[m].type) / 2.0f;
+        float mcy = mobs[m].position.y + GetMobHeight(mobs[m].type) / 2.0f;
+        float mdx = mcx - worldX, mdy = mcy - worldY;
+        float md = sqrtf(mdx * mdx + mdy * mdy);
+        if (md < blastPix) {
+            int dmg = (int)(TNT_DAMAGE * (1.0f - md / blastPix));
+            if (dmg > 0) DamageMob(&mobs[m], dmg);
+        }
+    }
+
+    // Visual flash + boom.
+    for (int p = 0; p < 24; p++) {
+        float angle = (float)(rand() % 628) / 100.0f;
+        float pd = 4.0f + (float)(rand() % (radius * 6));
+        SpawnDamageParticles(worldX + cosf(angle) * pd, worldY + sinf(angle) * pd,
+                             (Color){255, 150, 50, 255});
+    }
+    TriggerCameraShake(11.0f, 0.6f);
+    PlaySoundThunder();
+}
+
+void UpdatePrimedTnt(float dt)
+{
+    for (int i = 0; i < primedTntCount; i++) {
+        primedTntFuse[i] -= dt;
+        if (primedTntFuse[i] > 0.0f) continue;
+        int bx = primedTntX[i], by = primedTntY[i];
+        // Clear the block first so the blast doesn't re-prime itself.
+        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT && world[bx][by] == BLOCK_TNT) {
+            world[bx][by] = BLOCK_AIR;
+            NetSyncBlockChange(bx, by, BLOCK_AIR);
+            InvalidateChunkAt(bx, by);
+            UpdateLightAt(bx, by);
+        }
+        ExplodeAt(bx * BLOCK_SIZE + BLOCK_SIZE / 2.0f, by * BLOCK_SIZE + BLOCK_SIZE / 2.0f, TNT_EXPLODE_RADIUS);
+        // swap-remove this entry and re-check the swapped-in one
+        primedTntX[i] = primedTntX[primedTntCount - 1];
+        primedTntY[i] = primedTntY[primedTntCount - 1];
+        primedTntFuse[i] = primedTntFuse[primedTntCount - 1];
+        primedTntCount--;
+        i--;
+    }
 }
 
 int GetCropGrowth(int bx, int by)
@@ -3214,6 +3415,10 @@ void GenerateWorld(unsigned int seed)
                     int range = loot[chosen].maxCount - loot[chosen].minCount + 1;
                     c->counts[s] = loot[chosen].minCount + hash2D(dx, dy + s, seed + 11700 + s) % range;
                 }
+                // v13: per-slot durability/enchantments (looted tools at full durability)
+                memset(c->enchantments, 0, sizeof(c->enchantments));
+                for (int s = 0; s < CHEST_SLOTS; s++)
+                    c->durability[s] = IsTool((BlockType)c->items[s]) ? GetToolMaxDurability((BlockType)c->items[s]) : 0;
                 chestCount++;
             }
             placed = 1;
@@ -3713,6 +3918,10 @@ void GenerateWorld(unsigned int seed)
                             int range = loot[chosen].maxCount - loot[chosen].minCount + 1;
                             c->counts[s] = loot[chosen].minCount + (int)(hash2D(chestX, chestY + s, seed + 20600 + s) % range);
                         }
+                        // v13: per-slot durability/enchantments (looted tools at full durability)
+                        memset(c->enchantments, 0, sizeof(c->enchantments));
+                        for (int s = 0; s < CHEST_SLOTS; s++)
+                            c->durability[s] = IsTool((BlockType)c->items[s]) ? GetToolMaxDurability((BlockType)c->items[s]) : 0;
                         chestCount++;
                     }
                 }

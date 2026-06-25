@@ -11,12 +11,7 @@ Keep it honest: move items to *Done* when verified, delete items that turn out t
 
 ## High priority (real, scoped)
 
-- [ ] **`UpdateCrops` scans the whole world every 5s.** world.c:~2750 loops all
-      2048×256 = 524,288 cells. Maintain a crop-cell list (mirror the pressure-plate
-      registry pattern: register on plant, unregister on break) and iterate only that.
-      Risk: low/medium — must keep the list in sync with every plant/break/explosion path.
-      Note: SaveWorld also double-scans the world for the crop section; the same registry
-      would speed that up too.
+- [ ] _(none open — chest durability/enchant persistence shipped in part 4)_
 
 ## Medium priority (multiplayer authority — architectural)
 
@@ -25,15 +20,15 @@ Keep it honest: move items to *Done* when verified, delete items that turn out t
       host owns each player's inventory and validates actions against it. Large change.
 - [ ] **Sync container/station contents in multiplayer.** No packets for chest, furnace,
       or enchanting-table state — each client keeps a local copy, so shared use desyncs.
-- [ ] **Chests lose item durability & enchantments.** `ChestData` (types.h) stores only
-      `item` + `count`. Tools/armor placed in a chest come back at full durability and
-      un-enchanted. Extend `ChestData` (+ save format → bump version).
 
 ## Low priority / polish
 
-- [ ] **Slime split size.** Small slimes (`slimeType==1`) share the big slime's sprite and
-      hitbox because `mobWidth[]`/`mobHeight[]` are per-*type*, not per-*instance*
-      (mob.c DrawSlimeSprite ~1580, contact/collision). Needs per-instance size plumbing.
+- [ ] **Baby mobs render full-size.** Breeding works and babies have a grow timer, but
+      `Draw*Sprite` (pig/cow/sheep/chicken) use hardcoded pixel coords, so babies look
+      adult-sized. Each sprite fn would need a scale factor around `mob->position`. NOTE:
+      do NOT shrink baby hitboxes via `GetMobW/H` until the sprites scale too, or the
+      hitbox and sprite desync. (Slimes already scale because `DrawSlimeSprite` derives
+      from `GetMobW`.)
 - [ ] **Dead defensive death-cause cases** for passive mobs (mob.c:838-840) are unreachable
       (`mobDamage[]==0` returns early). Harmless; remove only if doing a cleanup pass.
 
@@ -56,10 +51,62 @@ These were flagged in audits but confirmed fine; left here to avoid wasted re-ch
   name via `GetBlockName` (crafting.c:740/747); `nameId` is simply unused.
 - **Enchanting-table UI exists.** Fully implemented at `DrawEnchantingTableUI`
   (rendering.c:4209), with option generation in player.c:~1062.
+- **Animal breeding is implemented.** Feed food to pig/cow/sheep/chicken → love mode
+  (15s) → two in-love same-type mobs nearby spawn a baby with a 2-min grow timer
+  (player.c:~1434, mob.c grow/heart display). Only the baby *sprite scale* is missing
+  (see polish item above).
 
 ---
 
 ## Done
+
+### Session 2026-06-26 (part 5 — multiplayer UX)
+- **Open to LAN (in-game, MC-style).** Pause menu now has a contextual "Open to LAN"
+  control: in single-player it calls `NetHostStart(NET_PORT)`, sets `localPlayerId=0`,
+  flashes the local IP\:port, and keeps playing — the existing `NetIsHost()`-gated host
+  loop already accepts late joiners. Once hosting it shows a live status line
+  (`ip:port (n/max)`) instead. Hidden for clients (can't host). No new state needed.
+- **Host/Join menus fixed + polished.** Replaced hardcoded English in the host-waiting
+  and join screens (`Players: %d/%d`, `ESC: Cancel`, `ESC: Back | Connect`) with i18n
+  strings (EN/ZH/JA). HOST_WAITING joiners now get the same starter inventory as the
+  in-play late-join path (previously they joined empty-handed — an inconsistency).
+
+> **Needs in-game / two-instance verification:** run two copies; on instance A pause →
+> Open to LAN; on instance B Join → enter A's IP → confirm spawn, movement sync, and
+> that B starts with the wooden-tool starter kit.
+
+### Session 2026-06-26 (part 4 — content + UI polish)
+- **Chest durability + enchantments persist (SAVE_VERSION 12 → 13).** `ChestData` now
+  carries per-slot `durability[]` + `enchantments[]`; every chest transfer point (click
+  take/place/stack, shift-click both directions) and the chest screen's inventory grid
+  move them with the item. Looted tools (e.g. dungeon bows) now generate at full
+  durability. Also fixed: the chest screen's inventory click previously dropped
+  enchantments (carried durability only).
+- **TNT block (new gameplay / hotspot).** New `BLOCK_TNT` (full block chain, added at the
+  END of the enum to keep save IDs stable). Right-click to light the fuse (~2s), then
+  `ExplodeAt()` destroys a radius-4 area, damages player + mobs by distance falloff, and
+  **chain-detonates** other TNT in the blast. `ExplodeAt` is separate from the creeper's
+  inline explosion to avoid regressing it. Recipe: 5 redstone → 1 TNT (needs table).
+  Uses existing fuse + thunder sounds; no new asset needed.
+- **Enchanted-item glint (UI polish).** Subtle animated purple shimmer over enchanted
+  icons in the hotbar, inventory grid, armor slots, and both chest-screen grids
+  (`DrawEnchantGlint`).
+
+> **Needs in-game verification:** craft + ignite TNT (incl. a chain reaction); store an
+> enchanted/used tool in a chest, reload, confirm durability + enchant survive; confirm
+> the glint appears on enchanted items only.
+
+### Session 2026-06-26 (part 3 — perf + mob polish)
+- **Crop registry — eliminated the 524K-cell scan.** `UpdateCrops` now iterates a
+  registered crop-cell list (mirrors the pressure-plate registry) instead of scanning the
+  whole world every 5s. Cells register on plant / world-gen / load-rescan
+  (`RebuildCropList` at startup, plus network-planted crops); stale cells (broken,
+  exploded, flooded) are pruned lazily during the scan, so no destruction path needs an
+  explicit unregister. Cap `MAX_CROP_CELLS = 8192`.
+- **Slime split size — per-instance.** Added `GetMobW/GetMobH(const Mob*)`; small slimes
+  (`slimeType==1`) are now half-size in both sprite and hitbox, kept consistent across
+  collision, projectile hits, contact, and drawing (all 43 size usages live in mob.c).
+- Verified **breeding already works**; documented it and filed baby-sprite-scale as polish.
 
 ### Session 2026-06-26 (part 2 — "complete version")
 - **Save bug fixed:** cauldron section was written last by `SaveWorld` but read early by

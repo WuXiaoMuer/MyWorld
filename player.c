@@ -1033,6 +1033,12 @@ void PlayerBlockInteraction(void)
                 PlaySoundUIClick();
                 return;
             }
+            // Ignite TNT (right-click lights the fuse)
+            if (world[blockX][blockY] == BLOCK_TNT) {
+                PrimeTnt(blockX, blockY);
+                ShowMessage(S(STR_BLOCK_TNT), (Color){255, 120, 80, 255});
+                return;
+            }
             // Enchanting table interaction
             if (world[blockX][blockY] == BLOCK_ENCHANTING_TABLE) {
                 if (IsTool(selectedTool) || IsArmor(selectedTool)) {
@@ -1531,6 +1537,7 @@ void PlayerBlockInteraction(void)
             if (world[blockX][blockY] == BLOCK_FARMLAND && world[blockX][blockY - 1] == BLOCK_AIR) {
                 world[blockX][blockY - 1] = BLOCK_CROPS;
                 SetCropGrowth(blockX, blockY - 1, 0); // fresh plant starts at stage 0
+                RegisterCrop(blockX, blockY - 1);     // track for growth (see UpdateCrops)
                 NetSyncBlockChange(blockX, blockY - 1, BLOCK_CROPS);
                 PlaySoundPlace(BLOCK_TALL_GRASS);
                 UpdateLightAt(blockX, blockY - 1);

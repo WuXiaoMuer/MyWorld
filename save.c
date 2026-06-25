@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format v12:
+// Save File Format v13:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
@@ -180,6 +180,11 @@ bool SaveWorld(const char *path)
         ok = ok && fwrite(&chestData[i].y, sizeof(int), 1, f) == 1;
         ok = ok && fwrite(chestData[i].items, sizeof(uint8_t), CHEST_SLOTS, f) == CHEST_SLOTS;
         ok = ok && fwrite(chestData[i].counts, sizeof(int), CHEST_SLOTS, f) == CHEST_SLOTS;
+        // v13+: tool durability + enchantments for items stored in the chest
+        if (version >= 13) {
+            ok = ok && fwrite(chestData[i].durability, sizeof(int), CHEST_SLOTS, f) == CHEST_SLOTS;
+            ok = ok && fwrite(chestData[i].enchantments, sizeof(uint16_t), CHEST_SLOTS, f) == CHEST_SLOTS;
+        }
     }
 
     // Weather state (v7+)
@@ -439,6 +444,13 @@ bool LoadWorld(const char *path)
                 if (fread(&chestData[i].y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
                 if (fread(chestData[i].items, sizeof(uint8_t), CHEST_SLOTS, f) != CHEST_SLOTS) { fclose(f); return false; }
                 if (fread(chestData[i].counts, sizeof(int), CHEST_SLOTS, f) != CHEST_SLOTS) { fclose(f); return false; }
+                // v13+: per-slot durability + enchantments (older saves default to 0)
+                if (version >= 13) {
+                    if (fread(chestData[i].durability, sizeof(int), CHEST_SLOTS, f) != CHEST_SLOTS) { fclose(f); return false; }
+                    if (fread(chestData[i].enchantments, sizeof(uint16_t), CHEST_SLOTS, f) != CHEST_SLOTS) { fclose(f); return false; }
+                } else {
+                    for (int s = 0; s < CHEST_SLOTS; s++) { chestData[i].durability[s] = 0; chestData[i].enchantments[s] = 0; }
+                }
             }
         } else {
             chestCount = 0;

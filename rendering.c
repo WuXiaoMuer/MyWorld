@@ -129,6 +129,21 @@ static StringId lastDeathCause = STR_YOU_DIED;
 
 void SetDeathCause(StringId cause) { lastDeathCause = cause; }
 
+// Subtle animated purple shimmer drawn over enchanted item icons (UI polish).
+static void DrawEnchantGlint(int x, int y, int size)
+{
+    float t = (float)GetTime();
+    unsigned char a = (unsigned char)(55 + 40 * (0.5f + 0.5f * sinf(t * 3.0f)));
+    DrawRectangleLines(x, y, size, size, (Color){180, 110, 255, a});
+    for (int s = 0; s < 2; s++) {
+        float ph = t * 2.0f + s * 3.14159f;
+        int sx = x + (int)(size * (0.3f + 0.4f * (0.5f + 0.5f * sinf(ph))));
+        int sy = y + (int)(size * (0.25f + 0.5f * (0.5f + 0.5f * cosf(ph * 1.3f))));
+        unsigned char sa = (unsigned char)(120 + 100 * (0.5f + 0.5f * sinf(ph * 2.0f)));
+        DrawRectangle(sx, sy, 2, 2, (Color){235, 205, 255, sa});
+    }
+}
+
 //----------------------------------------------------------------------------------
 // Inventory Sort
 //----------------------------------------------------------------------------------
@@ -425,6 +440,8 @@ void DrawInventoryScreen(void)
                     Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
                     Rectangle dst = { (float)(armorX + 4), (float)(ay + 4), (float)(armorSlotSize - 8), (float)(armorSlotSize - 8) };
                     DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+                    if (ENCH_TYPE(player.armorEnchantments[i]) != ENCH_NONE)
+                        DrawEnchantGlint(armorX + 4, ay + 4, armorSlotSize - 8);
                 } else {
                     DrawGameText(armorLabels[i], armorX + armorSlotSize / 2 - 4, ay + armorSlotSize / 2 - 6, 14, (Color){100, 95, 110, 150});
                 }
@@ -470,6 +487,8 @@ void DrawInventoryScreen(void)
                     Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
                     Rectangle dst = { (float)(x+4), (float)(y+4), (float)(slotSize-8), (float)(slotSize-8) };
                     DrawTexturePro(blockAtlas, src, dst, (Vector2){0,0}, 0, WHITE);
+                    if (ENCH_TYPE(player.itemEnchantments[idx]) != ENCH_NONE)
+                        DrawEnchantGlint(x+4, y+4, slotSize-8);
                     if (player.inventoryCount[idx] > 1) {
                         DrawGameText(TextFormat("%d",player.inventoryCount[idx]), x+slotSize-19, y+slotSize-13, 13, (Color){0,0,0,150});
                         DrawGameText(TextFormat("%d",player.inventoryCount[idx]), x+slotSize-20, y+slotSize-14, 13, WHITE);
@@ -680,6 +699,8 @@ void DrawInventoryScreen(void)
             for (int i = 0; i < CHEST_SLOTS; i++) {
                 chestData[chestIdx].items[i] = BLOCK_AIR;
                 chestData[chestIdx].counts[i] = 0;
+                chestData[chestIdx].durability[i] = 0;
+                chestData[chestIdx].enchantments[i] = 0;
             }
         }
 
@@ -740,6 +761,8 @@ void DrawInventoryScreen(void)
                     Rectangle dst = { (float)(sx + 4), (float)(sy + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
                     Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
                     DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+                    if (ENCH_TYPE(chestData[chestIdx].enchantments[si]) != ENCH_NONE)
+                        DrawEnchantGlint(sx + 4, sy + 4, slotSize - 8);
                     if (cnt > 1) DrawGameText(TextFormat("%d", cnt), sx + slotSize - 20, sy + slotSize - 16, 12, WHITE);
                     if (hover && heldItem == BLOCK_AIR) {
                         BlockType bt = (BlockType)item;
@@ -783,14 +806,18 @@ void DrawInventoryScreen(void)
                         }
                     }
                     chestData[chestIdx].counts[si] = cnt;
-                    if (cnt <= 0) { chestData[chestIdx].items[si] = BLOCK_AIR; }
+                    if (cnt <= 0) { chestData[chestIdx].items[si] = BLOCK_AIR; chestData[chestIdx].durability[si] = 0; chestData[chestIdx].enchantments[si] = 0; }
                     if (cnt > 0) {
                         for (int d = 0; d < INVENTORY_SLOTS; d++) {
                             if (player.inventory[d] == BLOCK_AIR) {
                                 player.inventory[d] = item;
                                 player.inventoryCount[d] = cnt;
+                                player.toolDurability[d] = chestData[chestIdx].durability[si];
+                                player.itemEnchantments[d] = chestData[chestIdx].enchantments[si];
                                 chestData[chestIdx].items[si] = BLOCK_AIR;
                                 chestData[chestIdx].counts[si] = 0;
+                                chestData[chestIdx].durability[si] = 0;
+                                chestData[chestIdx].enchantments[si] = 0;
                                 break;
                             }
                         }
@@ -802,21 +829,27 @@ void DrawInventoryScreen(void)
                     if (heldItem == BLOCK_AIR && chestData[chestIdx].items[si] != BLOCK_AIR) {
                         heldItem = chestData[chestIdx].items[si];
                         heldCount = chestData[chestIdx].counts[si];
-                        heldDurability = 0;
+                        heldDurability = chestData[chestIdx].durability[si];
+                        heldItemEnchant = chestData[chestIdx].enchantments[si];
                         chestData[chestIdx].items[si] = BLOCK_AIR;
                         chestData[chestIdx].counts[si] = 0;
+                        chestData[chestIdx].durability[si] = 0;
+                        chestData[chestIdx].enchantments[si] = 0;
                     } else if (heldItem != BLOCK_AIR && chestData[chestIdx].items[si] == BLOCK_AIR) {
                         chestData[chestIdx].items[si] = heldItem;
                         chestData[chestIdx].counts[si] = heldCount;
+                        chestData[chestIdx].durability[si] = heldDurability;
+                        chestData[chestIdx].enchantments[si] = heldItemEnchant;
                         heldItem = BLOCK_AIR;
                         heldCount = 0;
                         heldDurability = 0;
+                        heldItemEnchant = 0;
                     } else if (heldItem != BLOCK_AIR && chestData[chestIdx].items[si] == heldItem && chestData[chestIdx].counts[si] < 64) {
                         int space = 64 - chestData[chestIdx].counts[si];
                         int add = (heldCount < space) ? heldCount : space;
                         chestData[chestIdx].counts[si] += add;
                         heldCount -= add;
-                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldDurability = 0; }
+                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldDurability = 0; heldItemEnchant = 0; }
                     }
                 }
             }
@@ -855,6 +888,8 @@ void DrawInventoryScreen(void)
                     Rectangle dst = { (float)(sx + 4), (float)(sy + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
                     Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
                     DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+                    if (ENCH_TYPE(player.itemEnchantments[si]) != ENCH_NONE)
+                        DrawEnchantGlint(sx + 4, sy + 4, slotSize - 8);
                     if (cnt > 1) DrawGameText(TextFormat("%d", cnt), sx + slotSize - 20, sy + slotSize - 16, 12, WHITE);
                     if (hover && heldItem == BLOCK_AIR) {
                         tooltipText = GetBlockName((BlockType)item);
@@ -870,22 +905,26 @@ void DrawInventoryScreen(void)
                         heldItem = player.inventory[si];
                         heldCount = player.inventoryCount[si];
                         heldDurability = player.toolDurability[si];
+                        heldItemEnchant = player.itemEnchantments[si];
                         player.inventory[si] = BLOCK_AIR;
                         player.inventoryCount[si] = 0;
                         player.toolDurability[si] = 0;
+                        player.itemEnchantments[si] = 0;
                     } else if (heldItem != BLOCK_AIR && player.inventory[si] == BLOCK_AIR) {
                         player.inventory[si] = heldItem;
                         player.inventoryCount[si] = heldCount;
                         player.toolDurability[si] = heldDurability;
+                        player.itemEnchantments[si] = heldItemEnchant;
                         heldItem = BLOCK_AIR;
                         heldCount = 0;
                         heldDurability = 0;
+                        heldItemEnchant = 0;
                     } else if (heldItem != BLOCK_AIR && player.inventory[si] == heldItem && player.inventoryCount[si] < 64) {
                         int space = 64 - player.inventoryCount[si];
                         int add = (heldCount < space) ? heldCount : space;
                         player.inventoryCount[si] += add;
                         heldCount -= add;
-                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldDurability = 0; }
+                        if (heldCount <= 0) { heldItem = BLOCK_AIR; heldDurability = 0; heldItemEnchant = 0; }
                     }
                 }
 
@@ -904,16 +943,19 @@ void DrawInventoryScreen(void)
                             if (cnt <= 0) break;
                         }
                     }
-                    if (cnt <= 0) { player.inventory[si] = BLOCK_AIR; player.inventoryCount[si] = 0; player.toolDurability[si] = 0; merged = true; }
+                    if (cnt <= 0) { player.inventory[si] = BLOCK_AIR; player.inventoryCount[si] = 0; player.toolDurability[si] = 0; player.itemEnchantments[si] = 0; merged = true; }
                     // Place remaining in first empty slot
                     if (!merged) {
                         for (int ci = 0; ci < CHEST_SLOTS; ci++) {
                             if (chestData[chestIdx].items[ci] == BLOCK_AIR) {
                                 chestData[chestIdx].items[ci] = item;
                                 chestData[chestIdx].counts[ci] = cnt;
+                                chestData[chestIdx].durability[ci] = player.toolDurability[si];
+                                chestData[chestIdx].enchantments[ci] = player.itemEnchantments[si];
                                 player.inventory[si] = BLOCK_AIR;
                                 player.inventoryCount[si] = 0;
                                 player.toolDurability[si] = 0;
+                                player.itemEnchantments[si] = 0;
                                 break;
                             }
                         }
@@ -2187,6 +2229,8 @@ void DrawHotbar(void)
             Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
             Rectangle dst = { (float)(x + 5), (float)(drawY + 5), (float)(slotSize - 10), (float)(slotSize - 10) };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+            if (ENCH_TYPE(player.itemEnchantments[i]) != ENCH_NONE)
+                DrawEnchantGlint(x + 5, drawY + 5, slotSize - 10);
 
             if (player.inventoryCount[i] > 1) {
                 // Count badge with background pill
@@ -2652,6 +2696,50 @@ void DrawPauseMenu(void)
         DrawGameText(keys[i], keyX, ctrlY, 12, (Color){140, 160, 170, 160});
         DrawGameText(acts[i], actX, ctrlY, 12, (Color){150, 150, 160, 160});
         ctrlY += 15;
+    }
+
+    // --- Open to LAN (contextual; hidden for clients who can't host) ---
+    if (!NetIsClient()) {
+        int lanW = boxW - 60;
+        int lanX = boxX + 30;
+        int lanH = 30;
+        int lanY = boxY + boxH - 52 - 42;
+        char lanIp[64];
+        NetGetLocalIP(lanIp, sizeof(lanIp));
+        if (NetIsHost()) {
+            // Already open — show a status line instead of a button.
+            char st[128];
+            snprintf(st, sizeof(st), S(STR_LAN_STATUS), lanIp, NET_PORT, NetGetPlayerCount(), NET_MAX_PLAYERS);
+            DrawRoundedRect(lanX, lanY, lanW, lanH, 0.1f, (Color){20, 40, 30, (unsigned char)(200 * pauseAnim)});
+            DrawRectangleLinesEx((Rectangle){(float)lanX, (float)lanY, (float)lanW, (float)lanH}, 1, (Color){80, 180, 120, (unsigned char)(150 * pauseAnim)});
+            int tw = MeasureGameTextWidth(st, 13);
+            DrawGameText(st, lanX + (lanW - tw) / 2, lanY + 9, 13, (Color){150, 220, 170, (unsigned char)(230 * pauseAnim)});
+        } else {
+            Rectangle r = {(float)lanX, (float)lanY, (float)lanW, (float)lanH};
+            bool hover = CheckCollisionPointRec(mouse, r);
+            float h = GetHoverAlpha(60, hover, dt);
+            Color ac = {120, 200, 150, 255};
+            if (h > 0.01f) DrawRoundedRect(lanX - 2, lanY - 2, lanW + 4, lanH + 4, 0.1f, (Color){ac.r, ac.g, ac.b, (unsigned char)(12 * h * pauseAnim)});
+            DrawRoundedRect(lanX, lanY, lanW, lanH, 0.1f, (Color){
+                (unsigned char)((18 + (int)(ac.r * 0.12f * h)) * pauseAnim),
+                (unsigned char)((18 + (int)(ac.g * 0.12f * h)) * pauseAnim),
+                (unsigned char)((22 + (int)(ac.b * 0.12f * h)) * pauseAnim),
+                (unsigned char)(230 * pauseAnim)});
+            DrawRectangleLinesEx(r, 1, (Color){ac.r, ac.g, ac.b, (unsigned char)(150 * pauseAnim)});
+            const char *lbl = S(STR_OPEN_TO_LAN);
+            int tw = MeasureGameTextWidth(lbl, 16);
+            DrawGameText(lbl, lanX + (lanW - tw) / 2, lanY + 7, 16, (Color){255, 255, 255, (unsigned char)(230 * pauseAnim)});
+            if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                PlaySoundUIClick();
+                if (NetHostStart(NET_PORT)) {
+                    localPlayerId = 0;
+                    ShowMessage(Sf(STR_LAN_OPENED, lanIp, NET_PORT), (Color){120, 220, 150, 255});
+                    gamePaused = false;
+                } else {
+                    ShowMessage(S(STR_LAN_FAILED), (Color){240, 90, 80, 255});
+                }
+            }
+        }
     }
 
     // --- Buttons (styled like main menu) ---

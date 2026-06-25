@@ -212,6 +212,7 @@ void InitGame(void)
     InitSmeltingRecipes();
     InitTrades();
     InitRedstone();
+    InitPrimedTnt();
     InitWater();
     InitLava();
 
@@ -227,6 +228,7 @@ void InitGame(void)
     }
 
     RebuildPressurePlateList();
+    RebuildCropList();
     RecalculateAllLight();
     InitCameraSystem();
     InitChunkTable();
@@ -945,6 +947,14 @@ void UpdateGame(float dt)
                 players[fromId].health = MAX_HEALTH;
                 players[fromId].hunger = 20;
                 players[fromId].facingRight = true;
+                // Starter inventory (matches the late-join path during play)
+                players[fromId].inventory[0] = TOOL_WOOD_SWORD;   players[fromId].inventoryCount[0] = 1;
+                players[fromId].inventory[1] = TOOL_WOOD_PICKAXE; players[fromId].inventoryCount[1] = 1;
+                players[fromId].inventory[2] = TOOL_WOOD_AXE;     players[fromId].inventoryCount[2] = 1;
+                players[fromId].inventory[3] = TOOL_WOOD_SHOVEL;  players[fromId].inventoryCount[3] = 1;
+                players[fromId].inventory[4] = TOOL_WOOD_HOE;     players[fromId].inventoryCount[4] = 1;
+                players[fromId].inventory[5] = BLOCK_PLANKS;      players[fromId].inventoryCount[5] = 64;
+                players[fromId].inventory[6] = BLOCK_COBBLESTONE; players[fromId].inventoryCount[6] = 64;
                 remotePlayers[fromId].active = true;
                 remotePlayers[fromId].interpX = players[fromId].position.x;
                 remotePlayers[fromId].interpY = players[fromId].position.y;
@@ -1336,6 +1346,7 @@ void UpdateGame(float dt)
                             }
                         }
                         world[bc->x][bc->y] = bc->blockType;
+                        if (bc->blockType == BLOCK_CROPS) RegisterCrop(bc->x, bc->y); // track network-planted crops
                         RecordBlockChange(bc->x, bc->y, bc->blockType);
                         UpdateLightAt(bc->x, bc->y);
                         InvalidateChunkAt(bc->x, bc->y);
@@ -1606,6 +1617,7 @@ void UpdateGame(float dt)
                         const PktBlockChange *bc = (const PktBlockChange *)((const uint8_t *)data + 1 + j * sizeof(PktBlockChange));
                         if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
                             world[bc->x][bc->y] = bc->blockType;
+                            if (bc->blockType == BLOCK_CROPS) RegisterCrop(bc->x, bc->y);
                             UpdateLightAt(bc->x, bc->y);
                             InvalidateChunkAt(bc->x, bc->y);
                         }
@@ -1717,6 +1729,7 @@ void UpdateGame(float dt)
     UpdateHotbar();
     UpdateRedstoneTick();
     UpdateCrops(dt);
+    UpdatePrimedTnt(dt);
     CheckAchievements();
 
     // Distance checks: auto-close crafting table/furnace if player moves away
@@ -1796,11 +1809,11 @@ void DrawGame(void)
         DrawGameText(ipMsg, (SCREEN_WIDTH - ipW) / 2, 260, 20, (Color){180, 180, 200, 200});
         // Connected players count
         char countMsg[64];
-        snprintf(countMsg, sizeof(countMsg), "Players: %d / %d", NetGetPlayerCount(), NET_MAX_PLAYERS);
+        snprintf(countMsg, sizeof(countMsg), S(STR_HOST_PLAYERS_COUNT), NetGetPlayerCount(), NET_MAX_PLAYERS);
         int countW = MeasureGameTextWidth(countMsg, 20);
         DrawGameText(countMsg, (SCREEN_WIDTH - countW) / 2, 300, 20, (Color){160, 255, 160, 220});
         // ESC hint
-        const char *hint = "ESC: Cancel";
+        const char *hint = S(STR_HOST_CANCEL_HINT);
         int hintW = MeasureGameTextWidth(hint, 18);
         DrawGameText(hint, (SCREEN_WIDTH - hintW) / 2, 400, 18, (Color){150, 150, 170, 180});
         DrawFPS(SCREEN_WIDTH - 80, 10);
@@ -1834,7 +1847,7 @@ void DrawGame(void)
             int cursorX = boxX + 10 + MeasureGameTextWidth(joinIpBuf, 20);
             DrawRectangle(cursorX, boxY + 6, 2, boxH - 12, (Color){220, 230, 255, (unsigned char)(blink * 255)});
             // ESC hint
-            const char *escHint = "ESC: Back  |  Enter: Connect";
+            const char *escHint = S(STR_JOIN_HELP_HINT);
             int escW = MeasureGameTextWidth(escHint, 16);
             DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, 350, 16, (Color){150, 150, 170, 180});
         } else {

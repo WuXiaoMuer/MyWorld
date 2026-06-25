@@ -18,6 +18,21 @@ static const int mobDamage[] = { 0, 0, 4, 2, 0, 3, 2, 5, 0, 0, 0, 0 };
 int GetMobWidth(MobType type) { return mobWidth[type]; }
 int GetMobHeight(MobType type) { return mobHeight[type]; }
 
+// Per-instance size. Small slimes (split children, slimeType==1) are half-size in
+// both sprite and hitbox; every other mob returns its plain per-type dimensions.
+// Used wherever a specific mob's box matters (collision, hit tests, drawing) so
+// the visual and the hitbox stay in agreement.
+static int GetMobW(const Mob *m) {
+    int w = mobWidth[m->type];
+    if (m->type == MOB_SLIME && m->slimeType == 1) w = (w + 1) / 2;
+    return w;
+}
+static int GetMobH(const Mob *m) {
+    int h = mobHeight[m->type];
+    if (m->type == MOB_SLIME && m->slimeType == 1) h = (h + 1) / 2;
+    return h;
+}
+
 void InitMobs(void)
 {
     for (int i = 0; i < MAX_MOBS; i++) {
@@ -134,8 +149,8 @@ void UpdateProjectiles(float dt)
             // Player projectile: check collision with mobs
             for (int m = 0; m < MAX_MOBS; m++) {
                 if (!mobs[m].active || mobs[m].deathTimer > 0) continue;
-                int mw = mobWidth[mobs[m].type];
-                int mh = mobHeight[mobs[m].type];
+                int mw = GetMobW(&mobs[m]);
+                int mh = GetMobH(&mobs[m]);
                 if (p->position.x >= mobs[m].position.x && p->position.x <= mobs[m].position.x + mw &&
                     p->position.y >= mobs[m].position.y && p->position.y <= mobs[m].position.y + mh) {
                     DamageMob(&mobs[m], p->damage);
@@ -341,15 +356,15 @@ Mob* SpawnMob(MobType type, float x, float y)
 
 static bool CanMobSeePlayer(Mob *mob)
 {
-    float dx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + mobWidth[mob->type] / 2);
-    float dy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + mobHeight[mob->type] / 2);
+    float dx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + GetMobW(mob) / 2);
+    float dy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + GetMobH(mob) / 2);
     return dx * dx + dy * dy < 160000.0f; // 400^2
 }
 
 static void UpdateMobPhysics(Mob *mob, float dt)
 {
-    int w = mobWidth[mob->type];
-    int h = mobHeight[mob->type];
+    int w = GetMobW(mob);
+    int h = GetMobH(mob);
 
     // Apply gravity
     mob->velocity.y += MOB_GRAVITY * dt;
@@ -811,8 +826,8 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
     }
     if (mobDamage[mob->type] <= 0) return;
 
-    int w = mobWidth[mob->type];
-    int h = mobHeight[mob->type];
+    int w = GetMobW(mob);
+    int h = GetMobH(mob);
 
     float pLeft = player.position.x;
     float pRight = pLeft + PLAYER_WIDTH;
@@ -870,8 +885,8 @@ void DamageMob(Mob *mob, int damage)
     if (mob->deathTimer > 0) return; // Already dying, don't drop again
     mob->health -= damage;
     mob->despawnTimer = MOB_DESPAWN_TIME; // Reset timer on engagement
-    SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
-                         mob->position.y + mobHeight[mob->type] / 2.0f,
+    SpawnDamageParticles(mob->position.x + GetMobW(mob) / 2.0f,
+                         mob->position.y + GetMobH(mob) / 2.0f,
                          (Color){180, 30, 30, 255});
     if (mob->health <= 0) {
         mob->deathTimer = MOB_DEATH_TIME;
@@ -894,12 +909,12 @@ void DamageMob(Mob *mob, int damage)
             case MOB_VILLAGER: deathColor = (Color){120, 80, 50, 255}; break;
             default: deathColor = (Color){180, 30, 30, 255}; break;
         }
-        SpawnDamageParticles(mob->position.x + mobWidth[mob->type] / 2.0f,
-                             mob->position.y + mobHeight[mob->type] / 2.0f,
+        SpawnDamageParticles(mob->position.x + GetMobW(mob) / 2.0f,
+                             mob->position.y + GetMobH(mob) / 2.0f,
                              deathColor);
 
         // Drop items with staggered positions
-        float baseDropX = mob->position.x + mobWidth[mob->type] / 2;
+        float baseDropX = mob->position.x + GetMobW(mob) / 2;
         float baseDropY = mob->position.y;
         if (mob->type == MOB_PIG) {
             SpawnItemEntity(FOOD_RAW_PORK, 1, baseDropX + (rand() % 10 - 5), baseDropY);
@@ -948,8 +963,8 @@ void DamageMob(Mob *mob, int damage)
 
 bool IsPlayerNearMob(Mob *mob, float range)
 {
-    float dx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + mobWidth[mob->type] / 2);
-    float dy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + mobHeight[mob->type] / 2);
+    float dx = (player.position.x + PLAYER_WIDTH / 2) - (mob->position.x + GetMobW(mob) / 2);
+    float dy = (player.position.y + PLAYER_HEIGHT / 2) - (mob->position.y + GetMobH(mob) / 2);
     return (dx * dx + dy * dy) < (range * range);
 }
 
@@ -1211,8 +1226,8 @@ void UpdateMobs(float dt)
                 float soundChance = (1.0f - dist / 500.0f) * 0.0008f;
                 if ((float)rand() / RAND_MAX < soundChance) {
                     PlaySoundMobAt(mob->type,
-                                   mob->position.x + mobWidth[mob->type] / 2,
-                                   mob->position.y + mobHeight[mob->type] / 2);
+                                   mob->position.x + GetMobW(mob) / 2,
+                                   mob->position.y + GetMobH(mob) / 2);
                 }
             }
         }
@@ -1588,8 +1603,8 @@ static void DrawSlimeSprite(Mob *mob)
 {
     float x = mob->position.x;
     float y = mob->position.y;
-    int w = mobWidth[MOB_SLIME];
-    int h = mobHeight[MOB_SLIME];
+    int w = GetMobW(mob);
+    int h = GetMobH(mob);
 
     // Squash/stretch animation
     float bounce = mob->onGround ? 1.0f : 0.8f;
@@ -1684,7 +1699,7 @@ void DrawMobs(void)
             if (mob->deathTimer > 0) {
                 barAlpha = (unsigned char)(180 * (mob->deathTimer / MOB_DEATH_TIME));
             }
-            int w = mobWidth[mob->type];
+            int w = GetMobW(mob);
             int barW = w;
             int barH = 3;
             int barX = (int)mob->position.x;
@@ -1698,7 +1713,7 @@ void DrawMobs(void)
         if (mob->loveTimer > 0) {
             float heartTime = (float)GetTime() * 2.5f;
             for (int h = 0; h < 5; h++) {
-                float hx = mob->position.x + mobWidth[mob->type] / 2 + sinf(heartTime + h * 1.3f) * 12;
+                float hx = mob->position.x + GetMobW(mob) / 2 + sinf(heartTime + h * 1.3f) * 12;
                 float hy = mob->position.y - 8 + cosf(heartTime * 0.6f + h * 1.1f) * 5;
                 DrawCircle((int)hx, (int)hy, 3, (Color){255, 80, 120, 200});
             }
