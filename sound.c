@@ -448,7 +448,7 @@ static void GenerateBGMWave(short *samples, int totalFrames, int sampleRate)
         sample += shimmer;
 
         // Gentle wind-like noise (very subtle)
-        unsigned int rng = (unsigned int)(i * 1103515245 + 12345);
+        unsigned int rng = (unsigned int)i * 1103515245u + 12345u;
         float noise = (float)(rng % 1000) / 500.0f - 1.0f;
         float windEnv = 0.5f + 0.5f * fast_sine(t * 0.15f);
         sample += noise * windEnv * 0.01f;

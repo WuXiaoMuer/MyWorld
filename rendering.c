@@ -135,7 +135,7 @@ void SetDeathCause(StringId cause) { lastDeathCause = cause; }
 void SortInventory(void)
 {
     // Collect all non-empty items with their counts and durability
-    typedef struct { uint8_t item; int count; int durability; } SortEntry;
+    typedef struct { uint8_t item; int count; int durability; uint16_t ench; } SortEntry;
     SortEntry entries[INVENTORY_SLOTS];
     int entryCount = 0;
 
@@ -144,6 +144,7 @@ void SortInventory(void)
             entries[entryCount].item = player.inventory[i];
             entries[entryCount].count = player.inventoryCount[i];
             entries[entryCount].durability = player.toolDurability[i];
+            entries[entryCount].ench = player.itemEnchantments[i];
             entryCount++;
         }
     }
@@ -189,10 +190,12 @@ void SortInventory(void)
             player.inventory[i] = entries[i].item;
             player.inventoryCount[i] = entries[i].count;
             player.toolDurability[i] = entries[i].durability;
+            player.itemEnchantments[i] = entries[i].ench;
         } else {
             player.inventory[i] = BLOCK_AIR;
             player.inventoryCount[i] = 0;
             player.toolDurability[i] = 0;
+            player.itemEnchantments[i] = 0;
         }
     }
 }
@@ -935,6 +938,8 @@ void DrawInventoryScreen(void)
                 else if (enchType == ENCH_PROTECTION) enchStr = STR_ENCH_PROTECTION;
                 else if (enchType == ENCH_FORTUNE) enchStr = STR_ENCH_FORTUNE;
                 else if (enchType == ENCH_UNBREAKING) enchStr = STR_ENCH_UNBREAKING;
+                else if (enchType == ENCH_SILK_TOUCH) enchStr = STR_ENCH_SILK_TOUCH;
+                else if (enchType == ENCH_POWER) enchStr = STR_ENCH_POWER;
                 const char *enchName = S(enchStr);
                 int ew = MeasureGameTextWidth(TextFormat("%s %d", enchName, enchLvl), 12) + 10;
                 if (ew + 10 > tw) tw = ew + 10;
@@ -2472,8 +2477,8 @@ void DrawDebugInfo(void)
     DrawGameText(TextFormat(S(STR_DBG_CHUNKS), chunkCount), 10, y,16, c); y += lineH;
     DrawGameText(TextFormat(S(STR_DBG_TIME), dayNight.timeOfDay), 10, y,16, c); y += lineH;
     DrawGameText(TextFormat(S(STR_DBG_LIGHT), dayNight.lightLevel), 10, y,16, c); y += lineH;
-    const char *weatherStr = weather.type == WEATHER_CLEAR ? "Clear" : (weather.type == WEATHER_RAIN ? "Rain" : "Thunder");
-    DrawGameText(TextFormat("Weather: %s", weatherStr), 10, y, 16, c); y += lineH;
+    const char *weatherStr = weather.type == WEATHER_CLEAR ? S(STR_WEATHER_CLEAR) : (weather.type == WEATHER_RAIN ? S(STR_WEATHER_RAIN) : S(STR_WEATHER_THUNDER));
+    DrawGameText(TextFormat(S(STR_DBG_WEATHER), weatherStr), 10, y, 16, c); y += lineH;
     DrawGameText(TextFormat(S(STR_DBG_GROUND), player.onGround ? S(STR_YES) : S(STR_NO)), 10, y,16, c); y += lineH;
     // Player status
     DrawGameText(TextFormat(S(STR_DBG_HP), player.health, MAX_HEALTH, player.hunger, MAX_HUNGER), 10, y,16, c); y += lineH;
@@ -4199,6 +4204,7 @@ static const char* GetEnchantName(EnchantmentType type) {
         case ENCH_FORTUNE:      return S(STR_ENCH_FORTUNE);
         case ENCH_UNBREAKING:   return S(STR_ENCH_UNBREAKING);
         case ENCH_SILK_TOUCH:   return S(STR_ENCH_SILK_TOUCH);
+        case ENCH_POWER:        return S(STR_ENCH_POWER);
         default:                return "Unknown";
     }
 }

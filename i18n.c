@@ -213,6 +213,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DBG_OXYGEN] = "Oxygen: %d/%d  XP: %d/%d",
     [STR_DBG_UNDERWATER] = "Underwater: %s",
     [STR_DBG_SEED] = "Seed: %u",
+    [STR_DBG_WEATHER] = "Weather: %s",
+    [STR_WEATHER_CLEAR] = "Clear",
+    [STR_WEATHER_RAIN] = "Rain",
+    [STR_WEATHER_THUNDER] = "Thunder",
     [STR_YES] = "yes",
     [STR_NO] = "no",
 
@@ -436,6 +440,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_FORTUNE] = "Fortune",
     [STR_ENCH_UNBREAKING] = "Unbreaking",
     [STR_ENCH_SILK_TOUCH] = "Silk Touch",
+    [STR_ENCH_POWER] = "Power",
     // Fishing items
     [STR_ITEM_FISHING_ROD] = "Fishing Rod",
     [STR_ITEM_RAW_FISH] = "Raw Fish",
@@ -720,6 +725,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DBG_OXYGEN] = "氧气: %d/%d  XP: %d/%d",         // 氧气: %d/%d  XP: %d/%d
     [STR_DBG_UNDERWATER] = "水下: %s",                    // 水下: %s
     [STR_DBG_SEED] = "种子: %u",                          // 种子: %u
+    [STR_DBG_WEATHER] = "天气: %s",
+    [STR_WEATHER_CLEAR] = "晴",
+    [STR_WEATHER_RAIN] = "雨",
+    [STR_WEATHER_THUNDER] = "雷暴",
     [STR_YES] = "是",                                          // 是
     [STR_NO] = "否",                                           // 否
 
@@ -940,6 +949,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_FORTUNE] = "时运",
     [STR_ENCH_UNBREAKING] = "耐久",
     [STR_ENCH_SILK_TOUCH] = "精准采集",
+    [STR_ENCH_POWER] = "力量",
     // Fishing items
     [STR_ITEM_FISHING_ROD] = "钓鱼竿",
     [STR_ITEM_RAW_FISH] = "生鱼",
@@ -1224,6 +1234,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DBG_OXYGEN] = "酸素: %d/%d  XP: %d/%d",         // 酸素: %d/%d  XP: %d/%d
     [STR_DBG_UNDERWATER] = "水中: %s",                    // 水中: %s
     [STR_DBG_SEED] = "シード: %u",                    // シード: %u
+    [STR_DBG_WEATHER] = "天気: %s",
+    [STR_WEATHER_CLEAR] = "晴れ",
+    [STR_WEATHER_RAIN] = "雨",
+    [STR_WEATHER_THUNDER] = "雷雨",
     [STR_YES] = "はい",                                    // はい
     [STR_NO] = "いいえ",                               // いいえ
 
@@ -1444,6 +1458,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_FORTUNE] = "幸運",
     [STR_ENCH_UNBREAKING] = "耐久力",
     [STR_ENCH_SILK_TOUCH] = "シルクの触手",
+    [STR_ENCH_POWER] = "パワー",
     // Fishing items
     [STR_ITEM_FISHING_ROD] = "釣竿",
     [STR_ITEM_RAW_FISH] = "生の魚",

@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format v11:
+// Save File Format v12:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
@@ -19,6 +19,8 @@
 //   Modified:    count + per-block x,y,type (v8+)
 //   Mobs:        count + per-mob data (v10+)
 //   Cauldrons:   count + per-cauldron x,y,fillLevel (v11+)
+//   Crops:       uint32 count + per-crop (uint16 x, uint16 y, uint8 growth) (v12+)
+// NOTE: Cauldrons/Crops are written AFTER World+Modified; LoadWorld reads them last too.
 //----------------------------------------------------------------------------------
 
 bool SaveExists(const char *path)
@@ -244,6 +246,26 @@ bool SaveWorld(const char *path)
         }
     }
 
+    // v12+: crop growth — sparse, only BLOCK_CROPS cells carry a stage.
+    // Two passes: count first (the header needs the total), then write each cell.
+    if (version >= 12) {
+        uint32_t cropN = 0;
+        for (int x = 0; x < WORLD_WIDTH; x++)
+            for (int y = 0; y < WORLD_HEIGHT; y++)
+                if (world[x][y] == BLOCK_CROPS) cropN++;
+        ok = ok && fwrite(&cropN, sizeof(uint32_t), 1, f) == 1;
+        for (int x = 0; x < WORLD_WIDTH && ok; x++) {
+            for (int y = 0; y < WORLD_HEIGHT && ok; y++) {
+                if (world[x][y] != BLOCK_CROPS) continue;
+                uint16_t cx = (uint16_t)x, cy = (uint16_t)y;
+                uint8_t g = (uint8_t)GetCropGrowth(x, y);
+                ok = ok && fwrite(&cx, sizeof(uint16_t), 1, f) == 1;
+                ok = ok && fwrite(&cy, sizeof(uint16_t), 1, f) == 1;
+                ok = ok && fwrite(&g, sizeof(uint8_t), 1, f) == 1;
+            }
+        }
+    }
+
     fclose(f);
 
     if (!ok) {
@@ -465,17 +487,11 @@ bool LoadWorld(const char *path)
         } else {
             InitMobs();
         }
-        // v11+: cauldron data
-        if (version >= 11) {
-            if (fread(&cauldronCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-            for (int i = 0; i < cauldronCount && i < MAX_CAULDRONS; i++) {
-                if (fread(&cauldrons[i].x, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-                if (fread(&cauldrons[i].y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
-                if (fread(&cauldrons[i].fillLevel, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
-            }
-        } else {
-            cauldronCount = 0;
-        }
+        // Cauldron (v11+) and crop (v12+) data are written by SaveWorld AFTER the
+        // world + modified-block sections, so they are read below those sections.
+        // Default here; the previous version read them here, which desynced the
+        // stream for v11 saves (cauldron count was read from world-RLE bytes).
+        cauldronCount = 0;
     } else {
         // v2 compat: default values
         for (int i = 0; i < INVENTORY_SLOTS; i++) {
@@ -553,6 +569,35 @@ bool LoadWorld(const char *path)
             }
             memcpy(world, savedWorld, WORLD_WIDTH * WORLD_HEIGHT);
             free(savedWorld);
+        }
+    }
+
+    // v11+: cauldron data (SaveWorld writes this AFTER world + modified blocks).
+    // Read non-fatally: a truncated tail leaves earlier sections intact.
+    if (version >= 11) {
+        int cc = 0;
+        if (fread(&cc, sizeof(int), 1, f) == 1 && cc >= 0 && cc <= MAX_CAULDRONS) {
+            cauldronCount = cc;
+            for (int i = 0; i < cauldronCount; i++) {
+                if (fread(&cauldrons[i].x, sizeof(int), 1, f) != 1) { cauldronCount = i; break; }
+                if (fread(&cauldrons[i].y, sizeof(int), 1, f) != 1) { cauldronCount = i; break; }
+                if (fread(&cauldrons[i].fillLevel, sizeof(uint8_t), 1, f) != 1) { cauldronCount = i; break; }
+            }
+        }
+    }
+
+    // v12+: crop growth (sparse — only BLOCK_CROPS cells). cropGrowth was cleared
+    // by InitRedstone() before LoadWorld, so unlisted cells stay at stage 0.
+    if (version >= 12) {
+        uint32_t cropN = 0;
+        if (fread(&cropN, sizeof(uint32_t), 1, f) == 1) {
+            for (uint32_t i = 0; i < cropN; i++) {
+                uint16_t cx, cy; uint8_t g;
+                if (fread(&cx, sizeof(uint16_t), 1, f) != 1) break;
+                if (fread(&cy, sizeof(uint16_t), 1, f) != 1) break;
+                if (fread(&g, sizeof(uint8_t), 1, f) != 1) break;
+                SetCropGrowth((int)cx, (int)cy, (int)g);
+            }
         }
     }
 

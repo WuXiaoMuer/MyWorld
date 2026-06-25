@@ -1873,26 +1873,34 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
-    case BLOCK_CROPS:
+    case BLOCK_CROPS: {
+        // Render wheat growth stages 0-7: the plant grows taller as it matures and
+        // golden wheat tops appear once nearly ripe. worldX/worldY are the block's
+        // world coords; the block atlas is baked with an out-of-range worldY, so
+        // out-of-bounds coords fall back to a fully-grown icon.
+        int growth = (worldY >= 0 && worldY < WORLD_HEIGHT && worldX >= 0 && worldX < WORLD_WIDTH)
+                     ? GetCropGrowth(worldX, worldY) : 7;
+        if (growth < 0) growth = 0;
+        if (growth > 7) growth = 7;
+        int stalkTop = 14 - (3 + growth);   // stage 0 -> y11 (short sprout), stage 7 -> y4 (tall)
+        bool ripe = (growth >= 6);
         for (int y = 0; y < 16; y++)
             for (int x = 0; x < 16; x++) {
                 Color c = {0, 0, 0, 0};
-                // Green crop stalks
-                if (x >= 3 && x <= 5 && y >= 4 && y <= 14) {
+                // Two green stalks growing upward from the soil
+                if (((x >= 3 && x <= 5) || (x >= 10 && x <= 12)) && y >= stalkTop && y <= 14) {
                     c = (Color){80, 180, 40, 255};
                     if (y % 3 == 0) c = (Color){60, 150, 30, 255};
                 }
-                if (x >= 10 && x <= 12 && y >= 4 && y <= 14) {
-                    c = (Color){80, 180, 40, 255};
-                    if (y % 3 == 0) c = (Color){60, 150, 30, 255};
-                }
-                // Wheat tops
-                if (y >= 2 && y <= 5 && ((x >= 2 && x <= 6) || (x >= 9 && x <= 13))) {
-                    c = (Color){200, 180, 80, 255};
+                // Wheat tops only once nearly ripe; golden at full maturity
+                if (ripe && y >= stalkTop - 2 && y <= stalkTop + 1 &&
+                    ((x >= 2 && x <= 6) || (x >= 9 && x <= 13))) {
+                    c = (growth >= 7) ? (Color){210, 185, 75, 255} : (Color){170, 175, 70, 255};
                 }
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
+    }
 
     case BLOCK_HAY_BALE:
         for (int y = 0; y < 16; y++)
@@ -2747,6 +2755,7 @@ void UpdateCrops(float dt)
     if (cropGrowTimer < 5.0f) return; // Grow every 5 seconds
     cropGrowTimer = 0.0f;
 
+    bool grew = false;
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
             if (world[x][y] != BLOCK_CROPS) continue;
@@ -2776,11 +2785,18 @@ void UpdateCrops(float dt)
 
             if (rand() % 100 < chance) {
                 cropGrowth[x][y]++;
-                // Update visual - crops get taller with growth
-                // (handled in rendering)
+                // Crops get taller with growth; mark the chunk so its baked
+                // texture is regenerated with the new stage (see DrawBlockPattern).
+                InvalidateChunkAt(x, y);
+                grew = true;
             }
         }
     }
+
+    // UpdateCrops() runs after UpdateChunks() in the frame, so rebuild the
+    // invalidated chunks now — otherwise DrawWorld would skip them for one
+    // frame and the crop chunk would flicker. UpdateChunks() is idempotent.
+    if (grew) UpdateChunks();
 }
 
 int GetCropGrowth(int bx, int by)
@@ -3719,6 +3735,9 @@ void GenerateWorld(unsigned int seed)
                             // Crops on farmland
                             if (dx != fw / 2) {
                                 world[fx][fy] = BLOCK_CROPS;
+                                // Generated village farms look established: give each
+                                // crop a deterministic initial growth (1-7) from the seed.
+                                SetCropGrowth(fx, fy, 1 + (int)(hash2D(fx, fy, seed + 20700) % 7));
                             } else {
                                 world[fx][fy] = BLOCK_AIR;
                             }

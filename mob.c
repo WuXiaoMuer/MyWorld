@@ -46,6 +46,13 @@ int SpawnProjectile(float x, float y, float vx, float vy, bool fromPlayer)
             projectiles[i].lifetime = PROJECTILE_LIFETIME;
             projectiles[i].active = true;
             projectiles[i].fromPlayer = fromPlayer;
+            // Reset transient fields so a reused slot doesn't inherit stale state
+            // (e.g. a previous fishing bobber) and arrows get a clean base damage.
+            projectiles[i].isFishing = false;
+            projectiles[i].hasBite = false;
+            projectiles[i].fishTimer = 0.0f;
+            projectiles[i].catchValue = 0;
+            projectiles[i].damage = PROJECTILE_DAMAGE;
             return i;
         }
     }
@@ -131,7 +138,7 @@ void UpdateProjectiles(float dt)
                 int mh = mobHeight[mobs[m].type];
                 if (p->position.x >= mobs[m].position.x && p->position.x <= mobs[m].position.x + mw &&
                     p->position.y >= mobs[m].position.y && p->position.y <= mobs[m].position.y + mh) {
-                    DamageMob(&mobs[m], PROJECTILE_DAMAGE);
+                    DamageMob(&mobs[m], p->damage);
                     SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
                     p->active = false;
                     break;
@@ -613,7 +620,7 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                     float angle = (float)(rand() % 628) / 100.0f;
                     float pDist = 5.0f + (float)(rand() % 20);
                     SpawnDamageParticles(ecx + cosf(angle) * pDist,
-                                         ecy + sinf(angle) * dist,
+                                         ecy + sinf(angle) * pDist,
                                          (Color){255, 150, 50, 255});
                 }
 

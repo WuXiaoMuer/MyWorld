@@ -1087,7 +1087,7 @@ void PlayerBlockInteraction(void)
                                 eo->type = (EnchantmentType)pool[rand() % 4];
                             }
                         } else if (selectedTool == ITEM_BOW) {
-                            int pool[] = { ENCH_UNBREAKING, ENCH_UNBREAKING, ENCH_UNBREAKING };
+                            int pool[] = { ENCH_POWER, ENCH_POWER, ENCH_UNBREAKING };
                             eo->type = (EnchantmentType)pool[rand() % 3];
                         } else {
                             // Axe, shovel, hoe
@@ -1242,7 +1242,13 @@ void PlayerBlockInteraction(void)
                 float aimDist = sqrtf(dx * dx + dy * dy);
                 if (aimDist > 1.0f) {
                     float speed = PROJECTILE_SPEED * 1.5f;
-                    SpawnProjectile(px, py, (dx / aimDist) * speed, (dy / aimDist) * speed, true);
+                    int arrowIdx = SpawnProjectile(px, py, (dx / aimDist) * speed, (dy / aimDist) * speed, true);
+                    // Power enchantment: +2 arrow damage per level
+                    if (arrowIdx >= 0) {
+                        uint16_t be = player.itemEnchantments[player.selectedSlot];
+                        if (ENCH_TYPE(be) == ENCH_POWER)
+                            projectiles[arrowIdx].damage = PROJECTILE_DAMAGE + ENCH_LEVEL(be) * 2;
+                    }
                     // Sync projectile to network
                     if (NetIsClient()) {
                         uint8_t buf[64];
@@ -1524,6 +1530,7 @@ void PlayerBlockInteraction(void)
         if (selectedTool == ITEM_WHEAT_SEEDS) {
             if (world[blockX][blockY] == BLOCK_FARMLAND && world[blockX][blockY - 1] == BLOCK_AIR) {
                 world[blockX][blockY - 1] = BLOCK_CROPS;
+                SetCropGrowth(blockX, blockY - 1, 0); // fresh plant starts at stage 0
                 NetSyncBlockChange(blockX, blockY - 1, BLOCK_CROPS);
                 PlaySoundPlace(BLOCK_TALL_GRASS);
                 UpdateLightAt(blockX, blockY - 1);

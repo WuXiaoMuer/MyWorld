@@ -880,6 +880,23 @@ static void UpdateFurnaceTick(float dt)
     }
 }
 
+// Find a safe surface Y (pixel) for spawning at block column bx on the current world.
+// Scans from the top for the first non-air/non-water block and returns the pixel Y
+// that rests the player's feet just above it. Used so network joiners don't spawn
+// inside terrain when the host's reported Y is underground (e.g. host dug a tunnel).
+static float FindSpawnSurfaceY(int bx)
+{
+    if (bx < 0) bx = 0;
+    if (bx >= WORLD_WIDTH) bx = WORLD_WIDTH - 1;
+    for (int y = 0; y < WORLD_HEIGHT; y++) {
+        uint8_t b = world[bx][y];
+        if (b != BLOCK_AIR && b != BLOCK_WATER) {
+            return (float)(y * BLOCK_SIZE - PLAYER_HEIGHT);
+        }
+    }
+    return (float)(SEA_LEVEL * BLOCK_SIZE - PLAYER_HEIGHT);
+}
+
 void UpdateGame(float dt)
 {
     // Block input during screen transitions
@@ -1010,9 +1027,11 @@ void UpdateGame(float dt)
                     InitSmeltingRecipes();
                     GenerateWorld(worldSeed);
                     InitPlayer();
-                    // Use host's spawn position instead of independent spawn
+                    // Spawn near the host horizontally, but snap to this client's own
+                    // surface so we never spawn inside terrain (host may be underground,
+                    // and host's edits arrive after world generation as separate packets).
                     player.position.x = w->spawnX;
-                    player.position.y = w->spawnY;
+                    player.position.y = FindSpawnSurfaceY((int)(w->spawnX / BLOCK_SIZE));
                     dayNight.timeOfDay = w->timeOfDay;
                     weather.type = (WeatherType)w->weatherType;
                     weather.duration = w->weatherDuration;
@@ -1287,7 +1306,8 @@ void UpdateGame(float dt)
                         int by = (int)(input->cursorY / BLOCK_SIZE);
                         if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
                             BlockType tool = (BlockType)rp->inventory[rp->selectedSlot];
-                            if (tool != BLOCK_AIR && (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER)) {
+                            if (tool != BLOCK_AIR && rp->inventoryCount[rp->selectedSlot] > 0 &&
+                                (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER)) {
                                 world[bx][by] = tool;
                                 rp->inventoryCount[rp->selectedSlot]--;
                                 if (rp->inventoryCount[rp->selectedSlot] <= 0) {

@@ -129,7 +129,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        11
+#define SAVE_VERSION        12
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -667,6 +667,10 @@ typedef enum {
     STR_DBG_OXYGEN,
     STR_DBG_UNDERWATER,
     STR_DBG_SEED,
+    STR_DBG_WEATHER,
+    STR_WEATHER_CLEAR,
+    STR_WEATHER_RAIN,
+    STR_WEATHER_THUNDER,
     STR_YES,
     STR_NO,
 
@@ -926,6 +930,7 @@ typedef enum {
     STR_ENCH_FORTUNE,
     STR_ENCH_UNBREAKING,
     STR_ENCH_SILK_TOUCH,
+    STR_ENCH_POWER,
     STR_ENCHANTED,
 
     // Enchanting messages
@@ -1082,6 +1087,7 @@ typedef struct {
     float fishTimer;
     bool hasBite;
     int catchValue;
+    int damage;         // damage dealt to a mob on hit (base = PROJECTILE_DAMAGE, +ENCH_POWER)
 } Projectile;
 
 //----------------------------------------------------------------------------------
@@ -1218,6 +1224,7 @@ typedef enum {
     ENCH_FORTUNE,           // +15% chance per level for extra drop (pickaxes)
     ENCH_UNBREAKING,        // 1/(level+1) chance to skip durability loss (all)
     ENCH_SILK_TOUCH,        // Mine blocks in their original form
+    ENCH_POWER,             // +2 arrow damage per level (bows)
     ENCH_COUNT
 } EnchantmentType;
 
