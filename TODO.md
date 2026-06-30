@@ -18,25 +18,18 @@ Keep it honest: move items to *Done* when verified, delete items that turn out t
 - [ ] **Server-authoritative inventory.** Host trusts client-reported inventory for block
       place (game.c:~1290) and item use. A hacked client can desync/duplicate. Proper fix:
       host owns each player's inventory and validates actions against it. Large change.
-- [ ] **Sync container/station contents in multiplayer.** No packets for chest, furnace,
-      or enchanting-table state — each client keeps a local copy, so shared use desyncs.
+- [ ] **Sync container/station contents in multiplayer.** Chest and furnace sync are now
+      implemented; enchanting table remains local-only and will desync if multiple players
+      use it.
 
 ## Low priority / polish
 
-- [ ] **Baby mobs render full-size.** Breeding works and babies have a grow timer, but
-      `Draw*Sprite` (pig/cow/sheep/chicken) use hardcoded pixel coords, so babies look
-      adult-sized. Each sprite fn would need a scale factor around `mob->position`. NOTE:
-      do NOT shrink baby hitboxes via `GetMobW/H` until the sprites scale too, or the
-      hitbox and sprite desync. (Slimes already scale because `DrawSlimeSprite` derives
-      from `GetMobW`.)
 - [ ] **Dead defensive death-cause cases** for passive mobs (mob.c:838-840) are unreachable
       (`mobDamage[]==0` returns early). Harmless; remove only if doing a cleanup pass.
 
 ## Ideas / not yet scoped
 
 - [ ] Biome-specific passive mob spawns (mob.c spawn logic is biome-agnostic).
-- [ ] More achievements (fishing, enchanting, breeding); current set is 6 (game.c).
-- [ ] Player names in multiplayer (`PktJoin.playerName` exists but is always "Player").
 
 ---
 
@@ -53,12 +46,55 @@ These were flagged in audits but confirmed fine; left here to avoid wasted re-ch
   (rendering.c:4209), with option generation in player.c:~1062.
 - **Animal breeding is implemented.** Feed food to pig/cow/sheep/chicken → love mode
   (15s) → two in-love same-type mobs nearby spawn a baby with a 2-min grow timer
-  (player.c:~1434, mob.c grow/heart display). Only the baby *sprite scale* is missing
-  (see polish item above).
+  (player.c:~1434, mob.c grow/heart display). Baby sprites now scale to half size
+  (part 7).
 
 ---
 
 ## Done
+
+### Session 2026-06-30 (part 9 — multiplayer furnace sync)
+- **Furnace contents sync in multiplayer.** Added `PKT_FURNACE_OPEN` (client requests),
+  `PKT_FURNACE_SYNC` (bidirectional full-furnace data), and `PKT_FURNACE_CLOSE` (client notify).
+  - Mirrors the chest-sync authority model: host owns furnace data, clients request on open,
+    modifications are snapshot-detected in the furnace UI and pushed to the host, and the host
+    applies + broadcasts to other connected clients.
+  - Client opening a furnace waits for the host sync before showing the UI (avoids desync).
+  - Closing the furnace (E, ESC, or moving away) returns fuel/input/output to the closing
+    player's inventory and syncs the now-empty furnace to other watchers.
+  - No save-format change: the existing per-furnace `FurnaceData` array is already persisted.
+
+### Session 2026-06-30 (part 8 — multiplayer chest sync)
+- **Chest contents sync in multiplayer.** Added `PKT_CHEST_OPEN` (client requests),
+  `PKT_CHEST_SYNC` (bidirectional full-chest data), and `PKT_CHEST_CLOSE` (client notify).
+  - Client opens a chest → requests contents from host → opens UI only after receiving sync.
+  - Any modification by client or host is detected via a per-frame snapshot in the chest UI
+    and pushed to the other side.
+  - Host is authoritative: applies client changes and broadcasts to other connected clients.
+  - Durability and enchantments travel with items (already persisted per v13).
+  - Close-on-ESC / close-on-move-away also notify the host so it can stop tracking if needed.
+
+### Session 2026-06-30 (part 7 — multiplayer identity + visual polish)
+- **Multiplayer player names.** Added `playerName[32]` to `Player` and `RemotePlayer`,
+  included it in `PktPlayerInfo`, and threaded it through host send/receive and welcome
+  join paths. Join screen now has a **Name** input field above the IP field (Tab to
+  switch, default "Player"). Remote players render their chosen name above their head
+  instead of "P1/P2/P3".
+- **Baby passive mob sprites scale down.** Added `MobScale()` and `SRECT` macro; rewrote
+  `DrawPigSprite`, `DrawCowSprite`, `DrawSheepSprite`, and `DrawChickenSprite` to render
+  at half size when `isBaby == true`, anchored at the bottom-center so feet stay on the
+  ground. Collision box remains adult-sized (matching the scaled sprite footprint).
+
+### Session 2026-06-28 (part 6 — systems depth + content)
+- **Redstone-ignited TNT.** TNT now ignites when a redstone signal reaches it — added a
+  terminal case in the redstone BFS (`PropagateRedstoneBFS`), mirroring the lamp. So
+  lever / pressure-plate → wire → TNT works. `PrimeTnt` dedups, so repeated propagation
+  is safe. No save impact.
+- **4 new achievements (SAVE_VERSION 13 → 14).** Angler (catch a fish), Breeder (raise a
+  baby), Enchanter (enchant an item), Demolition (detonate TNT). `UnlockAchievement` made
+  public + triggered at each event site; i18n EN/ZH/JA. Save migration: v9–v13 stored 6
+  achievements, v14 stores `ACH_COUNT` (10) — loader reads the version-appropriate count
+  so old saves stay aligned.
 
 ### Session 2026-06-26 (part 5 — multiplayer UX)
 - **Open to LAN (in-game, MC-style).** Pause menu now has a contextual "Open to LAN"

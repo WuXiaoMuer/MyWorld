@@ -207,7 +207,7 @@ int NetHostGetClientCount(void)
 //----------------------------------------------------------------------------------
 // Client Mode
 //----------------------------------------------------------------------------------
-bool NetClientConnect(const char *ip, int port)
+bool NetClientConnect(const char *ip, int port, const char *playerName)
 {
     if (!netInitialized && !NetInit()) return false;
 
@@ -235,7 +235,7 @@ bool NetClientConnect(const char *ip, int port)
     // Send join request
     PktJoin join;
     memset(&join, 0, sizeof(join));
-    snprintf(join.playerName, sizeof(join.playerName), "Player");
+    snprintf(join.playerName, sizeof(join.playerName), "%s", playerName ? playerName : "Player");
 
     uint8_t buf[NET_PACKET_MAX];
     buf[0] = PKT_JOIN;

@@ -237,6 +237,15 @@ void DrawInventoryScreen(void)
 
     // --- Minecraft-style combined furnace + inventory screen ---
     if (furnaceOpen) {
+        // Snapshot active furnace state at the start of the frame so we can detect
+        // modifications and sync them to the host in multiplayer.
+        uint8_t snapFuel = furnaceFuel; int snapFuelCount = furnaceFuelCount;
+        uint8_t snapInput = furnaceInput; int snapInputCount = furnaceInputCount;
+        uint8_t snapOutput = furnaceOutput; int snapOutputCount = furnaceOutputCount;
+        float snapProgress = furnaceProgress;
+        float snapFuelBurn = furnaceFuelBurn;
+        float snapFuelBurnMax = furnaceFuelBurnMax;
+
         int padding = 3;
         int armorSlotSize = 40;
         int armorPad = 3;
@@ -675,6 +684,20 @@ void DrawInventoryScreen(void)
             if (heldCount > 1) DrawGameText(TextFormat("%d", heldCount), mx+slotSize-20, my+slotSize-16, 14, WHITE);
         }
 
+        // If this client modified the furnace this frame, push changes to the host.
+        // If we are the host, broadcast changes to watching clients.
+        if (NetIsConnected() && activeFurnace >= 0 && activeFurnace < furnaceCount) {
+            if (snapFuel != furnaceFuel || snapFuelCount != furnaceFuelCount ||
+                snapInput != furnaceInput || snapInputCount != furnaceInputCount ||
+                snapOutput != furnaceOutput || snapOutputCount != furnaceOutputCount ||
+                snapProgress != furnaceProgress || snapFuelBurn != furnaceFuelBurn ||
+                snapFuelBurnMax != furnaceFuelBurnMax) {
+                SyncActiveToFurnace(activeFurnace);
+                if (NetIsClient()) SyncFurnaceToHost();
+                else if (NetIsHost()) SyncFurnaceToAll();
+            }
+        }
+
         return;
     }
 
@@ -702,6 +725,19 @@ void DrawInventoryScreen(void)
                 chestData[chestIdx].durability[i] = 0;
                 chestData[chestIdx].enchantments[i] = 0;
             }
+        }
+
+        // Snapshot chest contents at the start of the frame so we can detect
+        // modifications and sync them to the host in multiplayer.
+        uint8_t snapItems[CHEST_SLOTS];
+        int snapCounts[CHEST_SLOTS];
+        int snapDur[CHEST_SLOTS];
+        uint16_t snapEnch[CHEST_SLOTS];
+        if (chestIdx >= 0) {
+            memcpy(snapItems, chestData[chestIdx].items, sizeof(snapItems));
+            memcpy(snapCounts, chestData[chestIdx].counts, sizeof(snapCounts));
+            memcpy(snapDur, chestData[chestIdx].durability, sizeof(snapDur));
+            memcpy(snapEnch, chestData[chestIdx].enchantments, sizeof(snapEnch));
         }
 
         int chestRows = 3;
@@ -997,6 +1033,18 @@ void DrawInventoryScreen(void)
             Rectangle src = { (float)(heldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
             if (heldCount > 1) DrawGameText(TextFormat("%d", heldCount), mx + 8, my + 8, 12, WHITE);
+        }
+
+        // If this client modified the chest this frame, push changes to the host.
+        // If we are the host, broadcast changes to watching clients.
+        if (chestIdx >= 0 && NetIsConnected()) {
+            if (memcmp(snapItems, chestData[chestIdx].items, sizeof(snapItems)) != 0 ||
+                memcmp(snapCounts, chestData[chestIdx].counts, sizeof(snapCounts)) != 0 ||
+                memcmp(snapDur, chestData[chestIdx].durability, sizeof(snapDur)) != 0 ||
+                memcmp(snapEnch, chestData[chestIdx].enchantments, sizeof(snapEnch)) != 0) {
+                if (NetIsClient()) SyncChestToHost(chestIdx);
+                else if (NetIsHost()) SyncChestToAll(chestIdx);
+            }
         }
 
         return;
@@ -1976,8 +2024,7 @@ void DrawRemotePlayers(void)
         DrawRectangle(eyeX, (int)(py + 6), 2, 2, (Color){40, 40, 40, 255});
 
         // Name tag
-        char nameTag[16];
-        snprintf(nameTag, sizeof(nameTag), "P%d", i);
+        const char *nameTag = players[i].playerName[0] ? players[i].playerName : "Player";
         int nameW = MeasureGameTextWidth(nameTag, 12);
         DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(py - 8), 12,
                      (Color){255, 255, 255, 200});
@@ -4377,6 +4424,7 @@ void DrawEnchantingTableUI(void)
             // Apply enchantment
             player.xp -= eo->xpCost;
             player.itemEnchantments[enchantHeldItemSlot] = ENCH_PACK(eo->type, eo->level);
+            UnlockAchievement(ACH_ENCHANTER);
 
             // Restore durability
             int maxDur = IsTool((BlockType)enchantHeldItem) ? GetToolMaxDurability((BlockType)enchantHeldItem) :

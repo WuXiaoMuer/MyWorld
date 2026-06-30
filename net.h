@@ -14,6 +14,7 @@
 #define NET_TICK_INTERVAL   (1.0f / NET_TICK_RATE)
 #define NET_TIMEOUT         10.0f   // Seconds before disconnecting idle client
 #define NET_RECV_BUF_SIZE   64      // Max packets buffered per frame
+#define NET_CHEST_SLOTS     27      // Must match CHEST_SLOTS in types.h
 
 //----------------------------------------------------------------------------------
 // Packet Types
@@ -34,6 +35,12 @@ typedef enum {
     PKT_TIME_SYNC,          // Server -> Client: day/night time
     PKT_WEATHER_SYNC,       // Server -> Client: weather change
     PKT_CHAT,               // Bidirectional: chat message
+    PKT_CHEST_OPEN,         // Client -> Server: request chest contents
+    PKT_CHEST_SYNC,         // Bidirectional: full chest slot data
+    PKT_CHEST_CLOSE,        // Client -> Server: closed chest UI
+    PKT_FURNACE_OPEN,       // Client -> Server: request furnace contents
+    PKT_FURNACE_SYNC,       // Bidirectional: full furnace slot data
+    PKT_FURNACE_CLOSE,      // Client -> Server: closed furnace UI
     PKT_DISCONNECT,         // Bidirectional: disconnect notice
     PKT_PING,               // Bidirectional: keepalive
 } PacketType;
@@ -90,6 +97,7 @@ typedef struct {
     int selectedSlot;
     int health;
     uint8_t armor[4];
+    char playerName[32];
 } PktPlayerInfo;
 
 typedef struct {
@@ -182,6 +190,36 @@ typedef struct {
     char reason[64];
 } PktDisconnect;
 
+// PKT_CHEST_OPEN / PKT_CHEST_CLOSE
+typedef struct {
+    int16_t x, y;
+} PktChestOpen;
+
+// PKT_CHEST_SYNC
+typedef struct {
+    int16_t x, y;
+    uint8_t items[NET_CHEST_SLOTS];
+    int counts[NET_CHEST_SLOTS];
+    int durability[NET_CHEST_SLOTS];
+    uint16_t enchantments[NET_CHEST_SLOTS];
+} PktChestSync;
+
+// PKT_FURNACE_OPEN / PKT_FURNACE_CLOSE
+typedef struct {
+    int16_t x, y;
+} PktFurnaceOpen;
+
+// PKT_FURNACE_SYNC
+typedef struct {
+    int16_t x, y;
+    uint8_t fuel; int fuelCount;
+    uint8_t input; int inputCount;
+    uint8_t output; int outputCount;
+    float progress;
+    float fuelBurn;
+    float fuelBurnMax;
+} PktFurnaceSync;
+
 //----------------------------------------------------------------------------------
 // Functions
 //----------------------------------------------------------------------------------
@@ -196,7 +234,7 @@ void NetHostStop(void);
 int NetHostGetClientCount(void);
 
 // Client mode
-bool NetClientConnect(const char *ip, int port);
+bool NetClientConnect(const char *ip, int port, const char *playerName);
 void NetClientDisconnect(void);
 
 // Status

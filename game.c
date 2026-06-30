@@ -56,6 +56,9 @@ char currentSavePath[256] = { 0 };
 // Join Game state
 static char joinIpBuf[64] = "127.0.0.1";
 static int joinIpLen = 8;
+static char joinNameBuf[32] = "Player";
+static int joinNameLen = 6;
+static int joinInputFocus = 0; // 0=name, 1=ip
 static bool joinConnecting = false;
 static float joinConnectTimer = 0.0f;
 
@@ -263,7 +266,7 @@ void InitGame(void)
     }
 }
 
-static void UnlockAchievement(Achievement ach) {
+void UnlockAchievement(Achievement ach) {
     if (!achievements[ach]) {
         achievements[ach] = true;
         StringId msgId = STR_NONE;
@@ -274,6 +277,10 @@ static void UnlockAchievement(Achievement ach) {
             case ACH_ARCHITECT: msgId = STR_ACH_ARCHITECT; break;
             case ACH_REDSTONE_ENGINEER: msgId = STR_ACH_REDSTONE_ENGINEER; break;
             case ACH_COLLECTOR: msgId = STR_ACH_COLLECTOR; break;
+            case ACH_ANGLER: msgId = STR_ACH_ANGLER; break;
+            case ACH_BREEDER: msgId = STR_ACH_BREEDER; break;
+            case ACH_ENCHANTER: msgId = STR_ACH_ENCHANTER; break;
+            case ACH_DEMOLITION: msgId = STR_ACH_DEMOLITION; break;
             default: break;
         }
         if (msgId != STR_NONE) {
@@ -790,6 +797,225 @@ void SyncActiveToFurnace(int idx)
 }
 
 // Return furnace items to inventory when closing
+
+//----------------------------------------------------------------------------------
+// Chest multiplayer sync helpers
+// In multiplayer the host owns chest contents; clients request/open/modify via packets.
+//----------------------------------------------------------------------------------
+static int ChestIndexAt(int bx, int by)
+{
+    for (int i = 0; i < chestCount; i++) {
+        if (chestData[i].x == bx && chestData[i].y == by) return i;
+    }
+    return -1;
+}
+
+static int GetOrCreateChestIndex(int bx, int by)
+{
+    int idx = ChestIndexAt(bx, by);
+    if (idx >= 0) return idx;
+    if (chestCount >= MAX_CHESTS) return -1;
+    idx = chestCount++;
+    memset(&chestData[idx], 0, sizeof(ChestData));
+    chestData[idx].x = bx;
+    chestData[idx].y = by;
+    for (int s = 0; s < CHEST_SLOTS; s++) {
+        chestData[idx].items[s] = BLOCK_AIR;
+        chestData[idx].counts[s] = 0;
+        chestData[idx].durability[s] = 0;
+        chestData[idx].enchantments[s] = 0;
+    }
+    return idx;
+}
+
+static void PackChestSync(PktChestSync *pkt, int idx)
+{
+    pkt->x = (int16_t)chestData[idx].x;
+    pkt->y = (int16_t)chestData[idx].y;
+    memcpy(pkt->items, chestData[idx].items, sizeof(pkt->items));
+    memcpy(pkt->counts, chestData[idx].counts, sizeof(pkt->counts));
+    memcpy(pkt->durability, chestData[idx].durability, sizeof(pkt->durability));
+    memcpy(pkt->enchantments, chestData[idx].enchantments, sizeof(pkt->enchantments));
+}
+
+static void ApplyChestSync(const PktChestSync *pkt)
+{
+    int idx = GetOrCreateChestIndex((int)pkt->x, (int)pkt->y);
+    if (idx < 0) return;
+    memcpy(chestData[idx].items, pkt->items, sizeof(chestData[idx].items));
+    memcpy(chestData[idx].counts, pkt->counts, sizeof(chestData[idx].counts));
+    memcpy(chestData[idx].durability, pkt->durability, sizeof(chestData[idx].durability));
+    memcpy(chestData[idx].enchantments, pkt->enchantments, sizeof(chestData[idx].enchantments));
+}
+
+void RequestOpenChest(int bx, int by)
+{
+    chestBlockX = bx;
+    chestBlockY = by;
+    if (!NetIsConnected()) {
+        // Single-player: open immediately (chest entry is created on demand in UI)
+        chestOpen = true;
+        inventoryOpen = true;
+        gamePaused = false;
+        PlaySoundCraft();
+        return;
+    }
+    if (NetIsHost()) {
+        // Host already owns the data; make sure the chest entry exists and open.
+        GetOrCreateChestIndex(bx, by);
+        chestOpen = true;
+        inventoryOpen = true;
+        gamePaused = false;
+        PlaySoundCraft();
+        return;
+    }
+    // Client: ask host for chest contents; UI will open when PKT_CHEST_SYNC arrives.
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_CHEST_OPEN;
+    PktChestOpen po;
+    po.x = (int16_t)bx;
+    po.y = (int16_t)by;
+    memcpy(buf + 1, &po, sizeof(po));
+    NetSendToServer(buf, 1 + sizeof(po), true);
+}
+
+void SyncChestToHost(int chestIdx)
+{
+    if (chestIdx < 0 || chestIdx >= chestCount) return;
+    if (!NetIsClient()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_CHEST_SYNC;
+    PktChestSync pkt;
+    PackChestSync(&pkt, chestIdx);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    NetSendToServer(buf, 1 + sizeof(pkt), true);
+}
+
+void SyncChestToAll(int chestIdx)
+{
+    if (chestIdx < 0 || chestIdx >= chestCount) return;
+    if (!NetIsHost()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_CHEST_SYNC;
+    PktChestSync pkt;
+    PackChestSync(&pkt, chestIdx);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+        if (players[r].netControlled) {
+            NetSendTo(r, buf, 1 + sizeof(pkt), true);
+        }
+    }
+}
+
+void CloseChestNetwork(void)
+{
+    if (NetIsClient()) {
+        uint8_t buf[NET_PACKET_MAX];
+        buf[0] = PKT_CHEST_CLOSE;
+        PktChestOpen po;
+        po.x = (int16_t)chestBlockX;
+        po.y = (int16_t)chestBlockY;
+        memcpy(buf + 1, &po, sizeof(po));
+        NetSendToServer(buf, 1 + sizeof(po), true);
+    }
+}
+
+//----------------------------------------------------------------------------------
+// Furnace multiplayer sync helpers
+//----------------------------------------------------------------------------------
+static void PackFurnaceSync(PktFurnaceSync *pkt, int idx)
+{
+    FurnaceData *f = &furnaces[idx];
+    pkt->x = (int16_t)f->x;
+    pkt->y = (int16_t)f->y;
+    pkt->fuel = f->fuel; pkt->fuelCount = f->fuelCount;
+    pkt->input = f->input; pkt->inputCount = f->inputCount;
+    pkt->output = f->output; pkt->outputCount = f->outputCount;
+    pkt->progress = f->progress;
+    pkt->fuelBurn = f->fuelBurn;
+    pkt->fuelBurnMax = f->fuelBurnMax;
+}
+
+static void ApplyFurnaceSync(const PktFurnaceSync *pkt)
+{
+    int idx = GetOrCreateFurnace((int)pkt->x, (int)pkt->y);
+    if (idx < 0) return;
+    FurnaceData *f = &furnaces[idx];
+    f->fuel = pkt->fuel; f->fuelCount = pkt->fuelCount;
+    f->input = pkt->input; f->inputCount = pkt->inputCount;
+    f->output = pkt->output; f->outputCount = pkt->outputCount;
+    f->progress = pkt->progress;
+    f->fuelBurn = pkt->fuelBurn;
+    f->fuelBurnMax = pkt->fuelBurnMax;
+    if (activeFurnace == idx) SyncFurnaceToActive(idx);
+}
+
+void RequestOpenFurnace(int bx, int by)
+{
+    furnaceBlockX = bx; furnaceBlockY = by;
+    if (!NetIsConnected()) {
+        activeFurnace = GetOrCreateFurnace(bx, by);
+        if (activeFurnace >= 0) SyncFurnaceToActive(activeFurnace);
+        furnaceOpen = true; inventoryOpen = true; gamePaused = false;
+        PlaySoundCraft();
+        return;
+    }
+    if (NetIsHost()) {
+        activeFurnace = GetOrCreateFurnace(bx, by);
+        if (activeFurnace >= 0) SyncFurnaceToActive(activeFurnace);
+        furnaceOpen = true; inventoryOpen = true; gamePaused = false;
+        PlaySoundCraft();
+        return;
+    }
+    // Client: ask host for furnace contents; UI opens when PKT_FURNACE_SYNC arrives.
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_FURNACE_OPEN;
+    PktFurnaceOpen po;
+    po.x = (int16_t)bx; po.y = (int16_t)by;
+    memcpy(buf + 1, &po, sizeof(po));
+    NetSendToServer(buf, 1 + sizeof(po), true);
+}
+
+void SyncFurnaceToHost(void)
+{
+    if (!NetIsClient()) return;
+    if (activeFurnace < 0 || activeFurnace >= furnaceCount) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_FURNACE_SYNC;
+    PktFurnaceSync pkt;
+    PackFurnaceSync(&pkt, activeFurnace);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    NetSendToServer(buf, 1 + sizeof(pkt), true);
+}
+
+void SyncFurnaceToAll(void)
+{
+    if (!NetIsHost()) return;
+    if (activeFurnace < 0 || activeFurnace >= furnaceCount) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_FURNACE_SYNC;
+    PktFurnaceSync pkt;
+    PackFurnaceSync(&pkt, activeFurnace);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+        if (players[r].netControlled) {
+            NetSendTo(r, buf, 1 + sizeof(pkt), true);
+        }
+    }
+}
+
+void CloseFurnaceNetwork(void)
+{
+    if (NetIsClient()) {
+        uint8_t buf[NET_PACKET_MAX];
+        buf[0] = PKT_FURNACE_CLOSE;
+        PktFurnaceOpen po;
+        po.x = (int16_t)furnaceBlockX; po.y = (int16_t)furnaceBlockY;
+        memcpy(buf + 1, &po, sizeof(po));
+        NetSendToServer(buf, 1 + sizeof(po), true);
+    }
+}
+
 void ReturnFurnaceItems(void)
 {
     if (furnaceFuel != BLOCK_AIR) {
@@ -825,6 +1051,13 @@ void ReturnFurnaceItems(void)
     // Sync cleared state back to furnace array
     if (activeFurnace >= 0 && activeFurnace < furnaceCount) {
         SyncActiveToFurnace(activeFurnace);
+        if (NetIsClient()) {
+            // Notify host that fuel/input/output were returned to the closing player.
+            SyncFurnaceToHost();
+        } else if (NetIsHost()) {
+            // Broadcast the now-empty furnace to other watching clients.
+            SyncFurnaceToAll();
+        }
     }
     activeFurnace = -1;
 }
@@ -926,6 +1159,13 @@ void UpdateGame(float dt)
             if (!data) continue;
             uint8_t type = ((const uint8_t *)data)[0];
             if (type == PKT_JOIN) {
+                // Extract the joining player's chosen name (optional).
+                const char *joinedName = "Player";
+                if (size >= 1 + (int)sizeof(PktJoin)) {
+                    const PktJoin *pj = (const PktJoin *)((const uint8_t *)data + 1);
+                    if (pj->playerName[0]) joinedName = pj->playerName;
+                }
+
                 // Send welcome packet to the new client
                 PktWelcome welcome;
                 welcome.playerId = (uint8_t)fromId;
@@ -947,6 +1187,7 @@ void UpdateGame(float dt)
                 players[fromId].health = MAX_HEALTH;
                 players[fromId].hunger = 20;
                 players[fromId].facingRight = true;
+                snprintf(players[fromId].playerName, sizeof(players[fromId].playerName), "%s", joinedName);
                 // Starter inventory (matches the late-join path during play)
                 players[fromId].inventory[0] = TOOL_WOOD_SWORD;   players[fromId].inventoryCount[0] = 1;
                 players[fromId].inventory[1] = TOOL_WOOD_PICKAXE; players[fromId].inventoryCount[1] = 1;
@@ -982,22 +1223,32 @@ void UpdateGame(float dt)
     if (gameState == STATE_JOIN_GAME) {
 
         if (!joinConnecting) {
-            // IP input mode
+            // Name + IP input mode. Tab switches focus.
+            if (Win32IsKeyPressed(KEY_TAB)) joinInputFocus = 1 - joinInputFocus;
+
+            char *activeBuf = (joinInputFocus == 0) ? joinNameBuf : joinIpBuf;
+            int *activeLen = (joinInputFocus == 0) ? &joinNameLen : &joinIpLen;
+            int activeCap = (joinInputFocus == 0) ? 31 : 60;
+
             int c;
             while ((c = Win32GetCharPressed()) != 0) {
-                if (joinIpLen < 60 && c >= 32 && c < 127) {
-                    joinIpBuf[joinIpLen++] = (char)c;
-                    joinIpBuf[joinIpLen] = '\0';
+                if (*activeLen < activeCap && c >= 32 && c < 127) {
+                    activeBuf[(*activeLen)++] = (char)c;
+                    activeBuf[*activeLen] = '\0';
                 }
             }
             // Backspace handling
             if (Win32IsKeyPressed(KEY_BACKSPACE)) {
-                if (joinIpLen > 0) joinIpBuf[--joinIpLen] = '\0';
+                if (*activeLen > 0) activeBuf[--(*activeLen)] = '\0';
             }
             // Enter to connect
             if (Win32IsKeyPressed(KEY_ENTER)) {
+                joinNameBuf[joinNameLen] = '\0';
                 joinIpBuf[joinIpLen] = '\0';
-                if (joinIpLen > 0 && NetClientConnect(joinIpBuf, NET_PORT)) {
+                // Default name if empty
+                if (joinNameLen <= 0) { strcpy(joinNameBuf, "Player"); joinNameLen = 6; }
+                if (joinIpLen > 0 && NetClientConnect(joinIpBuf, NET_PORT, joinNameBuf)) {
+                    snprintf(player.playerName, sizeof(player.playerName), "%s", joinNameBuf);
                     joinConnecting = true;
                     joinConnectTimer = 0.0f;
                 }
@@ -1005,6 +1256,9 @@ void UpdateGame(float dt)
             if (Win32IsKeyPressed(KEY_ESCAPE)) {
                 joinIpLen = 8;
                 memcpy(joinIpBuf, "127.0.0.1", 9);
+                joinNameLen = 6;
+                memcpy(joinNameBuf, "Player", 7);
+                joinInputFocus = 0;
                 StartTransition(STATE_MENU);
                 menuSelection = 0;
                 PlaySoundUIClick();
@@ -1116,6 +1370,7 @@ void UpdateGame(float dt)
     if (Win32IsKeyPressed(KEY_E)) {
         if (furnaceOpen) {
             // Close furnace
+            CloseFurnaceNetwork();
             ReturnFurnaceItems();
             furnaceOpen = false;
             inventoryOpen = false;
@@ -1124,6 +1379,7 @@ void UpdateGame(float dt)
             craftSearchBuf[0] = '\0';
         } else if (chestOpen) {
             // Close chest
+            CloseChestNetwork();
             chestOpen = false;
             inventoryOpen = false;
             ReturnHeldItem();
@@ -1151,6 +1407,7 @@ void UpdateGame(float dt)
             gamePaused = false;
             enchantOptionCount = 0;
         } else if (furnaceOpen) {
+            CloseFurnaceNetwork();
             ReturnFurnaceItems();
             furnaceOpen = false;
             inventoryOpen = false;
@@ -1158,6 +1415,7 @@ void UpdateGame(float dt)
             craftSearchLen = 0;
             craftSearchBuf[0] = '\0';
         } else if (chestOpen) {
+            CloseChestNetwork();
             chestOpen = false;
             inventoryOpen = false;
             ReturnHeldItem();
@@ -1221,6 +1479,13 @@ void UpdateGame(float dt)
                 if (!data) continue;
                 uint8_t type = ((const uint8_t *)data)[0];
                 if (type == PKT_JOIN && fromId > 0 && fromId < MAX_NET_PLAYERS) {
+                    // Extract the joining player's chosen name.
+                    const char *joinedName = "Player";
+                    if (size >= 1 + (int)sizeof(PktJoin)) {
+                        const PktJoin *pj = (const PktJoin *)((const uint8_t *)data + 1);
+                        if (pj->playerName[0]) joinedName = pj->playerName;
+                    }
+
                     // Late joiner: send welcome + world state
                     PktWelcome welcome;
                     welcome.playerId = (uint8_t)fromId;
@@ -1242,6 +1507,7 @@ void UpdateGame(float dt)
                     players[fromId].health = MAX_HEALTH;
                     players[fromId].hunger = 20;
                     players[fromId].facingRight = true;
+                    snprintf(players[fromId].playerName, sizeof(players[fromId].playerName), "%s", joinedName);
                     players[fromId].inventory[0] = TOOL_WOOD_SWORD;
                     players[fromId].inventoryCount[0] = 1;
                     players[fromId].inventory[1] = TOOL_WOOD_PICKAXE;
@@ -1391,6 +1657,62 @@ void UpdateGame(float dt)
                             NetSendTo(r, relayBuf, 1 + sizeof(PktProjectileSpawn), false);
                         }
                     }
+                } else if (type == PKT_CHEST_OPEN && size >= 1 + (int)sizeof(PktChestOpen)) {
+                    const PktChestOpen *po = (const PktChestOpen *)((const uint8_t *)data + 1);
+                    int idx = GetOrCreateChestIndex((int)po->x, (int)po->y);
+                    if (idx >= 0) {
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_CHEST_SYNC;
+                        PktChestSync pkt;
+                        PackChestSync(&pkt, idx);
+                        memcpy(sbuf + 1, &pkt, sizeof(pkt));
+                        NetSendTo(fromId, sbuf, 1 + sizeof(pkt), true);
+                    }
+                } else if (type == PKT_CHEST_SYNC && size >= 1 + (int)sizeof(PktChestSync)) {
+                    const PktChestSync *pkt = (const PktChestSync *)((const uint8_t *)data + 1);
+                    int idx = GetOrCreateChestIndex((int)pkt->x, (int)pkt->y);
+                    if (idx >= 0) {
+                        // Authoritative host: apply client's changes, then broadcast to others.
+                        ApplyChestSync(pkt);
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_CHEST_SYNC;
+                        memcpy(sbuf + 1, pkt, sizeof(PktChestSync));
+                        for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                            if (r != fromId && players[r].netControlled) {
+                                NetSendTo(r, sbuf, 1 + sizeof(PktChestSync), true);
+                            }
+                        }
+                    }
+                } else if (type == PKT_CHEST_CLOSE && size >= 1 + (int)sizeof(PktChestOpen)) {
+                    // Host can track per-player open chests here if needed; currently no-op.
+                } else if (type == PKT_FURNACE_OPEN && size >= 1 + (int)sizeof(PktFurnaceOpen)) {
+                    const PktFurnaceOpen *po = (const PktFurnaceOpen *)((const uint8_t *)data + 1);
+                    int idx = GetOrCreateFurnace((int)po->x, (int)po->y);
+                    if (idx >= 0) {
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_FURNACE_SYNC;
+                        PktFurnaceSync pkt;
+                        PackFurnaceSync(&pkt, idx);
+                        memcpy(sbuf + 1, &pkt, sizeof(pkt));
+                        NetSendTo(fromId, sbuf, 1 + sizeof(pkt), true);
+                    }
+                } else if (type == PKT_FURNACE_SYNC && size >= 1 + (int)sizeof(PktFurnaceSync)) {
+                    const PktFurnaceSync *pkt = (const PktFurnaceSync *)((const uint8_t *)data + 1);
+                    int idx = GetOrCreateFurnace((int)pkt->x, (int)pkt->y);
+                    if (idx >= 0) {
+                        // Authoritative host: apply client's changes, then broadcast to others.
+                        ApplyFurnaceSync(pkt);
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_FURNACE_SYNC;
+                        memcpy(sbuf + 1, pkt, sizeof(PktFurnaceSync));
+                        for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                            if (r != fromId && players[r].netControlled) {
+                                NetSendTo(r, sbuf, 1 + sizeof(PktFurnaceSync), true);
+                            }
+                        }
+                    }
+                } else if (type == PKT_FURNACE_CLOSE && size >= 1 + (int)sizeof(PktFurnaceOpen)) {
+                    // Host can track per-player open furnaces here if needed; currently no-op.
                 } else if (type == PKT_PING && size >= 1 + (int)sizeof(PktPing)) {
                     // Respond to ping (keep-alive)
                     uint8_t pongBuf[NET_PACKET_MAX];
@@ -1467,6 +1789,7 @@ void UpdateGame(float dt)
                             pi->selectedSlot = players[i].selectedSlot;
                             pi->health = players[i].health;
                             memcpy(pi->armor, players[i].armor, 4);
+                            snprintf(pi->playerName, sizeof(pi->playerName), "%s", players[i].playerName);
                         }
                     }
                     uint8_t buf[NET_PACKET_MAX];
@@ -1574,6 +1897,7 @@ void UpdateGame(float dt)
                             players[pid].selectedSlot = pi->selectedSlot;
                             players[pid].health = pi->health;
                             memcpy(players[pid].armor, pi->armor, 4);
+                            snprintf(players[pid].playerName, sizeof(players[pid].playerName), "%s", pi->playerName);
                             remotePlayers[pid].active = true;
                         } else if (pid == localPlayerId) {
                             // Server reconciliation: correct position if diverged
@@ -1667,6 +1991,30 @@ void UpdateGame(float dt)
                     StartTransition(STATE_MENU);
                     menuSelection = 0;
                     return;
+                } else if (type == PKT_CHEST_SYNC && size >= 1 + (int)sizeof(PktChestSync)) {
+                    const PktChestSync *pkt = (const PktChestSync *)((const uint8_t *)data + 1);
+                    ApplyChestSync(pkt);
+                    // If we have a pending open request for this chest, open the UI now.
+                    if (!chestOpen && pkt->x == chestBlockX && pkt->y == chestBlockY) {
+                        chestOpen = true;
+                        inventoryOpen = true;
+                        gamePaused = false;
+                        PlaySoundCraft();
+                    }
+                } else if (type == PKT_FURNACE_SYNC && size >= 1 + (int)sizeof(PktFurnaceSync)) {
+                    const PktFurnaceSync *pkt = (const PktFurnaceSync *)((const uint8_t *)data + 1);
+                    ApplyFurnaceSync(pkt);
+                    // If we have a pending open request for this furnace, open the UI now.
+                    if (!furnaceOpen && pkt->x == furnaceBlockX && pkt->y == furnaceBlockY) {
+                        activeFurnace = FindFurnace((int)pkt->x, (int)pkt->y);
+                        if (activeFurnace >= 0) {
+                            SyncFurnaceToActive(activeFurnace);
+                            furnaceOpen = true;
+                            inventoryOpen = true;
+                            gamePaused = false;
+                            PlaySoundCraft();
+                        }
+                    }
                 } else if (type == PKT_PING && size >= 1 + (int)sizeof(PktPing)) {
                     // Server ping response — just counts as keepalive
                 }
@@ -1749,9 +2097,11 @@ void UpdateGame(float dt)
         }
         if (!nearBlock) {
             if (furnaceOpen) {
+                CloseFurnaceNetwork();
                 ReturnFurnaceItems();
                 furnaceOpen = false;
             }
+            if (chestOpen) CloseChestNetwork();
             chestOpen = false;
             craftingTableOpen = false;
             inventoryOpen = false;
@@ -1835,21 +2185,38 @@ void DrawGame(void)
             const char *hint = S(STR_JOIN_IP_HINT);
             int hintW = MeasureGameTextWidth(hint, 20);
             DrawGameText(hint, (SCREEN_WIDTH - hintW) / 2, 260, 20, (Color){180, 180, 200, 200});
-            // IP input box
+            // Name input box
             int boxW = 300, boxH = 36;
             int boxX = (SCREEN_WIDTH - boxW) / 2;
-            int boxY = 290;
+            int boxY = 250; // above IP
+            Color nameCol = (joinInputFocus == 0) ? (Color){180, 230, 180, 200} : (Color){100, 140, 200, 200};
             DrawRectangle(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){20, 25, 40, 220});
-            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2, (Color){100, 140, 200, 200});
+            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2, nameCol);
+            DrawGameText(joinNameBuf, boxX + 10, boxY + 8, 20, (Color){220, 230, 255, 255});
+            if (joinInputFocus == 0) {
+                float blink = sinf((float)GetTime() * 4.0f) * 0.5f + 0.5f;
+                int cursorX = boxX + 10 + MeasureGameTextWidth(joinNameBuf, 20);
+                DrawRectangle(cursorX, boxY + 6, 2, boxH - 12, (Color){220, 230, 255, (unsigned char)(blink * 255)});
+            }
+            // IP input box
+            boxY = 300;
+            Color ipCol = (joinInputFocus == 1) ? (Color){180, 230, 180, 200} : (Color){100, 140, 200, 200};
+            DrawRectangle(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){20, 25, 40, 220});
+            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2, ipCol);
             DrawGameText(joinIpBuf, boxX + 10, boxY + 8, 20, (Color){220, 230, 255, 255});
-            // Cursor blink
-            float blink = sinf((float)GetTime() * 4.0f) * 0.5f + 0.5f;
-            int cursorX = boxX + 10 + MeasureGameTextWidth(joinIpBuf, 20);
-            DrawRectangle(cursorX, boxY + 6, 2, boxH - 12, (Color){220, 230, 255, (unsigned char)(blink * 255)});
+            if (joinInputFocus == 1) {
+                float blink = sinf((float)GetTime() * 4.0f) * 0.5f + 0.5f;
+                int cursorX = boxX + 10 + MeasureGameTextWidth(joinIpBuf, 20);
+                DrawRectangle(cursorX, boxY + 6, 2, boxH - 12, (Color){220, 230, 255, (unsigned char)(blink * 255)});
+            }
             // ESC hint
             const char *escHint = S(STR_JOIN_HELP_HINT);
             int escW = MeasureGameTextWidth(escHint, 16);
-            DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, 350, 16, (Color){150, 150, 170, 180});
+            DrawGameText(escHint, (SCREEN_WIDTH - escW) / 2, 360, 16, (Color){150, 150, 170, 180});
+            // Tab hint
+            const char *tabHint = S(STR_JOIN_TAB_HINT);
+            int tabW = MeasureGameTextWidth(tabHint, 14);
+            DrawGameText(tabHint, (SCREEN_WIDTH - tabW) / 2, 380, 14, (Color){130, 140, 150, 160});
         } else {
             // Connecting screen
             const char *title = S(STR_JOIN_CONNECTING);

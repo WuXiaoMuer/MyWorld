@@ -129,7 +129,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        13
+#define SAVE_VERSION        14
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -500,6 +500,7 @@ typedef enum {
     STR_HOST_PLAYERS_COUNT,
     STR_HOST_CANCEL_HINT,
     STR_JOIN_HELP_HINT,
+    STR_JOIN_TAB_HINT,
     STR_OPEN_TO_LAN,
     STR_LAN_OPENED,
     STR_LAN_STATUS,
@@ -640,6 +641,10 @@ typedef enum {
     STR_ACH_ARCHITECT,
     STR_ACH_REDSTONE_ENGINEER,
     STR_ACH_COLLECTOR,
+    STR_ACH_ANGLER,
+    STR_ACH_BREEDER,
+    STR_ACH_ENCHANTER,
+    STR_ACH_DEMOLITION,
 
     // Status Messages
     STR_MSG_GAME_SAVED,
@@ -1146,6 +1151,7 @@ typedef struct {
     bool netControlled;      // true = driven by network input, not keyboard
     float moveInput;         // -1.0 to 1.0, used when netControlled
     bool jumpHeld;           // jump key state from network
+    char playerName[32];     // display name in multiplayer
 } Player;
 
 //----------------------------------------------------------------------------------
@@ -1224,6 +1230,10 @@ typedef enum {
     ACH_ARCHITECT,          // Place 1000 blocks
     ACH_REDSTONE_ENGINEER,  // Build a working redstone circuit
     ACH_COLLECTOR,          // Have 20 unique item types in inventory
+    ACH_ANGLER,             // Catch a fish
+    ACH_BREEDER,            // Breed two animals into a baby
+    ACH_ENCHANTER,          // Enchant an item
+    ACH_DEMOLITION,         // Detonate TNT
     ACH_COUNT
 } Achievement;
 
@@ -1291,6 +1301,7 @@ typedef struct {
     int health;
     bool active;
     float interpX, interpY; // Interpolation targets
+    char playerName[32];    // display name (received from peer)
 } RemotePlayer;
 
 //----------------------------------------------------------------------------------
@@ -1357,6 +1368,7 @@ extern Difficulty gameDifficulty;
 
 // Achievement tracking
 extern bool achievements[ACH_COUNT];
+void UnlockAchievement(Achievement ach);
 extern int totalMobsKilled;
 extern int totalBlocksPlaced;
 
@@ -1419,6 +1431,10 @@ int FindFurnace(int x, int y);
 int GetOrCreateFurnace(int x, int y);
 void SyncFurnaceToActive(int idx);
 void SyncActiveToFurnace(int idx);
+void RequestOpenFurnace(int bx, int by);
+void SyncFurnaceToHost(void);
+void SyncFurnaceToAll(void);
+void CloseFurnaceNetwork(void);
 
 // Drag-and-drop held item (shared between rendering.c and crafting.c)
 extern uint8_t heldItem;
@@ -1523,6 +1539,11 @@ void InitPrimedTnt(void);
 void PrimeTnt(int bx, int by);
 void UpdatePrimedTnt(float dt);
 void ExplodeAt(float worldX, float worldY, int radius);
+// Multiplayer container sync
+void RequestOpenChest(int bx, int by);
+void SyncChestToHost(int chestIdx);
+void SyncChestToAll(int chestIdx);
+void CloseChestNetwork(void);
 
 // light.c
 void InitLightMap(void);

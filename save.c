@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 
 //----------------------------------------------------------------------------------
-// Save File Format v13:
+// Save File Format v14:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
@@ -14,7 +14,7 @@
 //   Furnace:     multi-furnace data (v5+, v9+ multi)
 //   Chests:      count + per-chest data (v6+)
 //   Weather:     type + duration (v7+)
-//   Achievements: bool[ACH_COUNT] + totalMobsKilled + totalBlocksPlaced (v9+)
+//   Achievements: bool[ACH_COUNT] + totalMobsKilled + totalBlocksPlaced (v9+; v9-v13 stored 6)
 //   World:       RLE per column: (uint8 block, uint16 count) pairs
 //   Modified:    count + per-block x,y,type (v8+)
 //   Mobs:        count + per-mob data (v10+)
@@ -466,9 +466,15 @@ bool LoadWorld(const char *path)
         } else {
             InitWeather();
         }
-        // v9+: achievements
+        // v9+: achievements. v9-v13 stored 6 achievements; v14+ stores ACH_COUNT.
         if (version >= 9) {
-            if (fread(achievements, sizeof(bool), ACH_COUNT, f) != ACH_COUNT) { fclose(f); return false; }
+            int achStored = (version >= 14) ? ACH_COUNT : 6;
+            for (int i = 0; i < ACH_COUNT; i++) achievements[i] = false;
+            for (int i = 0; i < achStored; i++) {
+                bool b;
+                if (fread(&b, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
+                if (i < ACH_COUNT) achievements[i] = b;
+            }
             if (fread(&totalMobsKilled, sizeof(int), 1, f) != 1) { fclose(f); return false; }
             if (fread(&totalBlocksPlaced, sizeof(int), 1, f) != 1) { fclose(f); return false; }
         } else {

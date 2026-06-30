@@ -1286,6 +1286,15 @@ void UpdateMobs(float dt)
 //----------------------------------------------------------------------------------
 // Mob Rendering
 //----------------------------------------------------------------------------------
+// Baby animals are drawn at half size, anchored at the bottom center so their
+// feet stay on the ground and collision box alignment is preserved.
+#define BABY_SCALE 0.5f
+static float MobScale(const Mob *m) { return m->isBaby ? BABY_SCALE : 1.0f; }
+#define SRECT(m, _x, _y, _w, _h) \
+    (int)(m->position.x + ((m->isBaby ? (mobWidth[m->type] * (1.0f - BABY_SCALE) * 0.5f) : 0.0f) + ((_x) - m->position.x) * MobScale(m))), \
+    (int)(m->position.y + ((m->isBaby ? (mobHeight[m->type] * (1.0f - BABY_SCALE)) : 0.0f) + ((_y) - m->position.y) * MobScale(m))), \
+    (int)((_w) * MobScale(m)), (int)((_h) * MobScale(m))
+
 static void DrawZombieSprite(Mob *mob)
 {
     float x = mob->position.x;
@@ -1342,24 +1351,24 @@ static void DrawPigSprite(Mob *mob)
         else flashIntensity = (flashIntensity - 0.7f) / 0.3f;
         if (flashIntensity > 0.01f) {
             unsigned char flashA = (unsigned char)(flashIntensity * 180);
-            DrawRectangle((int)(x - 1), (int)(y - 1), (int)(mobWidth[MOB_PIG] + 2), (int)(mobHeight[MOB_PIG] + 2), (Color){255, 255, 255, flashA});
+            DrawRectangle(SRECT(mob, x - 1, y - 1, mobWidth[MOB_PIG] + 2, mobHeight[MOB_PIG] + 2), (Color){255, 255, 255, flashA});
         }
     }
 
     // Body (pink)
-    DrawRectangle((int)x, (int)(y + 2), 16, 8, (Color){220, 150, 140, alpha});
+    DrawRectangle(SRECT(mob, x, y + 2, 16, 8), (Color){220, 150, 140, alpha});
     // Head
-    DrawRectangle((int)(x + (mob->facingRight ? 12 : -4)), (int)y, 8, 8, (Color){230, 160, 150, alpha});
+    DrawRectangle(SRECT(mob, x + (mob->facingRight ? 12 : -4), y, 8, 8), (Color){230, 160, 150, alpha});
     // Snout
-    int snoutX = mob->facingRight ? (int)(x + 18) : (int)(x - 4);
-    DrawRectangle(snoutX, (int)(y + 3), 4, 4, (Color){200, 130, 120, alpha});
+    float snoutX = mob->facingRight ? (x + 18) : (x - 4);
+    DrawRectangle(SRECT(mob, snoutX, y + 3, 4, 4), (Color){200, 130, 120, alpha});
     // Eye
-    int eyeX = mob->facingRight ? (int)(x + 17) : (int)(x + 1);
-    DrawRectangle(eyeX, (int)(y + 2), 2, 2, (Color){40, 40, 40, alpha});
+    float eyeX = mob->facingRight ? (x + 17) : (x + 1);
+    DrawRectangle(SRECT(mob, eyeX, y + 2, 2, 2), (Color){40, 40, 40, alpha});
     // Legs
-    DrawRectangle((int)(x + 1), (int)(y + 10 + legSwing), 3, 4, (Color){200, 130, 120, alpha});
-    DrawRectangle((int)(x + 5), (int)(y + 10 - legSwing), 3, 4, (Color){200, 130, 120, alpha});
-    DrawRectangle((int)(x + 10), (int)(y + 10 + legSwing), 3, 4, (Color){200, 130, 120, alpha});
+    DrawRectangle(SRECT(mob, x + 1, y + 10 + legSwing, 3, 4), (Color){200, 130, 120, alpha});
+    DrawRectangle(SRECT(mob, x + 5, y + 10 - legSwing, 3, 4), (Color){200, 130, 120, alpha});
+    DrawRectangle(SRECT(mob, x + 10, y + 10 + legSwing, 3, 4), (Color){200, 130, 120, alpha});
 }
 
 static void DrawCowSprite(Mob *mob)
@@ -1375,21 +1384,21 @@ static void DrawCowSprite(Mob *mob)
         alpha = (unsigned char)(255 * dp);
     }
     // Body (brown)
-    DrawRectangle((int)x, (int)(y + 3), 20, 10, (Color){100, 60, 30, alpha});
+    DrawRectangle(SRECT(mob, x, y + 3, 20, 10), (Color){100, 60, 30, alpha});
     // Head
-    DrawRectangle((int)(x + (mob->facingRight ? 16 : -6)), (int)y, 10, 10, (Color){110, 70, 35, alpha});
+    DrawRectangle(SRECT(mob, x + (mob->facingRight ? 16 : -6), y, 10, 10), (Color){110, 70, 35, alpha});
     // Eye
-    int eyeX = mob->facingRight ? (int)(x + 23) : (int)(x + 1);
-    DrawRectangle(eyeX, (int)(y + 3), 2, 2, (Color){30, 30, 30, alpha});
+    float eyeX = mob->facingRight ? (x + 23) : (x + 1);
+    DrawRectangle(SRECT(mob, eyeX, y + 3, 2, 2), (Color){30, 30, 30, alpha});
     // Horns
-    int hornX = mob->facingRight ? (int)(x + 18) : (int)(x + 2);
-    DrawRectangle(hornX, (int)(y - 2), 2, 3, (Color){200, 190, 170, alpha});
-    DrawRectangle(hornX + 4, (int)(y - 2), 2, 3, (Color){200, 190, 170, alpha});
+    float hornX = mob->facingRight ? (x + 18) : (x + 2);
+    DrawRectangle(SRECT(mob, hornX, y - 2, 2, 3), (Color){200, 190, 170, alpha});
+    DrawRectangle(SRECT(mob, hornX + 4, y - 2, 2, 3), (Color){200, 190, 170, alpha});
     // Legs
-    DrawRectangle((int)(x + 2), (int)(y + 13 + legSwing), 3, 5, (Color){90, 55, 25, alpha});
-    DrawRectangle((int)(x + 7), (int)(y + 13 - legSwing), 3, 5, (Color){90, 55, 25, alpha});
-    DrawRectangle((int)(x + 12), (int)(y + 13 + legSwing), 3, 5, (Color){90, 55, 25, alpha});
-    DrawRectangle((int)(x + 17), (int)(y + 13 - legSwing), 3, 5, (Color){90, 55, 25, alpha});
+    DrawRectangle(SRECT(mob, x + 2, y + 13 + legSwing, 3, 5), (Color){90, 55, 25, alpha});
+    DrawRectangle(SRECT(mob, x + 7, y + 13 - legSwing, 3, 5), (Color){90, 55, 25, alpha});
+    DrawRectangle(SRECT(mob, x + 12, y + 13 + legSwing, 3, 5), (Color){90, 55, 25, alpha});
+    DrawRectangle(SRECT(mob, x + 17, y + 13 - legSwing, 3, 5), (Color){90, 55, 25, alpha});
 }
 
 static void DrawSheepSprite(Mob *mob)
@@ -1405,18 +1414,18 @@ static void DrawSheepSprite(Mob *mob)
         alpha = (unsigned char)(255 * dp);
     }
     // Wool body (white fluffy)
-    DrawRectangle((int)x, (int)(y + 2), 16, 10, (Color){240, 240, 240, alpha});
-    DrawRectangle((int)(x + 1), (int)(y + 1), 14, 12, (Color){230, 230, 230, alpha});
+    DrawRectangle(SRECT(mob, x, y + 2, 16, 10), (Color){240, 240, 240, alpha});
+    DrawRectangle(SRECT(mob, x + 1, y + 1, 14, 12), (Color){230, 230, 230, alpha});
     // Head (dark)
-    DrawRectangle((int)(x + (mob->facingRight ? 12 : -4)), (int)y, 8, 8, (Color){60, 60, 60, alpha});
+    DrawRectangle(SRECT(mob, x + (mob->facingRight ? 12 : -4), y, 8, 8), (Color){60, 60, 60, alpha});
     // Eye
-    int eyeX = mob->facingRight ? (int)(x + 17) : (int)(x + 1);
-    DrawRectangle(eyeX, (int)(y + 2), 2, 2, (Color){200, 200, 200, alpha});
+    float eyeX = mob->facingRight ? (x + 17) : (x + 1);
+    DrawRectangle(SRECT(mob, eyeX, y + 2, 2, 2), (Color){200, 200, 200, alpha});
     // Legs
-    DrawRectangle((int)(x + 2), (int)(y + 12 + legSwing), 3, 4, (Color){50, 50, 50, alpha});
-    DrawRectangle((int)(x + 6), (int)(y + 12 - legSwing), 3, 4, (Color){50, 50, 50, alpha});
-    DrawRectangle((int)(x + 10), (int)(y + 12 + legSwing), 3, 4, (Color){50, 50, 50, alpha});
-    DrawRectangle((int)(x + 14), (int)(y + 12 - legSwing), 3, 4, (Color){50, 50, 50, alpha});
+    DrawRectangle(SRECT(mob, x + 2, y + 12 + legSwing, 3, 4), (Color){50, 50, 50, alpha});
+    DrawRectangle(SRECT(mob, x + 6, y + 12 - legSwing, 3, 4), (Color){50, 50, 50, alpha});
+    DrawRectangle(SRECT(mob, x + 10, y + 12 + legSwing, 3, 4), (Color){50, 50, 50, alpha});
+    DrawRectangle(SRECT(mob, x + 14, y + 12 - legSwing, 3, 4), (Color){50, 50, 50, alpha});
 }
 
 static void DrawChickenSprite(Mob *mob)
@@ -1432,22 +1441,22 @@ static void DrawChickenSprite(Mob *mob)
         alpha = (unsigned char)(255 * dp);
     }
     // Body (white)
-    DrawRectangle((int)x, (int)(y + 2), 8, 6, (Color){240, 230, 220, alpha});
+    DrawRectangle(SRECT(mob, x, y + 2, 8, 6), (Color){240, 230, 220, alpha});
     // Head
-    DrawRectangle((int)(x + (mob->facingRight ? 6 : -2)), (int)y, 5, 5, (Color){240, 230, 220, alpha});
+    DrawRectangle(SRECT(mob, x + (mob->facingRight ? 6 : -2), y, 5, 5), (Color){240, 230, 220, alpha});
     // Beak
-    int beakX = mob->facingRight ? (int)(x + 10) : (int)(x - 2);
-    DrawRectangle(beakX, (int)(y + 2), 3, 2, (Color){230, 180, 50, alpha});
+    float beakX = mob->facingRight ? (x + 10) : (x - 2);
+    DrawRectangle(SRECT(mob, beakX, y + 2, 3, 2), (Color){230, 180, 50, alpha});
     // Comb (red)
-    DrawRectangle((int)(x + (mob->facingRight ? 7 : 0)), (int)(y - 1), 3, 2, (Color){200, 50, 50, alpha});
+    DrawRectangle(SRECT(mob, x + (mob->facingRight ? 7 : 0), y - 1, 3, 2), (Color){200, 50, 50, alpha});
     // Eye
-    int eyeX = mob->facingRight ? (int)(x + 9) : (int)(x + 1);
-    DrawRectangle(eyeX, (int)(y + 1), 1, 1, (Color){30, 30, 30, alpha});
+    float eyeX = mob->facingRight ? (x + 9) : (x + 1);
+    DrawRectangle(SRECT(mob, eyeX, y + 1, 1, 1), (Color){30, 30, 30, alpha});
     // Legs
-    DrawRectangle((int)(x + 2), (int)(y + 8 + legSwing), 2, 3, (Color){200, 150, 50, alpha});
-    DrawRectangle((int)(x + 5), (int)(y + 8 - legSwing), 2, 3, (Color){200, 150, 50, alpha});
+    DrawRectangle(SRECT(mob, x + 2, y + 8 + legSwing, 2, 3), (Color){200, 150, 50, alpha});
+    DrawRectangle(SRECT(mob, x + 5, y + 8 - legSwing, 2, 3), (Color){200, 150, 50, alpha});
     // Tail
-    DrawRectangle((int)(x + (mob->facingRight ? -1 : 7)), (int)(y + 1), 2, 4, (Color){220, 210, 200, alpha});
+    DrawRectangle(SRECT(mob, x + (mob->facingRight ? -1 : 7), y + 1, 2, 4), (Color){220, 210, 200, alpha});
 }
 
 static void DrawVillagerSprite(Mob *mob)

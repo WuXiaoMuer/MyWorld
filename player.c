@@ -93,6 +93,11 @@ void InitPlayer(void)
     player.netControlled = false;
     player.moveInput = 0.0f;
 
+    // Preserve player name across respawns/init if already set; default otherwise.
+    if (player.playerName[0] == '\0') {
+        strcpy(player.playerName, "Player");
+    }
+
     for (int i = 0; i < 4; i++) {
         player.armor[i] = BLOCK_AIR;
         player.armorDurability[i] = 0;
@@ -1002,29 +1007,12 @@ void PlayerBlockInteraction(void)
             }
             // Interact with furnace
             if (world[blockX][blockY] == BLOCK_FURNACE) {
-                // Save current furnace state if one is open
-                if (activeFurnace >= 0) SyncActiveToFurnace(activeFurnace);
-                // Find or create furnace at this position
-                activeFurnace = GetOrCreateFurnace(blockX, blockY);
-                if (activeFurnace >= 0) {
-                    SyncFurnaceToActive(activeFurnace);
-                }
-                furnaceOpen = true;
-                furnaceBlockX = blockX;
-                furnaceBlockY = blockY;
-                inventoryOpen = true;
-                gamePaused = false;
-                PlaySoundCraft();
+                RequestOpenFurnace(blockX, blockY);
                 return;
             }
             // Interact with chest
             if (world[blockX][blockY] == BLOCK_CHEST) {
-                chestOpen = true;
-                chestBlockX = blockX;
-                chestBlockY = blockY;
-                inventoryOpen = true;
-                gamePaused = false;
-                PlaySoundCraft();
+                RequestOpenChest(blockX, blockY);
                 return;
             }
             // Toggle lever
@@ -1317,6 +1305,7 @@ void PlayerBlockInteraction(void)
                         AddToInventory((BlockType)catchItem);
                         ShowMessage(S(STR_FISH_CATCH), (Color){100, 200, 255, 255});
                         PlaySoundPickup();
+                        UnlockAchievement(ACH_ANGLER);
                         projectiles[i].active = false;
                     } else {
                         // Just retract with nothing
@@ -1478,6 +1467,7 @@ void PlayerBlockInteraction(void)
                                     baby->health = baby->maxHealth / 2;
                                     baby->maxHealth = baby->maxHealth / 2;
                                     breedCooldownTimer = 5.0f; // 5 second global cooldown
+                                    UnlockAchievement(ACH_BREEDER);
                                 }
                                 mobs[i].loveTimer = 0;
                                 mobs[j].loveTimer = 0;

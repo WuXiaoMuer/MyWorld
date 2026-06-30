@@ -2737,6 +2737,12 @@ static void PropagateRedstoneBFS(int startX, int startY, int power)
                     redstonePower[nx][ny] = (uint8_t)newPower;
                 }
             }
+            // TNT ignites when a redstone signal reaches it (terminal, like a lamp).
+            // PrimeTnt() dedups, so repeated propagation won't re-prime it.
+            else if (nblock == BLOCK_TNT) {
+                redstonePower[nx][ny] = (uint8_t)newPower;
+                PrimeTnt(nx, ny);
+            }
         }
     }
 }
@@ -2991,6 +2997,7 @@ void UpdatePrimedTnt(float dt)
             UpdateLightAt(bx, by);
         }
         ExplodeAt(bx * BLOCK_SIZE + BLOCK_SIZE / 2.0f, by * BLOCK_SIZE + BLOCK_SIZE / 2.0f, TNT_EXPLODE_RADIUS);
+        UnlockAchievement(ACH_DEMOLITION);
         // swap-remove this entry and re-check the swapped-in one
         primedTntX[i] = primedTntX[primedTntCount - 1];
         primedTntY[i] = primedTntY[primedTntCount - 1];
