@@ -233,6 +233,26 @@ void DrawInventoryScreen(void)
     if (inventoryOpen && !prevInvOpen) craftScrollOffset = 0;
     prevInvOpen = inventoryOpen;
 
+    // Snapshot inventory + armor at the start of the frame so we can detect
+    // modifications and sync them in multiplayer.
+    bool doInvSync = (inventoryOpen && NetIsConnected());
+    uint8_t  snapInv[INVENTORY_SLOTS];
+    int      snapCount[INVENTORY_SLOTS];
+    int      snapDur[INVENTORY_SLOTS];
+    uint16_t snapEnch[INVENTORY_SLOTS];
+    uint8_t  snapArmor[4];
+    int      snapArmorDur[4];
+    uint16_t snapArmorEnch[4];
+    if (doInvSync) {
+        memcpy(snapInv,   player.inventory,        sizeof(snapInv));
+        memcpy(snapCount, player.inventoryCount,   sizeof(snapCount));
+        memcpy(snapDur,   player.toolDurability,   sizeof(snapDur));
+        memcpy(snapEnch,  player.itemEnchantments, sizeof(snapEnch));
+        memcpy(snapArmor, player.armor,            sizeof(snapArmor));
+        memcpy(snapArmorDur,  player.armorDurability,  sizeof(snapArmorDur));
+        memcpy(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch));
+    }
+
     int slotSize = 40;
 
     // --- Minecraft-style combined furnace + inventory screen ---
@@ -698,6 +718,20 @@ void DrawInventoryScreen(void)
             }
         }
 
+        // If inventory/armor changed inside the furnace UI, sync that too.
+        if (doInvSync) {
+            if (memcmp(snapInv,   player.inventory,        sizeof(snapInv))   != 0 ||
+                memcmp(snapCount, player.inventoryCount,   sizeof(snapCount)) != 0 ||
+                memcmp(snapDur,   player.toolDurability,   sizeof(snapDur))   != 0 ||
+                memcmp(snapEnch,  player.itemEnchantments, sizeof(snapEnch))  != 0 ||
+                memcmp(snapArmor, player.armor,            sizeof(snapArmor)) != 0 ||
+                memcmp(snapArmorDur,  player.armorDurability,  sizeof(snapArmorDur))  != 0 ||
+                memcmp(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch)) != 0) {
+                if (NetIsClient()) SyncInventoryToHost();
+                else if (NetIsHost()) SyncInventoryToAll();
+            }
+        }
+
         return;
     }
 
@@ -1044,6 +1078,20 @@ void DrawInventoryScreen(void)
                 memcmp(snapEnch, chestData[chestIdx].enchantments, sizeof(snapEnch)) != 0) {
                 if (NetIsClient()) SyncChestToHost(chestIdx);
                 else if (NetIsHost()) SyncChestToAll(chestIdx);
+            }
+        }
+
+        // If inventory/armor changed inside the chest UI, sync that too.
+        if (doInvSync) {
+            if (memcmp(snapInv,   player.inventory,        sizeof(snapInv))   != 0 ||
+                memcmp(snapCount, player.inventoryCount,   sizeof(snapCount)) != 0 ||
+                memcmp(snapDur,   player.toolDurability,   sizeof(snapDur))   != 0 ||
+                memcmp(snapEnch,  player.itemEnchantments, sizeof(snapEnch))  != 0 ||
+                memcmp(snapArmor, player.armor,            sizeof(snapArmor)) != 0 ||
+                memcmp(snapArmorDur,  player.armorDurability,  sizeof(snapArmorDur))  != 0 ||
+                memcmp(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch)) != 0) {
+                if (NetIsClient()) SyncInventoryToHost();
+                else if (NetIsHost()) SyncInventoryToAll();
             }
         }
 
@@ -1780,6 +1828,20 @@ void DrawInventoryScreen(void)
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (heldCount > 1) {
             DrawGameText(TextFormat("%d", heldCount), mx + slotSize - 20, my + slotSize - 16,14, WHITE);
+        }
+    }
+
+    // If inventory/armor changed inside the normal inventory UI, sync it.
+    if (doInvSync) {
+        if (memcmp(snapInv,   player.inventory,        sizeof(snapInv))   != 0 ||
+            memcmp(snapCount, player.inventoryCount,   sizeof(snapCount)) != 0 ||
+            memcmp(snapDur,   player.toolDurability,   sizeof(snapDur))   != 0 ||
+            memcmp(snapEnch,  player.itemEnchantments, sizeof(snapEnch))  != 0 ||
+            memcmp(snapArmor, player.armor,            sizeof(snapArmor)) != 0 ||
+            memcmp(snapArmorDur,  player.armorDurability,  sizeof(snapArmorDur))  != 0 ||
+            memcmp(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch)) != 0) {
+            if (NetIsClient()) SyncInventoryToHost();
+            else if (NetIsHost()) SyncInventoryToAll();
         }
     }
 }
@@ -4346,7 +4408,7 @@ static const char* GetEnchantName(EnchantmentType type) {
 
 void DrawEnchantingTableUI(void)
 {
-    if (!enchantOpen || enchantOptionCount == 0) return;
+    if (!localEnchantSession.open || localEnchantSession.optionCount == 0) return;
 
     int panelW = 500, panelH = 320;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
@@ -4366,12 +4428,12 @@ void DrawEnchantingTableUI(void)
     DrawRectangle(slotX, slotY, slotSize, slotSize, (Color){40, 35, 55, 255});
     DrawRectangleLines(slotX, slotY, slotSize, slotSize, (Color){120, 100, 180, 200});
     // Draw the held item in the slot
-    if (enchantHeldItem != BLOCK_AIR && blockAtlas.id > 0) {
-        Rectangle src = { (float)(enchantHeldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+    if (localEnchantSession.heldItem != BLOCK_AIR && blockAtlas.id > 0) {
+        Rectangle src = { (float)(localEnchantSession.heldItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)(slotX + 8), (float)(slotY + 8), (float)(32), (float)(32) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
     }
-    DrawGameText(GetBlockName((BlockType)enchantHeldItem), slotX + slotSize + 8, slotY + 18, 11, (Color){200, 200, 200, 255});
+    DrawGameText(GetBlockName((BlockType)localEnchantSession.heldItem), slotX + slotSize + 8, slotY + 18, 11, (Color){200, 200, 200, 255});
 
     // XP available
     DrawGameText(TextFormat("XP: %d", player.xp), panelX + panelW / 2 - 30, panelY + 270, 12, (Color){80, 220, 80, 200});
@@ -4383,8 +4445,8 @@ void DrawEnchantingTableUI(void)
     int optW = panelW - 210;
     int optPad = 6;
 
-    for (int i = 0; i < enchantOptionCount; i++) {
-        EnchantOption *eo = &enchantOptions[i];
+    for (int i = 0; i < localEnchantSession.optionCount; i++) {
+        EnchantOption *eo = &localEnchantSession.options[i];
         if (eo->type == ENCH_NONE) continue;
 
         int oy = optY + i * (optH + optPad);
@@ -4423,24 +4485,64 @@ void DrawEnchantingTableUI(void)
         if (hover && canAfford) {
             // Apply enchantment
             player.xp -= eo->xpCost;
-            player.itemEnchantments[enchantHeldItemSlot] = ENCH_PACK(eo->type, eo->level);
+            player.itemEnchantments[localEnchantSession.heldItemSlot] = ENCH_PACK(eo->type, eo->level);
             UnlockAchievement(ACH_ENCHANTER);
 
             // Restore durability
-            int maxDur = IsTool((BlockType)enchantHeldItem) ? GetToolMaxDurability((BlockType)enchantHeldItem) :
-                         IsArmor((BlockType)enchantHeldItem) ? GetArmorMaxDurability((BlockType)enchantHeldItem) : 0;
-            if (IsTool((BlockType)enchantHeldItem)) {
-                player.toolDurability[enchantHeldItemSlot] = maxDur;
+            int maxDur = IsTool((BlockType)localEnchantSession.heldItem) ? GetToolMaxDurability((BlockType)localEnchantSession.heldItem) :
+                         IsArmor((BlockType)localEnchantSession.heldItem) ? GetArmorMaxDurability((BlockType)localEnchantSession.heldItem) : 0;
+            if (IsTool((BlockType)localEnchantSession.heldItem)) {
+                player.toolDurability[localEnchantSession.heldItemSlot] = maxDur;
             }
 
             PlaySoundCraft();
             ShowMessage(S(STR_MSG_ENCHANTED), (Color){180, 120, 255, 255});
 
             // Close UI
-            enchantOpen = false;
+            localEnchantSession.open = false;
             inventoryOpen = false;
-            enchantOptionCount = 0;
+            localEnchantSession.optionCount = 0;
         }
+    }
+}
+
+void DrawChatUI(void)
+{
+    int x = 10;
+    int y = SCREEN_HEIGHT - 220;
+    int w = 500;
+    int lineH = 18;
+    int maxVisible = 10;
+
+    // Draw recent messages
+    int shown = 0;
+    for (int i = chatHistoryCount - 1; i >= 0 && shown < maxVisible; i--) {
+        ChatMessage *cm = &chatHistory[i];
+        if (!chatOpen && cm->timer <= 0.0f) continue;
+        const char *name = "System";
+        Color nameColor = (Color){200, 200, 200, 255};
+        if (cm->playerId < MAX_NET_PLAYERS) {
+            name = players[cm->playerId].playerName;
+            if (cm->playerId == localPlayerId) nameColor = (Color){100, 220, 100, 255};
+            else nameColor = (Color){100, 180, 220, 255};
+        }
+        char line[160];
+        snprintf(line, sizeof(line), "%s: %s", name, cm->message);
+        int alpha = 255;
+        if (!chatOpen && cm->timer < 3.0f) alpha = (int)(255 * cm->timer / 3.0f);
+        if (alpha < 0) alpha = 0;
+        DrawRectangle(x, y - shown * lineH, w, lineH, (Color){0, 0, 0, (unsigned char)(140 * alpha / 255)});
+        DrawGameText(line, x + 4, y - shown * lineH + 2, 12, (Color){230, 230, 230, (unsigned char)alpha});
+        shown++;
+    }
+
+    // Draw chat input bar when open
+    if (chatOpen) {
+        int inputY = SCREEN_HEIGHT - 40;
+        DrawRectangle(x, inputY, w, 28, (Color){0, 0, 0, 200});
+        DrawRectangleLines(x, inputY, w, 28, (Color){120, 120, 140, 255});
+        DrawGameText(TextFormat("%s%s", chatInput, ((int)(GetTime() * 2) % 2 == 0) ? "_" : ""),
+                     x + 6, inputY + 6, 14, WHITE);
     }
 }
 

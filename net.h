@@ -15,6 +15,7 @@
 #define NET_TIMEOUT         10.0f   // Seconds before disconnecting idle client
 #define NET_RECV_BUF_SIZE   64      // Max packets buffered per frame
 #define NET_CHEST_SLOTS     27      // Must match CHEST_SLOTS in types.h
+#define NET_INVENTORY_SLOTS 36      // Must match INVENTORY_SLOTS in types.h
 
 //----------------------------------------------------------------------------------
 // Packet Types
@@ -31,7 +32,8 @@ typedef enum {
     PKT_BLOCK_CHANGE,       // Bidirectional: block placed/broken
     PKT_DAMAGE_MOB,         // Client -> Server: player hit a mob
     PKT_DAMAGE_PLAYER,      // Server -> Client: player took damage
-    PKT_INVENTORY_SYNC,     // Server -> Client: full inventory sync
+    PKT_INVENTORY_SYNC,     // Bidirectional: full inventory sync
+    PKT_CRAFT_REQUEST,      // Client -> Server: request to craft a recipe
     PKT_TIME_SYNC,          // Server -> Client: day/night time
     PKT_WEATHER_SYNC,       // Server -> Client: weather change
     PKT_CHAT,               // Bidirectional: chat message
@@ -219,6 +221,25 @@ typedef struct {
     float fuelBurn;
     float fuelBurnMax;
 } PktFurnaceSync;
+
+// PKT_INVENTORY_SYNC - full inventory + armor state (server <-> client)
+typedef struct {
+    uint8_t  playerId;                                  // server->client: owner; client->server: ignored
+    uint8_t  inventory[NET_INVENTORY_SLOTS];
+    int      inventoryCount[NET_INVENTORY_SLOTS];
+    int      toolDurability[NET_INVENTORY_SLOTS];
+    uint16_t itemEnchantments[NET_INVENTORY_SLOTS];
+    uint8_t  armor[4];
+    int      armorDurability[4];
+    uint16_t armorEnchantments[4];
+} PktInventorySync;
+
+// PKT_CRAFT_REQUEST - Client -> Server: craft recipe(s)
+// Recipe index is in the global craftRecipes[] table.
+typedef struct {
+    int recipeIndex;
+    int count;          // 1 for single craft, >1 for shift-click craft-all (capped by host)
+} PktCraftRequest;
 
 //----------------------------------------------------------------------------------
 // Functions

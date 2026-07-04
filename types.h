@@ -1262,11 +1262,19 @@ typedef struct {
 } EnchantOption;
 
 #define MAX_ENCHANT_OPTIONS 3
-extern EnchantOption enchantOptions[MAX_ENCHANT_OPTIONS];
-extern int enchantOptionCount;
-extern uint8_t enchantHeldItem;
-extern int enchantHeldItemSlot;
-extern int enchantTableBlockX, enchantTableBlockY;
+
+typedef struct {
+    bool open;
+    int blockX, blockY;
+    uint8_t heldItem;
+    int heldItemSlot;
+    int optionCount;
+    EnchantOption options[MAX_ENCHANT_OPTIONS];
+} EnchantSession;
+
+extern EnchantSession localEnchantSession;
+
+// Obsolete global aliases removed; use localEnchantSession.*
 
 typedef struct {
     bool exists;
@@ -1436,6 +1444,10 @@ void SyncFurnaceToHost(void);
 void SyncFurnaceToAll(void);
 void CloseFurnaceNetwork(void);
 
+// Inventory multiplayer sync helpers
+void SyncInventoryToHost(void);
+void SyncInventoryToAll(void);
+
 // Drag-and-drop held item (shared between rendering.c and crafting.c)
 extern uint8_t heldItem;
 extern int heldCount;
@@ -1470,8 +1482,22 @@ extern int tradeCount;
 extern bool tradeOpen;
 
 // Enchanting UI
-extern bool enchantOpen;
+extern EnchantSession localEnchantSession;
 extern int villagerTradeIndex;
+
+// Chat
+#define MAX_CHAT_MESSAGES 32
+#define MAX_CHAT_INPUT 128
+typedef struct {
+    uint8_t playerId;      // 255 = system
+    char message[MAX_CHAT_INPUT];
+    float timer;           // seconds remaining visible
+} ChatMessage;
+extern bool chatOpen;
+extern char chatInput[MAX_CHAT_INPUT];
+extern int chatInputLen;
+extern ChatMessage chatHistory[MAX_CHAT_MESSAGES];
+extern int chatHistoryCount;
 
 // Weather
 extern WeatherState weather;
@@ -1624,6 +1650,10 @@ void DrawLargeMap(void);
 void DrawSettingsScreen(void);
 void ReturnHeldItem(void);
 void ShowMessage(const char *msg, Color color);
+void AddChatMessage(uint8_t playerId, const char *msg);
+void SendChatMessage(const char *msg);
+void BroadcastChatMessage(uint8_t playerId, const char *msg);
+void DrawChatUI(void);
 void NetSyncBlockChange(int x, int y, uint8_t blockType);
 
 // save.c
@@ -1637,7 +1667,9 @@ void DeleteSaveSlot(int slot);
 // crafting.c
 void InitCraftingRecipes(void);
 bool CanCraft(int recipeIndex);
+bool CanCraftForPlayer(Player *p, int recipeIndex);
 void Craft(int recipeIndex);
+void CraftForPlayer(Player *p, int recipeIndex);
 void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad, bool showAdvanced);
 void InitSmeltingRecipes(void);
 int FindSmeltRecipe(BlockType input);

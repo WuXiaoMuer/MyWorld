@@ -857,9 +857,6 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
                 case MOB_SPIDER: SetDeathCause(STR_DEATH_MOB_SPIDER); break;
                 case MOB_SLIME: SetDeathCause(STR_DEATH_MOB_SLIME); break;
                 case MOB_ENDERMAN: SetDeathCause(STR_DEATH_MOB_ENDERMAN); break;
-                case MOB_COW: SetDeathCause(STR_DEATH_MOB_COW); break;
-                case MOB_SHEEP: SetDeathCause(STR_DEATH_MOB_SHEEP); break;
-                case MOB_CHICKEN: SetDeathCause(STR_DEATH_MOB_CHICKEN); break;
                 default: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
             }
         }
@@ -1146,7 +1143,7 @@ static void TrySpawnMobs(float dt)
         }
     }
 
-    // Passive mobs: spawn on grass in daylight
+    // Passive mobs: spawn on grass in daylight, biome-specific weights
     if (passiveCount < 8 && dayNight.lightLevel > 0.5f && (rand() % 3 == 0)) {
         float angle = (float)(rand() % 360) * 3.14159f / 180.0f;
         float dist = MOB_SPAWN_DIST_MIN + (float)(rand() % (int)(MOB_SPAWN_DIST_MAX - MOB_SPAWN_DIST_MIN));
@@ -1156,14 +1153,68 @@ static void TrySpawnMobs(float dt)
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
                 if (world[bx][y] == BLOCK_GRASS && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
-                    int roll = rand() % 20;
+                    int biome = GetBiomeAtX(bx);
+                    int roll = rand() % 100;
                     MobType spawnType;
-                    if (roll < 8) spawnType = MOB_PIG;
-                    else if (roll < 14) spawnType = MOB_COW;
-                    else if (roll < 18) spawnType = MOB_SHEEP;
-                    else if (roll < 19) spawnType = MOB_CHICKEN;
-                    else spawnType = MOB_VILLAGER;
-                    SpawnMob(spawnType, spawnX, (y - 2) * BLOCK_SIZE);
+                    bool doSpawn = true;
+                    switch (biome) {
+                        case 0: // plains - balanced
+                            if (roll < 35) spawnType = MOB_PIG;
+                            else if (roll < 65) spawnType = MOB_COW;
+                            else if (roll < 85) spawnType = MOB_SHEEP;
+                            else if (roll < 95) spawnType = MOB_CHICKEN;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        case 1: // desert - sparse, heat-tolerant
+                            if (roll < 60) doSpawn = false;
+                            else if (roll < 80) spawnType = MOB_CHICKEN;
+                            else if (roll < 95) spawnType = MOB_PIG;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        case 2: // forest - more cows and sheep
+                            if (roll < 35) spawnType = MOB_COW;
+                            else if (roll < 65) spawnType = MOB_SHEEP;
+                            else if (roll < 85) spawnType = MOB_PIG;
+                            else if (roll < 95) spawnType = MOB_CHICKEN;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        case 3: // tundra - hardy herds
+                            if (roll < 40) spawnType = MOB_COW;
+                            else if (roll < 75) spawnType = MOB_SHEEP;
+                            else if (roll < 90) spawnType = MOB_CHICKEN;
+                            else if (roll < 95) spawnType = MOB_PIG;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        case 4: // swamp - pigs common
+                            if (roll < 40) spawnType = MOB_PIG;
+                            else if (roll < 65) spawnType = MOB_COW;
+                            else if (roll < 80) spawnType = MOB_SHEEP;
+                            else if (roll < 90) spawnType = MOB_CHICKEN;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        case 5: // jungle - chickens and pigs
+                            if (roll < 35) spawnType = MOB_CHICKEN;
+                            else if (roll < 65) spawnType = MOB_PIG;
+                            else if (roll < 85) spawnType = MOB_COW;
+                            else if (roll < 95) spawnType = MOB_SHEEP;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        case 6: // taiga - sheep and cows
+                            if (roll < 40) spawnType = MOB_SHEEP;
+                            else if (roll < 70) spawnType = MOB_COW;
+                            else if (roll < 85) spawnType = MOB_PIG;
+                            else if (roll < 95) spawnType = MOB_CHICKEN;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                        default: // fallback to plains
+                            if (roll < 35) spawnType = MOB_PIG;
+                            else if (roll < 65) spawnType = MOB_COW;
+                            else if (roll < 85) spawnType = MOB_SHEEP;
+                            else if (roll < 95) spawnType = MOB_CHICKEN;
+                            else spawnType = MOB_VILLAGER;
+                            break;
+                    }
+                    if (doSpawn) SpawnMob(spawnType, spawnX, (y - 2) * BLOCK_SIZE);
                     break;
                 }
             }

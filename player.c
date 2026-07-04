@@ -1053,9 +1053,9 @@ void PlayerBlockInteraction(void)
                     if (maxLevel < 1) maxLevel = 1;
 
                     // Generate 3 random enchantment options
-                    enchantOptionCount = 0;
-                    for (int opt = 0; opt < MAX_ENCHANT_OPTIONS && enchantOptionCount < MAX_ENCHANT_OPTIONS; opt++) {
-                        EnchantOption *eo = &enchantOptions[opt];
+                    localEnchantSession.optionCount = 0;
+                    for (int opt = 0; opt < MAX_ENCHANT_OPTIONS && localEnchantSession.optionCount < MAX_ENCHANT_OPTIONS; opt++) {
+                        EnchantOption *eo = &localEnchantSession.options[opt];
                         eo->type = ENCH_NONE;
 
                         bool hasSilkTouch = (ENCH_TYPE(player.itemEnchantments[slot]) == ENCH_SILK_TOUCH);
@@ -1096,14 +1096,14 @@ void PlayerBlockInteraction(void)
                         if (lvl > 3) lvl = 3;
                         eo->level = lvl;
                         eo->xpCost = (lvl * 2 + 3) * 10;
-                        enchantOptionCount++;
+                        localEnchantSession.optionCount++;
                     }
 
-                    enchantHeldItem = selectedTool;
-                    enchantHeldItemSlot = slot;
-                    enchantTableBlockX = blockX;
-                    enchantTableBlockY = blockY;
-                    enchantOpen = true;
+                    localEnchantSession.heldItem = selectedTool;
+                    localEnchantSession.heldItemSlot = slot;
+                    localEnchantSession.blockX = blockX;
+                    localEnchantSession.blockY = blockY;
+                    localEnchantSession.open = true;
                     inventoryOpen = true;
                     gamePaused = true;
                     PlaySoundCraft();

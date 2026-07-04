@@ -1,4 +1,5 @@
 #include "types.h"
+#include "net.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -175,23 +176,28 @@ void InitTrades(void)
     trades[tradeCount++] = (Trade){ITEM_SLIMEBALL, 4, ITEM_REDSTONE, 4, STR_NONE};
 }
 
-bool CanCraft(int recipeIndex)
+bool CanCraftForPlayer(Player *p, int recipeIndex)
 {
-    if (recipeIndex < 0 || recipeIndex >= craftRecipeCount) return false;
+    if (!p || recipeIndex < 0 || recipeIndex >= craftRecipeCount) return false;
     CraftingRecipe *r = &craftRecipes[recipeIndex];
 
     int total = 0;
     for (int i = 0; i < INVENTORY_SLOTS; i++) {
-        if (player.inventory[i] == r->input) {
-            total += player.inventoryCount[i];
+        if (p->inventory[i] == r->input) {
+            total += p->inventoryCount[i];
         }
     }
     return total >= r->inputCount;
 }
 
-void Craft(int recipeIndex)
+bool CanCraft(int recipeIndex)
 {
-    if (!CanCraft(recipeIndex)) return;
+    return CanCraftForPlayer(&player, recipeIndex);
+}
+
+void CraftForPlayer(Player *p, int recipeIndex)
+{
+    if (!p || !CanCraftForPlayer(p, recipeIndex)) return;
     CraftingRecipe *r = &craftRecipes[recipeIndex];
 
     // Check if output fits in inventory before consuming inputs
@@ -199,27 +205,27 @@ void Craft(int recipeIndex)
     bool nonStackable = IsTool(r->output) || IsArmor(r->output);
     // Count available space in existing stacks and empty slots
     for (int i = 0; i < INVENTORY_SLOTS && outRemaining > 0; i++) {
-        if (player.inventory[i] == r->output && !nonStackable && player.inventoryCount[i] < 64) {
-            outRemaining -= (64 - player.inventoryCount[i]);
-        } else if (player.inventory[i] == BLOCK_AIR) {
+        if (p->inventory[i] == r->output && !nonStackable && p->inventoryCount[i] < 64) {
+            outRemaining -= (64 - p->inventoryCount[i]);
+        } else if (p->inventory[i] == BLOCK_AIR) {
             outRemaining -= nonStackable ? 1 : 64;
         }
     }
     if (outRemaining > 0) {
-        ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
+        if (p == &player) ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
         return;
     }
 
     // Remove input (may span multiple slots)
     int toRemove = r->inputCount;
     for (int i = 0; i < INVENTORY_SLOTS && toRemove > 0; i++) {
-        if (player.inventory[i] == r->input) {
-            int take = player.inventoryCount[i] < toRemove ? player.inventoryCount[i] : toRemove;
-            player.inventoryCount[i] -= take;
+        if (p->inventory[i] == r->input) {
+            int take = p->inventoryCount[i] < toRemove ? p->inventoryCount[i] : toRemove;
+            p->inventoryCount[i] -= take;
             toRemove -= take;
-            if (player.inventoryCount[i] <= 0) {
-                player.inventory[i] = BLOCK_AIR;
-                player.inventoryCount[i] = 0;
+            if (p->inventoryCount[i] <= 0) {
+                p->inventory[i] = BLOCK_AIR;
+                p->inventoryCount[i] = 0;
             }
         }
     }
@@ -232,8 +238,8 @@ void Craft(int recipeIndex)
         // Tools and armor don't stack, always use new slot
         if (!IsTool(r->output) && !IsArmor(r->output)) {
             for (int i = 0; i < INVENTORY_SLOTS; i++) {
-                if (player.inventory[i] == r->output && player.inventoryCount[i] + toAdd <= 64) {
-                    player.inventoryCount[i] += toAdd;
+                if (p->inventory[i] == r->output && p->inventoryCount[i] + toAdd <= 64) {
+                    p->inventoryCount[i] += toAdd;
                     stacked = true;
                     break;
                 }
@@ -241,13 +247,13 @@ void Craft(int recipeIndex)
         }
         if (!stacked) {
             for (int i = 0; i < INVENTORY_SLOTS; i++) {
-                if (player.inventory[i] == BLOCK_AIR) {
-                    player.inventory[i] = r->output;
-                    player.inventoryCount[i] = toAdd;
+                if (p->inventory[i] == BLOCK_AIR) {
+                    p->inventory[i] = r->output;
+                    p->inventoryCount[i] = toAdd;
                     if (IsTool(r->output)) {
-                        player.toolDurability[i] = GetToolMaxDurability(r->output);
+                        p->toolDurability[i] = GetToolMaxDurability(r->output);
                     } else if (IsArmor(r->output)) {
-                        player.toolDurability[i] = GetArmorMaxDurability(r->output);
+                        p->toolDurability[i] = GetArmorMaxDurability(r->output);
                     }
                     stacked = true;
                     break;
@@ -257,7 +263,12 @@ void Craft(int recipeIndex)
         if (!stacked) break;
         remaining -= toAdd;
     }
-    PlaySoundCraft();
+    if (p == &player) PlaySoundCraft();
+}
+
+void Craft(int recipeIndex)
+{
+    CraftForPlayer(&player, recipeIndex);
 }
 
 void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad, bool showAdvanced)
@@ -406,14 +417,29 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         }
         if (hover) {
             if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && canCraft) {
-                if (Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT)) {
-                    int count = 0;
-                    while (count < 10 && CanCraft(ri)) {
-                        Craft(ri);
-                        count++;
+                if (NetIsClient()) {
+                    // Ask host to craft authoritatively
+                    int craftCount = 1;
+                    if (Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT)) {
+                        craftCount = 10; // cap; host will stop when materials run out
                     }
+                    uint8_t buf[NET_PACKET_MAX];
+                    buf[0] = PKT_CRAFT_REQUEST;
+                    PktCraftRequest req;
+                    req.recipeIndex = ri;
+                    req.count = craftCount;
+                    memcpy(buf + 1, &req, sizeof(req));
+                    NetSendToServer(buf, 1 + sizeof(req), true);
                 } else {
-                    Craft(ri);
+                    if (Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT)) {
+                        int count = 0;
+                        while (count < 10 && CanCraft(ri)) {
+                            Craft(ri);
+                            count++;
+                        }
+                    } else {
+                        Craft(ri);
+                    }
                 }
             }
         }

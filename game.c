@@ -1016,6 +1016,470 @@ void CloseFurnaceNetwork(void)
     }
 }
 
+//----------------------------------------------------------------------------------
+// Inventory multiplayer sync helpers
+//----------------------------------------------------------------------------------
+static void PackInventorySync(PktInventorySync *pkt, int playerId)
+{
+    if (playerId < 0 || playerId >= MAX_NET_PLAYERS) return;
+    Player *p = &players[playerId];
+    pkt->playerId = (uint8_t)playerId;
+    memcpy(pkt->inventory, p->inventory, sizeof(pkt->inventory));
+    memcpy(pkt->inventoryCount, p->inventoryCount, sizeof(pkt->inventoryCount));
+    memcpy(pkt->toolDurability, p->toolDurability, sizeof(pkt->toolDurability));
+    memcpy(pkt->itemEnchantments, p->itemEnchantments, sizeof(pkt->itemEnchantments));
+    memcpy(pkt->armor, p->armor, sizeof(pkt->armor));
+    memcpy(pkt->armorDurability, p->armorDurability, sizeof(pkt->armorDurability));
+    memcpy(pkt->armorEnchantments, p->armorEnchantments, sizeof(pkt->armorEnchantments));
+}
+
+static void ApplyInventorySync(const PktInventorySync *pkt, int playerId)
+{
+    if (playerId < 0 || playerId >= MAX_NET_PLAYERS) return;
+    Player *p = &players[playerId];
+    memcpy(p->inventory, pkt->inventory, sizeof(p->inventory));
+    memcpy(p->inventoryCount, pkt->inventoryCount, sizeof(p->inventoryCount));
+    memcpy(p->toolDurability, pkt->toolDurability, sizeof(p->toolDurability));
+    memcpy(p->itemEnchantments, pkt->itemEnchantments, sizeof(p->itemEnchantments));
+    memcpy(p->armor, pkt->armor, sizeof(p->armor));
+    memcpy(p->armorDurability, pkt->armorDurability, sizeof(p->armorDurability));
+    memcpy(p->armorEnchantments, pkt->armorEnchantments, sizeof(p->armorEnchantments));
+}
+
+void SyncInventoryToHost(void)
+{
+    if (!NetIsClient()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_INVENTORY_SYNC;
+    PktInventorySync pkt;
+    PackInventorySync(&pkt, localPlayerId);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    NetSendToServer(buf, 1 + sizeof(pkt), true);
+}
+
+void SyncInventoryToAll(void)
+{
+    if (!NetIsHost()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_INVENTORY_SYNC;
+    PktInventorySync pkt;
+    PackInventorySync(&pkt, localPlayerId);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+        if (players[r].netControlled) {
+            NetSendTo(r, buf, 1 + sizeof(pkt), true);
+        }
+    }
+}
+
+// Authoritative remote block placement. Returns true if the placement was accepted.
+static bool TryPlaceBlockRemote(Player *p, int bx, int by)
+{
+    if (p->playerDead) return false;
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+
+    // Range check
+    float cx = bx * BLOCK_SIZE + BLOCK_SIZE * 0.5f;
+    float cy = by * BLOCK_SIZE + BLOCK_SIZE * 0.5f;
+    float px = p->position.x + PLAYER_WIDTH * 0.5f;
+    float py = p->position.y + PLAYER_HEIGHT * 0.5f;
+    float dx = cx - px, dy = cy - py;
+    if (sqrtf(dx * dx + dy * dy) > PLACE_RANGE * BLOCK_SIZE) return false;
+
+    int slot = p->selectedSlot;
+    if (slot < 0 || slot >= INVENTORY_SLOTS) return false;
+
+    uint8_t item = p->inventory[slot];
+    if (item == BLOCK_AIR || p->inventoryCount[slot] <= 0) return false;
+
+    // Bucket special cases
+    if (item == ITEM_WATER_BUCKET) {
+        if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
+        SetWaterSource(bx, by);
+        p->inventory[slot] = ITEM_BUCKET;
+        NetSyncBlockChange(bx, by, BLOCK_WATER);
+        return true;
+    }
+    if (item == ITEM_LAVA_BUCKET) {
+        if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
+        if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
+        SetLavaSource(bx, by);
+        p->inventory[slot] = ITEM_BUCKET;
+        NetSyncBlockChange(bx, by, BLOCK_LAVA);
+        return true;
+    }
+
+    // Must be a placeable block
+    if (IsTool((BlockType)item) || IsFood((BlockType)item) || IsArmor((BlockType)item)) return false;
+    if (item >= BLOCK_COUNT) return false;
+    if (!blockInfo[item].breakable) return false;
+    if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
+
+    // Player collision check
+    float bLeft = bx * BLOCK_SIZE;
+    float bRight = bLeft + BLOCK_SIZE;
+    float bTop = by * BLOCK_SIZE;
+    float bBottom = bTop + BLOCK_SIZE;
+    float pLeft = p->position.x;
+    float pRight = pLeft + PLAYER_WIDTH;
+    float pTop = p->position.y;
+    float pBottom = pTop + PLAYER_HEIGHT;
+    if (pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom)
+        return false;
+
+    // Place it
+    bool wasWater = (world[bx][by] == BLOCK_WATER);
+    if (wasWater) RemoveWaterAt(bx, by);
+    world[bx][by] = item;
+
+    // Consume item
+    p->inventoryCount[slot]--;
+    if (p->inventoryCount[slot] <= 0) {
+        p->inventory[slot] = BLOCK_AIR;
+        p->inventoryCount[slot] = 0;
+    }
+
+    // Side effects
+    if (item == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(bx, by);
+    UpdateLightAt(bx, by);
+    InvalidateChunkAt(bx, by);
+    if (bx % CHUNK_SIZE == 0) InvalidateChunkAt(bx - 1, by);
+    if (bx % CHUNK_SIZE == CHUNK_SIZE - 1) InvalidateChunkAt(bx + 1, by);
+    UpdateRedstoneAt(bx, by);
+
+    // Falling blocks
+    if (IsGravityBlock(item)) {
+        world[bx][by] = BLOCK_AIR;
+        int landY = by;
+        while (landY < WORLD_HEIGHT - 1 &&
+               (world[bx][landY + 1] == BLOCK_AIR || world[bx][landY + 1] == BLOCK_WATER))
+            landY++;
+        world[bx][landY] = item;
+        NetSyncBlockChange(bx, by, BLOCK_AIR);
+        NetSyncBlockChange(bx, landY, item);
+        UpdateLightAt(bx, landY);
+        InvalidateChunkAt(bx, landY);
+    } else {
+        NetSyncBlockChange(bx, by, item);
+    }
+
+    totalBlocksPlaced++;
+    return true;
+}
+
+// Authoritative remote item use (E key / right-click use). Returns true if an item was consumed.
+// Handles eating, bucket fill/empty, hoe tilling, seed planting, and mob breeding.
+static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cursorY)
+{
+    if (p->playerDead) return false;
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+
+    // Range check against the cursor target
+    float px = p->position.x + PLAYER_WIDTH * 0.5f;
+    float py = p->position.y + PLAYER_HEIGHT * 0.5f;
+    float dx = cursorX - px, dy = cursorY - py;
+    if (sqrtf(dx * dx + dy * dy) > BREAK_RANGE * BLOCK_SIZE) return false;
+
+    int slot = p->selectedSlot;
+    if (slot < 0 || slot >= INVENTORY_SLOTS) return false;
+
+    uint8_t item = p->inventory[slot];
+    if (item == BLOCK_AIR || p->inventoryCount[slot] <= 0) return false;
+
+    // Eat food
+    if (IsFood((BlockType)item) && p->hunger < MAX_HUNGER) {
+        int foodVal = GetFoodValue((BlockType)item);
+        p->hunger += foodVal;
+        if (p->hunger > MAX_HUNGER) p->hunger = MAX_HUNGER;
+        p->inventoryCount[slot]--;
+        if (p->inventoryCount[slot] <= 0) {
+            p->inventory[slot] = BLOCK_AIR;
+            p->inventoryCount[slot] = 0;
+        }
+        return true;
+    }
+
+    // Bucket use
+    if (item == ITEM_WATER_BUCKET) {
+        if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
+            SetWaterSource(bx, by);
+            p->inventory[slot] = ITEM_BUCKET;
+            NetSyncBlockChange(bx, by, BLOCK_WATER);
+            UpdateLightAt(bx, by);
+            InvalidateChunkAt(bx, by);
+            return true;
+        }
+    }
+    if (item == ITEM_LAVA_BUCKET) {
+        if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
+            if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
+            SetLavaSource(bx, by);
+            p->inventory[slot] = ITEM_BUCKET;
+            NetSyncBlockChange(bx, by, BLOCK_LAVA);
+            UpdateLightAt(bx, by);
+            InvalidateChunkAt(bx, by);
+            return true;
+        }
+    }
+    if (item == ITEM_BUCKET) {
+        if (world[bx][by] == BLOCK_WATER) {
+            RemoveWaterAt(bx, by);
+            p->inventory[slot] = ITEM_WATER_BUCKET;
+            NetSyncBlockChange(bx, by, BLOCK_AIR);
+            UpdateLightAt(bx, by);
+            InvalidateChunkAt(bx, by);
+            return true;
+        }
+        if (world[bx][by] == BLOCK_LAVA) {
+            RemoveLavaAt(bx, by);
+            p->inventory[slot] = ITEM_LAVA_BUCKET;
+            NetSyncBlockChange(bx, by, BLOCK_AIR);
+            UpdateLightAt(bx, by);
+            InvalidateChunkAt(bx, by);
+            return true;
+        }
+    }
+
+    // Hoe: till dirt/grass into farmland
+    if (IsHoe((BlockType)item)) {
+        if (world[bx][by] == BLOCK_DIRT || world[bx][by] == BLOCK_GRASS) {
+            world[bx][by] = BLOCK_FARMLAND;
+            NetSyncBlockChange(bx, by, BLOCK_FARMLAND);
+            UpdateLightAt(bx, by);
+            InvalidateChunkAt(bx, by);
+            p->toolDurability[slot]--;
+            if (p->toolDurability[slot] <= 0) {
+                p->inventory[slot] = BLOCK_AIR;
+                p->inventoryCount[slot] = 0;
+                p->toolDurability[slot] = 0;
+                p->itemEnchantments[slot] = 0;
+            }
+            return true;
+        }
+    }
+
+    // Seeds: plant on farmland
+    if (item == ITEM_WHEAT_SEEDS) {
+        if (world[bx][by] == BLOCK_FARMLAND && by > 0 && world[bx][by - 1] == BLOCK_AIR) {
+            world[bx][by - 1] = BLOCK_CROPS;
+            SetCropGrowth(bx, by - 1, 0);
+            RegisterCrop(bx, by - 1);
+            NetSyncBlockChange(bx, by - 1, BLOCK_CROPS);
+            UpdateLightAt(bx, by - 1);
+            InvalidateChunkAt(bx, by - 1);
+            p->inventoryCount[slot]--;
+            if (p->inventoryCount[slot] <= 0) {
+                p->inventory[slot] = BLOCK_AIR;
+                p->inventoryCount[slot] = 0;
+            }
+            return true;
+        }
+    }
+
+    // Breeding: feed passive mobs with food
+    if (IsFood((BlockType)item)) {
+        for (int i = 0; i < MAX_MOBS; i++) {
+            if (!mobs[i].active || mobs[i].isBaby) continue;
+            if (mobs[i].type != MOB_PIG && mobs[i].type != MOB_COW &&
+                mobs[i].type != MOB_SHEEP && mobs[i].type != MOB_CHICKEN) continue;
+            if (mobs[i].loveTimer > 0) continue;
+            int mw = GetMobWidth(mobs[i].type);
+            int mh = GetMobHeight(mobs[i].type);
+            float mx = mobs[i].position.x, my = mobs[i].position.y;
+            if (cursorX >= mx && cursorX <= mx + mw && cursorY >= my && cursorY <= my + mh) {
+                float mdx = (p->position.x + PLAYER_WIDTH / 2) - (mx + mw / 2);
+                float mdy = (p->position.y + PLAYER_HEIGHT / 2) - (my + mh / 2);
+                if (mdx * mdx + mdy * mdy < (BREAK_RANGE * BLOCK_SIZE) * (BREAK_RANGE * BLOCK_SIZE)) {
+                    mobs[i].loveTimer = 15.0f;
+                    p->inventoryCount[slot]--;
+                    if (p->inventoryCount[slot] <= 0) {
+                        p->inventory[slot] = BLOCK_AIR;
+                        p->inventoryCount[slot] = 0;
+                    }
+                    // Try to find a partner and spawn a baby
+                    for (int j = 0; j < MAX_MOBS; j++) {
+                        if (j == i || !mobs[j].active) continue;
+                        if (mobs[j].type != mobs[i].type || mobs[j].loveTimer <= 0) continue;
+                        float bdx = mobs[j].position.x - mobs[i].position.x;
+                        float bdy = mobs[j].position.y - mobs[i].position.y;
+                        if (bdx * bdx + bdy * bdy < 100 * 100) {
+                            float babyX = (mobs[i].position.x + mobs[j].position.x) / 2;
+                            float babyY = (mobs[i].position.y + mobs[j].position.y) / 2;
+                            Mob *baby = SpawnMob(mobs[i].type, babyX, babyY);
+                            if (baby) {
+                                baby->isBaby = true;
+                                baby->growTimer = 120.0f;
+                                baby->health = baby->maxHealth / 2;
+                                baby->maxHealth = baby->maxHealth / 2;
+                                UnlockAchievement(ACH_BREEDER);
+                            }
+                            mobs[i].loveTimer = 0;
+                            mobs[j].loveTimer = 0;
+                            break;
+                        }
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+//----------------------------------------------------------------------------------
+// Chat helpers
+//----------------------------------------------------------------------------------
+void AddChatMessage(uint8_t playerId, const char *msg)
+{
+    if (!msg || !msg[0]) return;
+    // Shift history if full
+    if (chatHistoryCount >= MAX_CHAT_MESSAGES) {
+        for (int i = 1; i < MAX_CHAT_MESSAGES; i++) {
+            chatHistory[i - 1] = chatHistory[i];
+        }
+        chatHistoryCount = MAX_CHAT_MESSAGES - 1;
+    }
+    ChatMessage *cm = &chatHistory[chatHistoryCount++];
+    cm->playerId = playerId;
+    snprintf(cm->message, sizeof(cm->message), "%s", msg);
+    cm->timer = 12.0f; // visible for 12 seconds
+}
+
+void BroadcastChatMessage(uint8_t playerId, const char *msg)
+{
+    AddChatMessage(playerId, msg);
+    if (!NetIsConnected()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_CHAT;
+    PktChat pkt;
+    pkt.playerId = playerId;
+    snprintf(pkt.message, sizeof(pkt.message), "%s", msg);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    if (NetIsHost()) {
+        for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+            if (players[r].netControlled) {
+                NetSendTo(r, buf, 1 + sizeof(pkt), true);
+            }
+        }
+    } else if (NetIsClient()) {
+        NetSendToServer(buf, 1 + sizeof(pkt), true);
+    }
+}
+
+static bool ProcessChatCommand(const char *msg);
+
+void SendChatMessage(const char *msg)
+{
+    if (!msg || !msg[0]) return;
+    // Process commands locally on host/single-player.
+    if (msg[0] == '/' && !NetIsClient()) {
+        if (ProcessChatCommand(msg)) return;
+    }
+    if (NetIsClient()) {
+        // Client sends to host; host will relay with proper playerId.
+        uint8_t buf[NET_PACKET_MAX];
+        buf[0] = PKT_CHAT;
+        PktChat pkt;
+        pkt.playerId = (uint8_t)localPlayerId;
+        snprintf(pkt.message, sizeof(pkt.message), "%s", msg);
+        memcpy(buf + 1, &pkt, sizeof(pkt));
+        NetSendToServer(buf, 1 + sizeof(pkt), true);
+        // Optimistically show locally until host echoes.
+        AddChatMessage((uint8_t)localPlayerId, msg);
+    } else {
+        // Single-player or host: broadcast immediately.
+        BroadcastChatMessage((uint8_t)localPlayerId, msg);
+    }
+}
+
+// Returns true if msg was a recognized command.
+static bool ProcessChatCommand(const char *msg)
+{
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s", msg);
+    char *cmd = strtok(buf, " ");
+    if (!cmd) return false;
+
+    if (strcmp(cmd, "/help") == 0) {
+        AddChatMessage(255, "Commands: /help /tp x y /give id count /time day|night /weather clear|rain|thunder");
+        return true;
+    }
+
+    if (strcmp(cmd, "/tp") == 0) {
+        char *sx = strtok(NULL, " ");
+        char *sy = strtok(NULL, " ");
+        if (sx && sy) {
+            int tx = atoi(sx);
+            int ty = atoi(sy);
+            if (tx >= 0 && tx < WORLD_WIDTH && ty >= 0 && ty < WORLD_HEIGHT) {
+                player.position.x = tx * BLOCK_SIZE;
+                player.position.y = ty * BLOCK_SIZE;
+                AddChatMessage(255, "Teleported.");
+            } else {
+                AddChatMessage(255, "Invalid coordinates.");
+            }
+        } else {
+            AddChatMessage(255, "Usage: /tp x y");
+        }
+        return true;
+    }
+
+    if (strcmp(cmd, "/give") == 0) {
+        char *sid = strtok(NULL, " ");
+        char *scnt = strtok(NULL, " ");
+        if (sid && scnt) {
+            int id = atoi(sid);
+            int cnt = atoi(scnt);
+            if (id > 0 && id < BLOCK_COUNT && cnt > 0 && cnt <= 64) {
+                int added = AddToInventoryCount((BlockType)id, cnt);
+                if (added < cnt) {
+                    SpawnItemEntity((uint8_t)id, cnt - added,
+                                    player.position.x + PLAYER_WIDTH / 2, player.position.y);
+                }
+                AddChatMessage(255, "Given item.");
+            } else {
+                AddChatMessage(255, "Invalid item id or count.");
+            }
+        } else {
+            AddChatMessage(255, "Usage: /give id count");
+        }
+        return true;
+    }
+
+    if (strcmp(cmd, "/time") == 0) {
+        char *sarg = strtok(NULL, " ");
+        if (sarg) {
+            if (strcmp(sarg, "day") == 0) dayNight.timeOfDay = 0.25f;
+            else if (strcmp(sarg, "noon") == 0) dayNight.timeOfDay = 0.5f;
+            else if (strcmp(sarg, "night") == 0) dayNight.timeOfDay = 0.75f;
+            else if (strcmp(sarg, "midnight") == 0) dayNight.timeOfDay = 0.0f;
+            else dayNight.timeOfDay = fmodf(atof(sarg), 1.0f);
+            AddChatMessage(255, "Time set.");
+        } else {
+            AddChatMessage(255, "Usage: /time day|night|noon|midnight|value");
+        }
+        return true;
+    }
+
+    if (strcmp(cmd, "/weather") == 0) {
+        char *sarg = strtok(NULL, " ");
+        if (sarg) {
+            if (strcmp(sarg, "clear") == 0) { weather.type = WEATHER_CLEAR; weather.duration = 600.0f; }
+            else if (strcmp(sarg, "rain") == 0) { weather.type = WEATHER_RAIN; weather.duration = 600.0f; }
+            else if (strcmp(sarg, "thunder") == 0) { weather.type = WEATHER_THUNDER; weather.duration = 600.0f; }
+            else { AddChatMessage(255, "Unknown weather."); return true; }
+            AddChatMessage(255, "Weather set.");
+        } else {
+            AddChatMessage(255, "Usage: /weather clear|rain|thunder");
+        }
+        return true;
+    }
+
+    AddChatMessage(255, "Unknown command. Use /help.");
+    return true;
+}
+
 void ReturnFurnaceItems(void)
 {
     if (furnaceFuel != BLOCK_AIR) {
@@ -1199,6 +1663,15 @@ void UpdateGame(float dt)
                 remotePlayers[fromId].active = true;
                 remotePlayers[fromId].interpX = players[fromId].position.x;
                 remotePlayers[fromId].interpY = players[fromId].position.y;
+                // Send authoritative inventory to the new client.
+                {
+                    uint8_t sbuf[NET_PACKET_MAX];
+                    sbuf[0] = PKT_INVENTORY_SYNC;
+                    PktInventorySync ipkt;
+                    PackInventorySync(&ipkt, fromId);
+                    memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                    NetSendTo(fromId, sbuf, 1 + sizeof(ipkt), true);
+                }
                 // Send modified blocks to new client
                 NetSendWorldToClient(fromId);
                 ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
@@ -1366,8 +1839,45 @@ void UpdateGame(float dt)
         return;
     }
 
+    // Chat input handling
+    bool chatJustClosed = false;
+    if (chatOpen) {
+        int c;
+        while ((c = Win32GetCharPressed()) != 0) {
+            if (chatInputLen < MAX_CHAT_INPUT - 1 && c >= 32 && c < 127) {
+                chatInput[chatInputLen++] = (char)c;
+                chatInput[chatInputLen] = '\0';
+            }
+        }
+        if (Win32IsKeyPressed(KEY_BACKSPACE)) {
+            if (chatInputLen > 0) chatInput[--chatInputLen] = '\0';
+        }
+        if (Win32IsKeyPressed(KEY_ENTER)) {
+            if (chatInputLen > 0) {
+                SendChatMessage(chatInput);
+            }
+            chatOpen = false;
+            chatJustClosed = true;
+            chatInput[0] = '\0';
+            chatInputLen = 0;
+        }
+        if (Win32IsKeyPressed(KEY_ESCAPE)) {
+            chatOpen = false;
+            chatJustClosed = true;
+            chatInput[0] = '\0';
+            chatInputLen = 0;
+        }
+    } else {
+        // Open chat
+        if (Win32IsKeyPressed(KEY_T)) {
+            chatOpen = true;
+            chatInput[0] = '\0';
+            chatInputLen = 0;
+        }
+    }
+
     // Toggle inventory
-    if (Win32IsKeyPressed(KEY_E)) {
+    if (!chatOpen && Win32IsKeyPressed(KEY_E)) {
         if (furnaceOpen) {
             // Close furnace
             CloseFurnaceNetwork();
@@ -1400,12 +1910,12 @@ void UpdateGame(float dt)
     }
 
     // ESC: close enchanting first, then furnace, then chest, then inventory, then large map, then toggle pause
-    if (Win32IsKeyPressed(KEY_ESCAPE)) {
-        if (enchantOpen) {
-            enchantOpen = false;
+    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_ESCAPE)) {
+        if (localEnchantSession.open) {
+            localEnchantSession.open = false;
             inventoryOpen = false;
             gamePaused = false;
-            enchantOptionCount = 0;
+            localEnchantSession.optionCount = 0;
         } else if (furnaceOpen) {
             CloseFurnaceNetwork();
             ReturnFurnaceItems();
@@ -1436,10 +1946,10 @@ void UpdateGame(float dt)
         PlaySoundUIClick();
     }
 
-    if (Win32IsKeyPressed(KEY_F3)) showDebug = !showDebug;
+    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F3)) showDebug = !showDebug;
 
     // M: toggle large map
-    if (Win32IsKeyPressed(KEY_M) && !inventoryOpen && !player.playerDead) {
+    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_M) && !inventoryOpen && !player.playerDead) {
         showLargeMap = !showLargeMap;
         if (showLargeMap) gamePaused = true;
         else gamePaused = false;
@@ -1447,12 +1957,12 @@ void UpdateGame(float dt)
 
     // F11: toggle fullscreen (any non-windowed mode -> windowed, windowed -> borderless fullscreen)
     // Use borderless instead of exclusive fullscreen to avoid DPI issues with desktop icons
-    if (Win32IsKeyPressed(KEY_F11)) {
+    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F11)) {
         ApplyWindowMode(windowMode != 0 ? 0 : 2);
     }
 
     // XP healing
-    if (Win32IsKeyPressed(KEY_H) && !inventoryOpen && !gamePaused && !player.playerDead) {
+    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_H) && !inventoryOpen && !gamePaused && !player.playerDead) {
         if (player.xp >= XP_HEAL_COST && player.health < MAX_HEALTH) {
             player.xp -= XP_HEAL_COST;
             player.health += XP_HEAL_AMOUNT;
@@ -1525,6 +2035,15 @@ void UpdateGame(float dt)
                     remotePlayers[fromId].active = true;
                     remotePlayers[fromId].interpX = players[fromId].position.x;
                     remotePlayers[fromId].interpY = players[fromId].position.y;
+                    // Send authoritative inventory to the new client.
+                    {
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_INVENTORY_SYNC;
+                        PktInventorySync ipkt;
+                        PackInventorySync(&ipkt, fromId);
+                        memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                        NetSendTo(fromId, sbuf, 1 + sizeof(ipkt), true);
+                    }
                     // Send modified blocks to new client
                     NetSendWorldToClient(fromId);
                     ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
@@ -1580,18 +2099,23 @@ void UpdateGame(float dt)
                     if (input->place) {
                         int bx = (int)(input->cursorX / BLOCK_SIZE);
                         int by = (int)(input->cursorY / BLOCK_SIZE);
-                        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                            BlockType tool = (BlockType)rp->inventory[rp->selectedSlot];
-                            if (tool != BLOCK_AIR && rp->inventoryCount[rp->selectedSlot] > 0 &&
-                                (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER)) {
-                                world[bx][by] = tool;
-                                rp->inventoryCount[rp->selectedSlot]--;
-                                if (rp->inventoryCount[rp->selectedSlot] <= 0) {
-                                    rp->inventory[rp->selectedSlot] = BLOCK_AIR;
-                                    rp->inventoryCount[rp->selectedSlot] = 0;
+                        TryPlaceBlockRemote(rp, bx, by);
+                    }
+                    // Handle item use from remote player
+                    if (input->use) {
+                        int bx = (int)(input->cursorX / BLOCK_SIZE);
+                        int by = (int)(input->cursorY / BLOCK_SIZE);
+                        if (TryUseItemRemote(rp, bx, by, input->cursorX, input->cursorY)) {
+                            // Send authoritative inventory back to all clients.
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
                                 }
-                                NetSyncBlockChange(bx, by, tool);
-                                InvalidateChunkAt(bx, by);
                             }
                         }
                     }
@@ -1713,6 +2237,52 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_FURNACE_CLOSE && size >= 1 + (int)sizeof(PktFurnaceOpen)) {
                     // Host can track per-player open furnaces here if needed; currently no-op.
+                } else if (type == PKT_INVENTORY_SYNC && size >= 1 + (int)sizeof(PktInventorySync)) {
+                    const PktInventorySync *pkt = (const PktInventorySync *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        // Authoritative host: accept client's inventory state and relay to others.
+                        ApplyInventorySync(pkt, fromId);
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_INVENTORY_SYNC;
+                        PktInventorySync relay;
+                        PackInventorySync(&relay, fromId);
+                        memcpy(sbuf + 1, &relay, sizeof(relay));
+                        for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                            if (r != fromId && players[r].netControlled) {
+                                NetSendTo(r, sbuf, 1 + sizeof(relay), true);
+                            }
+                        }
+                    }
+                } else if (type == PKT_CRAFT_REQUEST && size >= 1 + (int)sizeof(PktCraftRequest)) {
+                    const PktCraftRequest *req = (const PktCraftRequest *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        int crafted = 0;
+                        int limit = req->count > 0 ? req->count : 1;
+                        if (limit > 64) limit = 64; // sanity cap
+                        while (crafted < limit && CanCraftForPlayer(&players[fromId], req->recipeIndex)) {
+                            CraftForPlayer(&players[fromId], req->recipeIndex);
+                            crafted++;
+                        }
+                        if (crafted > 0) {
+                            // Send authoritative inventory back to the crafting client and others.
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                        }
+                    }
+                } else if (type == PKT_CHAT && size >= 1 + (int)sizeof(PktChat)) {
+                    const PktChat *pkt = (const PktChat *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        // Host receives chat from client and rebroadcasts to everyone.
+                        BroadcastChatMessage((uint8_t)fromId, pkt->message);
+                    }
                 } else if (type == PKT_PING && size >= 1 + (int)sizeof(PktPing)) {
                     // Respond to ping (keep-alive)
                     uint8_t pongBuf[NET_PACKET_MAX];
@@ -1742,7 +2312,7 @@ void UpdateGame(float dt)
                 }
             }
             // Run authoritative game logic
-            UpdatePlayer(dt);
+            if (!chatOpen) UpdatePlayer(dt);
             // Update remote players' physics
             {
                 int savedLocalId = localPlayerId;
@@ -1841,7 +2411,7 @@ void UpdateGame(float dt)
             // Client mode: send input, receive state
             NetPoll();
             // Send local input to server
-            {
+            if (!chatOpen) {
                 inputTickTimer += dt;
                 if (inputTickTimer >= NET_TICK_INTERVAL) {
                     inputTickTimer = 0.0f;
@@ -2015,6 +2585,16 @@ void UpdateGame(float dt)
                             PlaySoundCraft();
                         }
                     }
+                } else if (type == PKT_INVENTORY_SYNC && size >= 1 + (int)sizeof(PktInventorySync)) {
+                    const PktInventorySync *pkt = (const PktInventorySync *)((const uint8_t *)data + 1);
+                    int pid = pkt->playerId;
+                    if (pid == localPlayerId && pid >= 0 && pid < MAX_NET_PLAYERS) {
+                        // Host is the authority: overwrite local inventory with host's view.
+                        ApplyInventorySync(pkt, pid);
+                    }
+                } else if (type == PKT_CHAT && size >= 1 + (int)sizeof(PktChat)) {
+                    const PktChat *pkt = (const PktChat *)((const uint8_t *)data + 1);
+                    AddChatMessage(pkt->playerId, pkt->message);
                 } else if (type == PKT_PING && size >= 1 + (int)sizeof(PktPing)) {
                     // Server ping response — just counts as keepalive
                 }
@@ -2033,6 +2613,15 @@ void UpdateGame(float dt)
                     memcpy(pbuf + 1, &pp, sizeof(PktPing));
                     NetSendToServer(pbuf, 1 + sizeof(PktPing), false);
                 }
+                // Periodic full-inventory sync safety net (mining drops, pickups, etc.)
+                {
+                    static float clientInvSyncTimer = 0.0f;
+                    clientInvSyncTimer += dt;
+                    if (clientInvSyncTimer >= 2.0f) {
+                        clientInvSyncTimer = 0.0f;
+                        SyncInventoryToHost();
+                    }
+                }
                 // Any received packet keeps connection alive
                 if (NetGetReceivedCount() > 0) lastServerPacket = NetGetTime();
                 // Timeout: no packets from server for 15s
@@ -2045,7 +2634,7 @@ void UpdateGame(float dt)
                 }
             }
             // Client-side: update local player, entities, particles, camera
-            UpdatePlayer(dt);
+            if (!chatOpen) UpdatePlayer(dt);
             UpdateEntities(dt);
             UpdateParticles(dt);
             PickupAndSyncItems(player.position.x, player.position.y, localPlayerId);
@@ -2053,7 +2642,7 @@ void UpdateGame(float dt)
             if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
         } else {
             // Single-player mode: original logic
-            UpdatePlayer(dt);
+            if (!chatOpen) UpdatePlayer(dt);
             UpdateMobs(dt);
             UpdateProjectiles(dt);
             UpdateXpOrbs(dt);
@@ -2074,7 +2663,7 @@ void UpdateGame(float dt)
         UpdateFurnaceTick(dt);
     }
     UpdateChunks();
-    UpdateHotbar();
+    if (!chatOpen) UpdateHotbar();
     UpdateRedstoneTick();
     UpdateCrops(dt);
     UpdatePrimedTnt(dt);
@@ -2109,6 +2698,11 @@ void UpdateGame(float dt)
             craftSearchLen = 0;
             craftSearchBuf[0] = '\0';
         }
+    }
+
+    // Update chat message timers
+    for (int i = 0; i < chatHistoryCount; i++) {
+        chatHistory[i].timer -= dt;
     }
 }
 
@@ -2293,6 +2887,7 @@ void DrawGame(void)
     DrawDebugInfo();
     DrawMinimap();
     DrawMessage();
+    DrawChatUI();
 
     DrawInventoryScreen();
     DrawTradeUI();

@@ -1,17 +1,25 @@
 # MyWorld
 
-A 2D sandbox game inspired by Minecraft, built with [raylib](https://www.raylib.com/) 5.5. All assets are procedurally generated pixel art -- no external textures or sprites required.
+A 2D sandbox game inspired by Minecraft, built with [raylib](https://www.raylib.com/) 5.5.
+All assets are procedurally generated pixel art — no external textures or sprites required.
 
 ![Game Screenshot](play_game_test.png)
 
 ## Features
 
-- **Procedural World Generation** -- 2048x256 block world with terrain, caves, trees, and ores using fractal Brownian motion noise
-- **15 Block Types** -- Grass, dirt, stone, wood, leaves, sand, water, coal ore, iron ore, glass, brick, and more
-- **Day/Night Cycle** -- Dynamic sky color and lighting overlay
-- **Chunk-Based Rendering** -- Only visible chunks are rendered for performance
-- **Block Interaction** -- Break and place blocks within range
-- **Inventory System** -- 9-slot hotbar with stacking (up to 64 per slot)
+- **Procedural World Generation** — 2048×256 block world with terrain, caves, trees, ores,
+  villages, dungeons, and multiple biomes using fractal Brownian motion noise.
+- **50+ Blocks & Items** — building blocks, ores, tools, armor, food, redstone components,
+  crops, and more.
+- **Day/Night Cycle** — dynamic sky color, lighting overlay, and mob spawning.
+- **Chunk-Based Rendering** — only visible chunks are rendered for performance.
+- **Inventory System** — 36-slot inventory, 9-slot hotbar with stacking up to 64, tool
+  durability, and enchantments.
+- **Crafting & Smelting** — craft recipes and furnace smelting.
+- **Redstone** — levers, pressure plates, redstone wire, lamps, and TNT ignition.
+- **Multiplayer** — host/join over LAN with up to 4 players.
+- **Chat & Commands** — in-game chat (`T`) and slash commands (`/help`, `/tp`, `/give`, etc.).
+  See [COMMANDS.md](COMMANDS.md) for details.
 
 ## Controls
 
@@ -19,10 +27,17 @@ A 2D sandbox game inspired by Minecraft, built with [raylib](https://www.raylib.
 |-----|--------|
 | `A` / `D` or `Left` / `Right` | Move left / right |
 | `W` / `Up` / `Space` | Jump |
-| `Left Mouse Button` | Break block |
-| `Right Mouse Button` | Place block |
-| `1` - `9` | Select hotbar slot |
+| `Left Shift` | Sprint |
+| `Left Mouse Button` | Break block / attack |
+| `Right Mouse Button` | Place block / use item |
+| `E` | Open inventory / interact |
+| `1` – `9` | Select hotbar slot |
+| `Mouse Wheel` | Scroll hotbar |
 | `F3` | Toggle debug info |
+| `F11` | Toggle fullscreen |
+| `M` | Toggle large map |
+| `T` | Open chat |
+| `Esc` | Close menu / chat |
 
 ## Building from Source
 
@@ -46,14 +61,16 @@ A 2D sandbox game inspired by Minecraft, built with [raylib](https://www.raylib.
 
 2. Build:
    ```bash
-   make -f makefile.win
+   make clean && make
    ```
 
 3. Run `MyWorld.exe`
 
 ### Platform Notes
 
-The `makefile.win` is configured for Windows with MinGW. For Linux/macOS, adjust the makefile to remove `-mwindows` and `-lgdi32`, and link against `-lX11` or the appropriate platform libraries.
+The `Makefile` is configured for Windows with MinGW. For Linux/macOS, adjust the makefile to
+remove `-mwindows` and `-lgdi32`, and link against `-lX11` or the appropriate platform
+libraries.
 
 ## License
 

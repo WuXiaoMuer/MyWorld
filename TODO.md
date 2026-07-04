@@ -1,7 +1,7 @@
 # MyWorld — TODO / Backlog
 
 Living backlog for continued development. Each item lists **where**, **why**, and **risk**.
-Keep it honest: move items to *Done* when verified, delete items that turn out to be non-issues.
+Move items to *Done* when verified, delete items that turn out to be non-issues.
 
 > Convention: `file.c:line` references are approximate — confirm before editing, the
 > codebase shifts. Anything touching **save format** must bump `SAVE_VERSION` (types.h)
@@ -11,25 +11,23 @@ Keep it honest: move items to *Done* when verified, delete items that turn out t
 
 ## High priority (real, scoped)
 
-- [ ] _(none open — chest durability/enchant persistence shipped in part 4)_
+- [ ] _(none open)_
 
 ## Medium priority (multiplayer authority — architectural)
 
-- [ ] **Server-authoritative inventory.** Host trusts client-reported inventory for block
-      place (game.c:~1290) and item use. A hacked client can desync/duplicate. Proper fix:
-      host owns each player's inventory and validates actions against it. Large change.
-- [ ] **Sync container/station contents in multiplayer.** Chest and furnace sync are now
-      implemented; enchanting table remains local-only and will desync if multiple players
-      use it.
+- [ ] **Server-authoritative inventory — milestone 2.** Milestone 1 implemented: host now
+      maintains and syncs authoritative inventory, and validates remote block placement.
+      Crafting and item consumption (eating, buckets, seeds, breeding) are now also
+      authoritative. Remaining: arrows/bow, enchanting, ender pearl, fishing rod, cauldron,
+      and pickup/drop authority. Large change.
 
 ## Low priority / polish
 
-- [ ] **Dead defensive death-cause cases** for passive mobs (mob.c:838-840) are unreachable
-      (`mobDamage[]==0` returns early). Harmless; remove only if doing a cleanup pass.
+_(none open)_
 
 ## Ideas / not yet scoped
 
-- [ ] Biome-specific passive mob spawns (mob.c spawn logic is biome-agnostic).
+_(none open)_
 
 ---
 
@@ -53,129 +51,17 @@ These were flagged in audits but confirmed fine; left here to avoid wasted re-ch
 
 ## Done
 
-### Session 2026-06-30 (part 9 — multiplayer furnace sync)
-- **Furnace contents sync in multiplayer.** Added `PKT_FURNACE_OPEN` (client requests),
-  `PKT_FURNACE_SYNC` (bidirectional full-furnace data), and `PKT_FURNACE_CLOSE` (client notify).
-  - Mirrors the chest-sync authority model: host owns furnace data, clients request on open,
-    modifications are snapshot-detected in the furnace UI and pushed to the host, and the host
-    applies + broadcasts to other connected clients.
-  - Client opening a furnace waits for the host sync before showing the UI (avoids desync).
-  - Closing the furnace (E, ESC, or moving away) returns fuel/input/output to the closing
-    player's inventory and syncs the now-empty furnace to other watchers.
-  - No save-format change: the existing per-furnace `FurnaceData` array is already persisted.
+> Historical done entries (parts 1–14) are preserved in git history and previous commits.
+> This section is intentionally kept lean.
 
-### Session 2026-06-30 (part 8 — multiplayer chest sync)
-- **Chest contents sync in multiplayer.** Added `PKT_CHEST_OPEN` (client requests),
-  `PKT_CHEST_SYNC` (bidirectional full-chest data), and `PKT_CHEST_CLOSE` (client notify).
-  - Client opens a chest → requests contents from host → opens UI only after receiving sync.
-  - Any modification by client or host is detected via a per-frame snapshot in the chest UI
-    and pushed to the other side.
-  - Host is authoritative: applies client changes and broadcasts to other connected clients.
-  - Durability and enchantments travel with items (already persisted per v13).
-  - Close-on-ESC / close-on-move-away also notify the host so it can stop tracking if needed.
-
-### Session 2026-06-30 (part 7 — multiplayer identity + visual polish)
-- **Multiplayer player names.** Added `playerName[32]` to `Player` and `RemotePlayer`,
-  included it in `PktPlayerInfo`, and threaded it through host send/receive and welcome
-  join paths. Join screen now has a **Name** input field above the IP field (Tab to
-  switch, default "Player"). Remote players render their chosen name above their head
-  instead of "P1/P2/P3".
-- **Baby passive mob sprites scale down.** Added `MobScale()` and `SRECT` macro; rewrote
-  `DrawPigSprite`, `DrawCowSprite`, `DrawSheepSprite`, and `DrawChickenSprite` to render
-  at half size when `isBaby == true`, anchored at the bottom-center so feet stay on the
-  ground. Collision box remains adult-sized (matching the scaled sprite footprint).
-
-### Session 2026-06-28 (part 6 — systems depth + content)
-- **Redstone-ignited TNT.** TNT now ignites when a redstone signal reaches it — added a
-  terminal case in the redstone BFS (`PropagateRedstoneBFS`), mirroring the lamp. So
-  lever / pressure-plate → wire → TNT works. `PrimeTnt` dedups, so repeated propagation
-  is safe. No save impact.
-- **4 new achievements (SAVE_VERSION 13 → 14).** Angler (catch a fish), Breeder (raise a
-  baby), Enchanter (enchant an item), Demolition (detonate TNT). `UnlockAchievement` made
-  public + triggered at each event site; i18n EN/ZH/JA. Save migration: v9–v13 stored 6
-  achievements, v14 stores `ACH_COUNT` (10) — loader reads the version-appropriate count
-  so old saves stay aligned.
-
-### Session 2026-06-26 (part 5 — multiplayer UX)
-- **Open to LAN (in-game, MC-style).** Pause menu now has a contextual "Open to LAN"
-  control: in single-player it calls `NetHostStart(NET_PORT)`, sets `localPlayerId=0`,
-  flashes the local IP\:port, and keeps playing — the existing `NetIsHost()`-gated host
-  loop already accepts late joiners. Once hosting it shows a live status line
-  (`ip:port (n/max)`) instead. Hidden for clients (can't host). No new state needed.
-- **Host/Join menus fixed + polished.** Replaced hardcoded English in the host-waiting
-  and join screens (`Players: %d/%d`, `ESC: Cancel`, `ESC: Back | Connect`) with i18n
-  strings (EN/ZH/JA). HOST_WAITING joiners now get the same starter inventory as the
-  in-play late-join path (previously they joined empty-handed — an inconsistency).
-
-> **Needs in-game / two-instance verification:** run two copies; on instance A pause →
-> Open to LAN; on instance B Join → enter A's IP → confirm spawn, movement sync, and
-> that B starts with the wooden-tool starter kit.
-
-### Session 2026-06-26 (part 4 — content + UI polish)
-- **Chest durability + enchantments persist (SAVE_VERSION 12 → 13).** `ChestData` now
-  carries per-slot `durability[]` + `enchantments[]`; every chest transfer point (click
-  take/place/stack, shift-click both directions) and the chest screen's inventory grid
-  move them with the item. Looted tools (e.g. dungeon bows) now generate at full
-  durability. Also fixed: the chest screen's inventory click previously dropped
-  enchantments (carried durability only).
-- **TNT block (new gameplay / hotspot).** New `BLOCK_TNT` (full block chain, added at the
-  END of the enum to keep save IDs stable). Right-click to light the fuse (~2s), then
-  `ExplodeAt()` destroys a radius-4 area, damages player + mobs by distance falloff, and
-  **chain-detonates** other TNT in the blast. `ExplodeAt` is separate from the creeper's
-  inline explosion to avoid regressing it. Recipe: 5 redstone → 1 TNT (needs table).
-  Uses existing fuse + thunder sounds; no new asset needed.
-- **Enchanted-item glint (UI polish).** Subtle animated purple shimmer over enchanted
-  icons in the hotbar, inventory grid, armor slots, and both chest-screen grids
-  (`DrawEnchantGlint`).
-
-> **Needs in-game verification:** craft + ignite TNT (incl. a chain reaction); store an
-> enchanted/used tool in a chest, reload, confirm durability + enchant survive; confirm
-> the glint appears on enchanted items only.
-
-### Session 2026-06-26 (part 3 — perf + mob polish)
-- **Crop registry — eliminated the 524K-cell scan.** `UpdateCrops` now iterates a
-  registered crop-cell list (mirrors the pressure-plate registry) instead of scanning the
-  whole world every 5s. Cells register on plant / world-gen / load-rescan
-  (`RebuildCropList` at startup, plus network-planted crops); stale cells (broken,
-  exploded, flooded) are pruned lazily during the scan, so no destruction path needs an
-  explicit unregister. Cap `MAX_CROP_CELLS = 8192`.
-- **Slime split size — per-instance.** Added `GetMobW/GetMobH(const Mob*)`; small slimes
-  (`slimeType==1`) are now half-size in both sprite and hitbox, kept consistent across
-  collision, projectile hits, contact, and drawing (all 43 size usages live in mob.c).
-- Verified **breeding already works**; documented it and filed baby-sprite-scale as polish.
-
-### Session 2026-06-26 (part 2 — "complete version")
-- **Save bug fixed:** cauldron section was written last by `SaveWorld` but read early by
-  `LoadWorld` (inside the v≥3 block), desyncing the stream for v11 saves — they loaded
-  corrupt or failed. Loader now reads cauldron + crop sections after world+modified,
-  matching write order. **This recovers previously-unloadable v11 saves (e.g. world7.mwsav).**
-- **Feature complete — crop growth persistence (SAVE_VERSION 11 → 12).** Sparse section
-  stores `(x,y,growth)` for every `BLOCK_CROPS` cell; older saves default to stage 0.
-  Crops now keep their maturity across save/load.
-- **Village farms** generate with deterministic initial growth (1–7) from the seed
-  (world.c), so they look established instead of freshly planted.
-- **Feature — ENCH_POWER (bow):** new ranged enchant, +2 arrow damage per level. Added
-  enum + `Projectile.damage` field + i18n (3 langs) + both name-display paths; bow enchant
-  pool now offers Power/Unbreaking instead of 3× identical Unbreaking. Mob/network arrows
-  default to base damage (no signature/packet change needed).
-- **Latent bug fixed:** `SpawnProjectile` now resets transient fields (`isFishing`,
-  `hasBite`, `fishTimer`, `catchValue`, `damage`) so a reused slot can't inherit stale
-  state (an arrow reusing a fishing-bobber slot could behave as a bobber).
-- Also fixed a missing Silk Touch case in the inventory tooltip enchant-name mapping.
-
-> **Needs in-game verification** (build is clean but GUI not runtime-tested here):
-> save a world with growing/mature crops → reload → crops keep their stage; and try
-> loading the existing `saves/world7.mwsav` (v11) to confirm the load-order fix.
-
-### Session 2026-06-26 (part 1)
-- Trimmed `CLAUDE.md` (dropped stale line counts & derivable prose; kept build, "add new X"
-  recipes, conventions, invariants).
-- Fixed signed-overflow UB in BGM wind-noise generator (sound.c:451).
-- Fixed creeper explosion particle Y-offset using player distance instead of radius (mob.c:616).
-- `SortInventory` now carries `itemEnchantments` so enchants don't scramble on sort (rendering.c).
-- Debug-overlay weather text now uses i18n via `S()` (+ 4 new STR_ strings, 3 langs).
-- Network block-place now guards `inventoryCount > 0` (game.c).
-- Network joiners snap to their own surface (`FindSpawnSurfaceY`) instead of the host's Y,
-  preventing suffocation when the host is underground (game.c).
-- **Feature:** wheat crops now render 8 growth stages; chunk re-bakes on growth without
-  flicker; planting resets growth to 0 (world.c, player.c).
+- **Part 15:** In-game chat (`T`) with message history and network relay; slash commands
+  (`/help`, `/tp`, `/give`, `/time`, `/weather`); updated `README.md` and added
+  `COMMANDS.md`.
+- **Part 14:** Authoritative remote item use — host validates eating, bucket place/collect,
+  hoe tilling, seed planting, and mob breeding, then syncs inventory.
+- **Part 13:** Authoritative crafting (`PKT_CRAFT_REQUEST`, `CraftForPlayer`).
+- **Part 12:** Server-authoritative inventory milestone 1 (`PKT_INVENTORY_SYNC`, remote
+  block placement validation).
+- **Part 11:** Enchanting table per-session state + passive-mob death-cause cleanup.
+- **Part 10:** Biome-specific passive mob spawns.
+- **Parts 1–9:** See git log / previous `TODO.md` revisions.
