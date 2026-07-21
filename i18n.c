@@ -453,6 +453,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_UNBREAKING] = "Unbreaking",
     [STR_ENCH_SILK_TOUCH] = "Silk Touch",
     [STR_ENCH_POWER] = "Power",
+    [STR_ENCH_KNOCKBACK] = "Knockback",
+    [STR_ENCH_FIRE_ASPECT] = "Fire Aspect",
     // Fishing items
     [STR_ITEM_FISHING_ROD] = "Fishing Rod",
     [STR_ITEM_RAW_FISH] = "Raw Fish",
@@ -565,6 +567,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_MUTTON] = "Cook Mutton",
     [STR_SMELT_CHICKEN] = "Cook Chicken",
     [STR_SMELT_FISH] = "Cook Fish",
+    [STR_MSG_CANT_SLEEP_MOBS] = "Monsters are nearby!",
 },
 
 // ===== SIMPLIFIED CHINESE =====
@@ -976,6 +979,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_UNBREAKING] = "耐久",
     [STR_ENCH_SILK_TOUCH] = "精准采集",
     [STR_ENCH_POWER] = "力量",
+    [STR_ENCH_KNOCKBACK] = "击退",
+    [STR_ENCH_FIRE_ASPECT] = "火焰附加",
     // Fishing items
     [STR_ITEM_FISHING_ROD] = "钓鱼竿",
     [STR_ITEM_RAW_FISH] = "生鱼",
@@ -1088,6 +1093,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_MUTTON] = "烤羊肉",
     [STR_SMELT_CHICKEN] = "烤鸡肉",
     [STR_SMELT_FISH] = "烤鱼",
+    [STR_MSG_CANT_SLEEP_MOBS] = "附近有怪物！",
 },
 
 // ===== JAPANESE =====
@@ -1499,6 +1505,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ENCH_UNBREAKING] = "耐久力",
     [STR_ENCH_SILK_TOUCH] = "シルクの触手",
     [STR_ENCH_POWER] = "パワー",
+    [STR_ENCH_KNOCKBACK] = "ノックバック",
+    [STR_ENCH_FIRE_ASPECT] = "フレイムアスペクト",
     // Fishing items
     [STR_ITEM_FISHING_ROD] = "釣竿",
     [STR_ITEM_RAW_FISH] = "生の魚",
@@ -1611,6 +1619,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_SMELT_MUTTON] = "羊肉を焼く",
     [STR_SMELT_CHICKEN] = "鶏肉を焼く",
     [STR_SMELT_FISH] = "魚を焼く",
+    [STR_MSG_CANT_SLEEP_MOBS] = "近くにモンスターがいる！",
 },
 };
 

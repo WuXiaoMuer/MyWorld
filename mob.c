@@ -346,6 +346,7 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
             mobs[i].fuseTimer = 0.0f;
             mobs[i].burnTimer = 0.0f;
+            mobs[i].fireTimer = 0.0f;
             mobs[i].despawnTimer = MOB_DESPAWN_TIME;
             mobs[i].active = true;
             return &mobs[i];
@@ -1267,6 +1268,18 @@ void UpdateMobs(float dt)
                 }
             } else {
                 mob->burnTimer = 0.0f;
+            }
+        }
+
+        // Fire Aspect damage
+        if (mob->fireTimer > 0.0f) {
+            mob->fireTimer -= dt;
+            // Deal fire damage every 0.5s
+            static float fireDmgAccum = 0.0f;
+            fireDmgAccum += dt;
+            if (fireDmgAccum >= 0.5f) {
+                fireDmgAccum -= 0.5f;
+                DamageMob(mob, 1);
             }
         }
 

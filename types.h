@@ -946,6 +946,8 @@ typedef enum {
     STR_ENCH_UNBREAKING,
     STR_ENCH_SILK_TOUCH,
     STR_ENCH_POWER,
+    STR_ENCH_KNOCKBACK,
+    STR_ENCH_FIRE_ASPECT,
     STR_ENCHANTED,
 
     // Enchanting messages
@@ -1020,6 +1022,7 @@ typedef enum {
     STR_RECIPE_BOOK,
     STR_RECIPE_SUGAR,
     STR_MSG_CACTUS_DAMAGE,
+    STR_MSG_CANT_SLEEP_MOBS,
 
     STR_COUNT
 } StringId;
@@ -1084,6 +1087,7 @@ typedef struct {
     float contactCooldown;
     float deathTimer;   // >0 = dying
     float burnTimer;    // sunlight damage accumulator
+    float fireTimer;    // fire aspect damage accumulator (counts down)
     float attackTimer;  // cooldown for ranged attacks / creeper fuse
     float fuseTimer;    // creeper explosion fuse countdown
     float despawnTimer; // time-based despawn to prevent mob cap saturation
@@ -1247,6 +1251,8 @@ typedef enum {
     ENCH_UNBREAKING,        // 1/(level+1) chance to skip durability loss (all)
     ENCH_SILK_TOUCH,        // Mine blocks in their original form
     ENCH_POWER,             // +2 arrow damage per level (bows)
+    ENCH_KNOCKBACK,         // +50% knockback per level (swords)
+    ENCH_FIRE_ASPECT,       // sets mobs on fire for 1.5s per level (swords)
     ENCH_COUNT
 } EnchantmentType;
 

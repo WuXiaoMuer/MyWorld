@@ -805,7 +805,16 @@ void PlayerBlockInteraction(void)
                                                  mobs[i].position.y + mh / 2.0f,
                                                  (Color){255, 215, 0, 255});
                         }
+                        // Fire Aspect: set mob on fire
+                        if (ENCH_TYPE(toolEnch) == ENCH_FIRE_ASPECT) {
+                            mobs[i].fireTimer = 1.5f * ENCH_LEVEL(toolEnch);
+                        }
                         DamageMob(&mobs[i], damage);
+                        // Knockback: push mob further back
+                        if (ENCH_TYPE(toolEnch) == ENCH_KNOCKBACK) {
+                            float kbDir = (player.position.x < mobs[i].position.x) ? 1.0f : -1.0f;
+                            mobs[i].velocity.x += kbDir * 150.0f * ENCH_LEVEL(toolEnch);
+                        }
                         player.attackCooldown = GetAttackSpeed(selectedTool);
                         // Consume durability (Unbreaking check)
                         if (IsTool(selectedTool)) {
@@ -986,10 +995,32 @@ void PlayerBlockInteraction(void)
         // Interact with bed (set spawn point or sleep)
         if (blockX >= 0 && blockX < WORLD_WIDTH && blockY >= 0 && blockY < WORLD_HEIGHT) {
             if (world[blockX][blockY] == BLOCK_BED) {
+                // Check for nearby hostile mobs
+                bool mobsNearby = false;
+                float bcx = blockX * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
+                float bcy = blockY * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
+                for (int mi = 0; mi < MAX_MOBS; mi++) {
+                    if (!mobs[mi].active || mobs[mi].deathTimer > 0) continue;
+                    if (mobs[mi].type == MOB_PIG || mobs[mi].type == MOB_COW ||
+                        mobs[mi].type == MOB_SHEEP || mobs[mi].type == MOB_CHICKEN ||
+                        mobs[mi].type == MOB_VILLAGER) continue;
+                    float mcx = mobs[mi].position.x + GetMobWidth(mobs[mi].type) / 2.0f;
+                    float mcy = mobs[mi].position.y + GetMobHeight(mobs[mi].type) / 2.0f;
+                    float mdx = mcx - bcx, mdy = mcy - bcy;
+                    if (mdx * mdx + mdy * mdy < 200 * 200) {
+                        mobsNearby = true;
+                        break;
+                    }
+                }
+                if (mobsNearby) {
+                    ShowMessage(S(STR_MSG_CANT_SLEEP_MOBS), (Color){255, 100, 100, 255});
+                    return;
+                }
                 player.spawnX = blockX;
                 player.spawnY = blockY - 1;
                 if (TrySleep()) {
                     ShowMessage(S(STR_MSG_SLEEP), (Color){200, 150, 255, 255});
+                    ShowMessage(S(STR_MSG_SPAWN_SET), (Color){100, 220, 100, 255});
                 } else {
                     ShowMessage(S(STR_MSG_SLEEP_ONLY_NIGHT), (Color){255, 200, 100, 255});
                     ShowMessage(S(STR_MSG_SPAWN_SET), (Color){100, 220, 100, 255});
@@ -1066,9 +1097,8 @@ void PlayerBlockInteraction(void)
                             int pool[] = { ENCH_PROTECTION, ENCH_PROTECTION, ENCH_UNBREAKING };
                             eo->type = (EnchantmentType)pool[rand() % 3];
                         } else if (IsSword(selectedTool)) {
-                            // Silk Touch excluded on swords (it's for mining)
-                            int pool[] = { ENCH_SHARPNESS, ENCH_SHARPNESS, ENCH_UNBREAKING };
-                            eo->type = (EnchantmentType)pool[rand() % 3];
+                            int pool[] = { ENCH_SHARPNESS, ENCH_SHARPNESS, ENCH_UNBREAKING, ENCH_KNOCKBACK };
+                            eo->type = (EnchantmentType)pool[rand() % 4];
                         } else if (IsPickaxe(selectedTool)) {
                             if (hasSilkTouch) {
                                 int pool[] = { ENCH_EFFICIENCY, ENCH_EFFICIENCY, ENCH_UNBREAKING };

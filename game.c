@@ -2088,7 +2088,17 @@ void UpdateGame(float dt)
                                     }
                                     bool crit = rp->velocity.y > CRIT_FALL_THRESHOLD;
                                     if (crit) dmg = (int)(dmg * CRIT_DAMAGE_MULT);
+                                    // Fire Aspect: set mob on fire
+                                    uint16_t toolEnch = rp->itemEnchantments[rp->selectedSlot];
+                                    if (ENCH_TYPE(toolEnch) == ENCH_FIRE_ASPECT) {
+                                        mobs[mi].fireTimer = 1.5f * ENCH_LEVEL(toolEnch);
+                                    }
                                     DamageMob(&mobs[mi], dmg);
+                                    // Knockback: push mob further back
+                                    if (ENCH_TYPE(toolEnch) == ENCH_KNOCKBACK) {
+                                        float kbDir = (rp->position.x < mobs[mi].position.x) ? 1.0f : -1.0f;
+                                        mobs[mi].velocity.x += kbDir * 150.0f * ENCH_LEVEL(toolEnch);
+                                    }
                                     attackCooldownNet[fromId] = GetAttackSpeed(tool);
                                     break;
                                 }
