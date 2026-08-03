@@ -266,26 +266,49 @@ void InitGame(void)
     }
 }
 
+static StringId GetAchString(Achievement ach) {
+    switch (ach) {
+        case ACH_FIRST_STEPS: return STR_ACH_FIRST_STEPS;
+        case ACH_DEEP_DIG: return STR_ACH_DEEP_DIG;
+        case ACH_MONSTER_HUNTER: return STR_ACH_MONSTER_HUNTER;
+        case ACH_ARCHITECT: return STR_ACH_ARCHITECT;
+        case ACH_REDSTONE_ENGINEER: return STR_ACH_REDSTONE_ENGINEER;
+        case ACH_COLLECTOR: return STR_ACH_COLLECTOR;
+        case ACH_ANGLER: return STR_ACH_ANGLER;
+        case ACH_BREEDER: return STR_ACH_BREEDER;
+        case ACH_ENCHANTER: return STR_ACH_ENCHANTER;
+        case ACH_DEMOLITION: return STR_ACH_DEMOLITION;
+        default: return STR_NONE;
+    }
+}
+
 void UnlockAchievement(Achievement ach) {
     if (!achievements[ach]) {
         achievements[ach] = true;
-        StringId msgId = STR_NONE;
-        switch (ach) {
-            case ACH_FIRST_STEPS: msgId = STR_ACH_FIRST_STEPS; break;
-            case ACH_DEEP_DIG: msgId = STR_ACH_DEEP_DIG; break;
-            case ACH_MONSTER_HUNTER: msgId = STR_ACH_MONSTER_HUNTER; break;
-            case ACH_ARCHITECT: msgId = STR_ACH_ARCHITECT; break;
-            case ACH_REDSTONE_ENGINEER: msgId = STR_ACH_REDSTONE_ENGINEER; break;
-            case ACH_COLLECTOR: msgId = STR_ACH_COLLECTOR; break;
-            case ACH_ANGLER: msgId = STR_ACH_ANGLER; break;
-            case ACH_BREEDER: msgId = STR_ACH_BREEDER; break;
-            case ACH_ENCHANTER: msgId = STR_ACH_ENCHANTER; break;
-            case ACH_DEMOLITION: msgId = STR_ACH_DEMOLITION; break;
-            default: break;
-        }
+        StringId msgId = GetAchString(ach);
         if (msgId != STR_NONE) {
             ShowMessage(S(msgId), (Color){255, 215, 0, 255});
             PlaySoundXP();
+        }
+        // Network sync: tell host/host tells clients
+        if (NetIsClient()) {
+            uint8_t buf[32];
+            buf[0] = PKT_ACHIEVEMENT_UNLOCK;
+            PktAchievementUnlock au;
+            au.achievementId = (uint8_t)ach;
+            memcpy(buf + 1, &au, sizeof(PktAchievementUnlock));
+            NetSendToServer(buf, 1 + sizeof(PktAchievementUnlock), true);
+        } else if (NetIsHost()) {
+            uint8_t buf[32];
+            buf[0] = PKT_ACHIEVEMENT_UNLOCK;
+            PktAchievementUnlock au;
+            au.achievementId = (uint8_t)ach;
+            memcpy(buf + 1, &au, sizeof(PktAchievementUnlock));
+            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                if (players[r].netControlled) {
+                    NetSendTo(r, buf, 1 + sizeof(PktAchievementUnlock), true);
+                }
+            }
         }
     }
 }
@@ -1327,6 +1350,401 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
     return false;
 }
 
+// Add item to a specific player's inventory (host-side helper)
+static void AddToInventoryForPlayer(Player *p, BlockType item)
+{
+    if (IsTool(item)) {
+        for (int i = 0; i < INVENTORY_SLOTS; i++) {
+            if (p->inventory[i] == BLOCK_AIR) {
+                p->inventory[i] = item;
+                p->inventoryCount[i] = 1;
+                p->toolDurability[i] = GetToolMaxDurability(item);
+                return;
+            }
+        }
+        return;
+    }
+    if (IsArmor(item)) {
+        for (int i = 0; i < INVENTORY_SLOTS; i++) {
+            if (p->inventory[i] == BLOCK_AIR) {
+                p->inventory[i] = item;
+                p->inventoryCount[i] = 1;
+                p->toolDurability[i] = GetArmorMaxDurability(item);
+                return;
+            }
+        }
+        return;
+    }
+    // Stackable items
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+        if (p->inventory[i] == item && p->inventoryCount[i] < 64) {
+            p->inventoryCount[i]++;
+            return;
+        }
+    }
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+        if (p->inventory[i] == BLOCK_AIR) {
+            p->inventory[i] = item;
+            p->inventoryCount[i] = 1;
+            return;
+        }
+    }
+}
+
+// Process pending projectile-vs-mob hits (authoritative damage resolution)
+static void ProcessPendingProjectileHits(void)
+{
+    for (int i = 0; i < pendingProjectileHitCount; i++) {
+        int mi = pendingProjectileHitIndex[i];
+        if (mi < 0 || mi >= MAX_MOBS || !mobs[mi].active) continue;
+        if (NetIsHost()) {
+            DamageMob(&mobs[mi], pendingProjectileHitDamage[i]);
+            // Broadcast to all clients
+            uint8_t buf[64];
+            buf[0] = PKT_DAMAGE_MOB;
+            PktDamageMob dm;
+            dm.mobIndex = (uint8_t)mi;
+            dm.damage = pendingProjectileHitDamage[i];
+            memcpy(buf + 1, &dm, sizeof(PktDamageMob));
+            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                if (players[r].netControlled) {
+                    NetSendTo(r, buf, 1 + sizeof(PktDamageMob), false);
+                }
+            }
+        } else if (!NetIsClient()) {
+            // Single-player: apply damage directly
+            DamageMob(&mobs[mi], pendingProjectileHitDamage[i]);
+        }
+        // Client: don't apply locally, wait for host's PKT_DAMAGE_MOB
+    }
+    pendingProjectileHitCount = 0;
+}
+
+// Broadcast sound event to all clients
+static void BroadcastSound(uint8_t soundId, float x, float y)
+{
+    if (!NetIsHost()) return;
+    uint8_t buf[32];
+    buf[0] = PKT_SOUND_EVENT;
+    PktSoundEvent se;
+    se.soundId = soundId;
+    se.x = x; se.y = y;
+    memcpy(buf + 1, &se, sizeof(PktSoundEvent));
+    for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+        if (players[r].netControlled) {
+            NetSendTo(r, buf, 1 + sizeof(PktSoundEvent), false);
+        }
+    }
+}
+
+// Authoritative remote bow fire. Returns true if the shot was accepted.
+static bool TryFireBowRemote(Player *p, const PktBowRequest *req)
+{
+    if (p->playerDead) return false;
+
+    int slot = p->selectedSlot;
+    uint8_t held = p->inventory[slot];
+
+    // Validate: holding a bow with durability
+    if (held != ITEM_BOW) return false;
+    if (p->toolDurability[slot] <= 0) return false;
+
+    // Find arrows in inventory
+    int arrowSlot = -1;
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+        if (p->inventory[i] == ITEM_ARROW && p->inventoryCount[i] > 0) {
+            arrowSlot = i;
+            break;
+        }
+    }
+    if (arrowSlot < 0) return false;
+
+    // Spawn projectile (authoritative)
+    int arrowIdx = SpawnProjectile(req->spawnX, req->spawnY, req->vx, req->vy, true);
+    if (arrowIdx >= 0) {
+        int baseDmg = PROJECTILE_DAMAGE;
+        uint16_t be = p->itemEnchantments[slot];
+        if (ENCH_TYPE(be) == ENCH_POWER)
+            baseDmg += ENCH_LEVEL(be) * 2;
+        // Critical hit: +50% damage at full charge
+        if (req->charge >= BOW_CHARGE_MAX * 0.95f) {
+            baseDmg = (int)(baseDmg * 1.5f);
+        }
+        projectiles[arrowIdx].damage = baseDmg;
+    }
+
+    // Consume arrow
+    p->inventoryCount[arrowSlot]--;
+    if (p->inventoryCount[arrowSlot] <= 0)
+        p->inventory[arrowSlot] = BLOCK_AIR;
+
+    // Bow durability (Unbreaking check)
+    {
+        uint16_t bowEnch = p->itemEnchantments[slot];
+        bool skipBowDur = false;
+        if (ENCH_TYPE(bowEnch) == ENCH_UNBREAKING) {
+            skipBowDur = (rand() % (ENCH_LEVEL(bowEnch) + 1)) != 0;
+        }
+        if (!skipBowDur) p->toolDurability[slot]--;
+        if (p->toolDurability[slot] <= 0) {
+            p->inventory[slot] = BLOCK_AIR;
+            p->inventoryCount[slot] = 0;
+            p->toolDurability[slot] = 0;
+            p->itemEnchantments[slot] = 0;
+        }
+    }
+
+    return true;
+}
+
+// Authoritative remote ender pearl use. Returns true if teleport was accepted.
+static bool TryEnderPearlRemote(Player *p, float targetX, float targetY)
+{
+    if (p->playerDead) return false;
+
+    int slot = p->selectedSlot;
+    uint8_t held = p->inventory[slot];
+    if (held != ITEM_ENDER_PEARL) return false;
+    if (p->inventoryCount[slot] <= 0) return false;
+
+    // Distance check (max 400 pixels from player center)
+    float px = p->position.x + PLAYER_WIDTH / 2.0f;
+    float py = p->position.y + PLAYER_HEIGHT / 2.0f;
+    float dx = targetX + PLAYER_WIDTH / 2.0f - px;
+    float dy = targetY + PLAYER_HEIGHT / 2.0f - py;
+    float dist = sqrtf(dx * dx + dy * dy);
+    if (dist > 400.0f) return false;
+
+    // Check target position is safe (not inside solid blocks)
+    int tlx = (int)(targetX) / BLOCK_SIZE;
+    int trx = (int)(targetX + PLAYER_WIDTH - 0.01f) / BLOCK_SIZE;
+    int tty = (int)(targetY) / BLOCK_SIZE;
+    int tby = (int)(targetY + PLAYER_HEIGHT - 0.01f) / BLOCK_SIZE;
+    if (tlx < 0) tlx = 0;
+    if (trx >= WORLD_WIDTH) trx = WORLD_WIDTH - 1;
+    if (tty < 0) tty = 0;
+    if (tby >= WORLD_HEIGHT) tby = WORLD_HEIGHT - 1;
+    bool safe = true;
+    for (int bx = tlx; bx <= trx && safe; bx++) {
+        for (int by = tty; by <= tby && safe; by++) {
+            if (IsBlockSolid(bx, by)) safe = false;
+        }
+    }
+    if (!safe) {
+        // Try to find nearest safe spot by scanning outward
+        float bestX = targetX, bestY = targetY;
+        float bestDist = 1e9f;
+        for (int ox = -2; ox <= 2; ox++) {
+            for (int oy = -2; oy <= 2; oy++) {
+                int nx = (int)(targetX) / BLOCK_SIZE + ox;
+                int ny = (int)(targetY) / BLOCK_SIZE + oy;
+                if (nx < 0 || nx >= WORLD_WIDTH - 1 || ny < 0 || ny >= WORLD_HEIGHT - 2) continue;
+                float sx = nx * BLOCK_SIZE;
+                float sy = ny * BLOCK_SIZE;
+                int sminBX = (int)(sx) / BLOCK_SIZE;
+                int smaxBX = (int)(sx + PLAYER_WIDTH - 0.01f) / BLOCK_SIZE;
+                int sminBY = (int)(sy) / BLOCK_SIZE;
+                int smaxBY = (int)(sy + PLAYER_HEIGHT - 0.01f) / BLOCK_SIZE;
+                bool free = true;
+                for (int bx = sminBX; bx <= smaxBX && free; bx++) {
+                    if (bx < 0 || bx >= WORLD_WIDTH) { free = false; break; }
+                    for (int by = sminBY; by <= smaxBY && free; by++) {
+                        if (IsBlockSolid(bx, by)) free = false;
+                    }
+                }
+                if (free) {
+                    float dist2 = (sx - targetX) * (sx - targetX) + (sy - targetY) * (sy - targetY);
+                    if (dist2 < bestDist) { bestDist = dist2; bestX = sx; bestY = sy; }
+                }
+            }
+        }
+        if (bestDist < 1e8f) {
+            targetX = bestX;
+            targetY = bestY;
+            safe = true;
+        }
+    }
+    if (!safe) return false;
+
+    // Teleport
+    p->position.x = targetX;
+    p->position.y = targetY;
+    p->velocity.x = 0;
+    p->velocity.y = 0;
+
+    // Consume pearl
+    p->inventoryCount[slot]--;
+    if (p->inventoryCount[slot] <= 0) {
+        p->inventory[slot] = BLOCK_AIR;
+    }
+    p->health -= 2;
+    p->damageFlashTimer = 0.3f;
+
+    return true;
+}
+
+// Authoritative remote enchanting. Returns true if enchantment was applied.
+static bool TryEnchantRemote(Player *p, int blockX, int blockY, int enchantType, int enchantLevel, int xpCost)
+{
+    if (p->playerDead) return false;
+
+    // Validate enchanting table exists
+    if (blockX < 0 || blockX >= WORLD_WIDTH || blockY < 0 || blockY >= WORLD_HEIGHT) return false;
+    if (world[blockX][blockY] != BLOCK_ENCHANTING_TABLE) return false;
+
+    int slot = p->selectedSlot;
+    uint8_t held = p->inventory[slot];
+    if (held == BLOCK_AIR) return false;
+
+    // Only tools and armor can be enchanted
+    if (!IsTool((BlockType)held) && !IsArmor((BlockType)held)) return false;
+
+    // Check not already enchanted
+    if (ENCH_TYPE(p->itemEnchantments[slot]) != ENCH_NONE) return false;
+
+    // Validate enchantment level range
+    if (enchantLevel < 1 || enchantLevel > 3) return false;
+
+    // Validate XP cost range (based on level*2+3 * 10 pattern, range 50-200)
+    if (xpCost < 30 || xpCost > 250) return false;
+    if (p->xp < xpCost) return false;
+
+    // Deduct XP
+    p->xp -= xpCost;
+
+    // Apply enchantment
+    p->itemEnchantments[slot] = ENCH_PACK((EnchantmentType)enchantType, enchantLevel);
+
+    // Restore durability
+    int maxDur = IsTool((BlockType)held) ? GetToolMaxDurability((BlockType)held) :
+                 IsArmor((BlockType)held) ? GetArmorMaxDurability((BlockType)held) : 0;
+    if (IsTool((BlockType)held)) {
+        p->toolDurability[slot] = maxDur;
+    }
+
+    return true;
+}
+
+// Authoritative remote fishing. Returns true if accepted.
+static bool TryFishingRemote(Player *p, uint8_t action, float vx, float vy)
+{
+    if (p->playerDead) return false;
+
+    int slot = p->selectedSlot;
+    uint8_t held = p->inventory[slot];
+    if (held != ITEM_FISHING_ROD) return false;
+
+    if (action == 0) {
+        // CAST: spawn fishing projectile
+        // Check no active fishing projectile already
+        for (int i = 0; i < MAX_PROJECTILES; i++) {
+            if (projectiles[i].active && projectiles[i].isFishing) return false;
+        }
+        float px = p->position.x + PLAYER_WIDTH / 2.0f;
+        float py = p->position.y + PLAYER_HEIGHT / 2.0f;
+        float speed = PROJECTILE_SPEED * 0.8f;
+        float aimDist = sqrtf(vx * vx + vy * vy);
+        if (aimDist < 0.01f) return false;
+        int si = SpawnProjectile(px, py, (vx / aimDist) * speed, (vy / aimDist) * speed, false);
+        if (si >= 0) {
+            projectiles[si].isFishing = true;
+            projectiles[si].fishTimer = 5.0f + (float)(rand() % 25);
+            projectiles[si].lifetime = 60.0f;
+        }
+        return true;
+    } else if (action == 1) {
+        // RETRACT: check for active fishing projectile
+        for (int i = 0; i < MAX_PROJECTILES; i++) {
+            if (projectiles[i].active && projectiles[i].isFishing) {
+                if (projectiles[i].hasBite) {
+                    // Generate catch
+                    int roll = rand() % 100;
+                    int catchItem;
+                    if (roll < 60) {
+                        catchItem = ITEM_RAW_FISH;
+                    } else if (roll < 85) {
+                        int junk = rand() % 3;
+                        catchItem = (junk == 0) ? ITEM_STICK : (junk == 1) ? ITEM_BONE : ITEM_RAW_CHICKEN;
+                    } else {
+                        int treasure = rand() % 4;
+                        catchItem = (treasure == 0) ? ITEM_ENDER_PEARL : (treasure == 1) ? ITEM_IRON_INGOT :
+                                    (treasure == 2) ? ITEM_BOW : ITEM_STRING;
+                    }
+                    AddToInventoryForPlayer(p, (BlockType)catchItem);
+                }
+                projectiles[i].active = false;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Authoritative remote cauldron interaction. Returns true if accepted.
+static bool TryCauldronInteractRemote(Player *p, int bx, int by)
+{
+    if (p->playerDead) return false;
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+    if (world[bx][by] != BLOCK_CAULDRON) return false;
+
+    int slot = p->selectedSlot;
+    uint8_t held = p->inventory[slot];
+
+    // Find or create cauldron entry
+    int cdIdx = -1;
+    for (int ci = 0; ci < cauldronCount; ci++) {
+        if (cauldrons[ci].x == bx && cauldrons[ci].y == by) {
+            cdIdx = ci;
+            break;
+        }
+    }
+    if (cdIdx < 0 && cauldronCount < MAX_CAULDRONS) {
+        cdIdx = cauldronCount++;
+        cauldrons[cdIdx].x = bx;
+        cauldrons[cdIdx].y = by;
+        cauldrons[cdIdx].fillLevel = 0;
+    }
+    if (cdIdx < 0) return false;
+
+    if (held == ITEM_WATER_BUCKET && cauldrons[cdIdx].fillLevel < 3) {
+        cauldrons[cdIdx].fillLevel = 3;
+        p->inventory[slot] = ITEM_BUCKET;
+        return true;
+    }
+    if (held == ITEM_BUCKET && cauldrons[cdIdx].fillLevel > 0) {
+        cauldrons[cdIdx].fillLevel = 0;
+        p->inventory[slot] = ITEM_WATER_BUCKET;
+        return true;
+    }
+    if (cauldrons[cdIdx].fillLevel >= 2) {
+        p->oxygen = MAX_OXYGEN;
+        cauldrons[cdIdx].fillLevel = 1;
+        return true;
+    }
+    return false;
+}
+
+// Authoritative remote item drop. Returns true if accepted.
+static bool TryItemDropRemote(Player *p, int slotIdx)
+{
+    if (p->playerDead) return false;
+    if (slotIdx < 0 || slotIdx >= INVENTORY_SLOTS) return false;
+
+    uint8_t item = p->inventory[slotIdx];
+    if (item == BLOCK_AIR) return false;
+
+    int count = p->inventoryCount[slotIdx];
+    float px = p->position.x + PLAYER_WIDTH / 2;
+    float py = p->position.y + PLAYER_HEIGHT / 2;
+    SpawnItemEntity(item, count, px, py);
+
+    p->inventory[slotIdx] = BLOCK_AIR;
+    p->inventoryCount[slotIdx] = 0;
+    p->toolDurability[slotIdx] = 0;
+    p->itemEnchantments[slotIdx] = 0;
+    return true;
+}
+
 //----------------------------------------------------------------------------------
 // Chat helpers
 //----------------------------------------------------------------------------------
@@ -1402,7 +1820,7 @@ static bool ProcessChatCommand(const char *msg)
     if (!cmd) return false;
 
     if (strcmp(cmd, "/help") == 0) {
-        AddChatMessage(255, "Commands: /help /tp x y /give id count /time day|night /weather clear|rain|thunder");
+        AddChatMessage(255, "Commands: /help /tp x y /give id count /time day|night /weather clear|rain|thunder /heal /list");
         return true;
     }
 
@@ -1473,6 +1891,33 @@ static bool ProcessChatCommand(const char *msg)
         } else {
             AddChatMessage(255, "Usage: /weather clear|rain|thunder");
         }
+        return true;
+    }
+
+    if (strcmp(cmd, "/heal") == 0) {
+        if (player.playerDead) {
+            AddChatMessage(255, "You are dead. Respawn first!");
+        } else {
+            player.health = MAX_HEALTH;
+            player.hunger = MAX_HUNGER;
+            player.oxygen = MAX_OXYGEN;
+            AddChatMessage(255, "Health and hunger restored.");
+        }
+        return true;
+    }
+
+    if (strcmp(cmd, "/list") == 0) {
+        char listBuf[256] = "";
+        int count = 0;
+        for (int i = 0; i < MAX_NET_PLAYERS; i++) {
+            if (i == 0 || players[i].netControlled) {
+                if (count > 0) strcat(listBuf, ", ");
+                strcat(listBuf, players[i].playerName[0] ? players[i].playerName : "Host");
+                count++;
+            }
+        }
+        if (count == 0) strcpy(listBuf, "No players online.");
+        AddChatMessage(255, listBuf);
         return true;
     }
 
@@ -2162,8 +2607,34 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_DAMAGE_MOB && size >= 1 + (int)sizeof(PktDamageMob)) {
                     const PktDamageMob *dm = (const PktDamageMob *)((const uint8_t *)data + 1);
-                    if (dm->mobIndex < MAX_MOBS && mobs[dm->mobIndex].active) {
-                        DamageMob(&mobs[dm->mobIndex], dm->damage);
+                    if (dm->mobIndex < MAX_MOBS && mobs[dm->mobIndex].active && fromId > 0 && fromId < MAX_NET_PLAYERS) {
+                        Player *rp = &players[fromId];
+                        // Validate: mob must be within melee range
+                        float px = rp->position.x + PLAYER_WIDTH / 2.0f;
+                        float py = rp->position.y + PLAYER_HEIGHT / 2.0f;
+                        float mx = mobs[dm->mobIndex].position.x + GetMobWidth(mobs[dm->mobIndex].type) / 2.0f;
+                        float my = mobs[dm->mobIndex].position.y + GetMobHeight(mobs[dm->mobIndex].type) / 2.0f;
+                        float dx = mx - px, dy = my - py;
+                        float dist = sqrtf(dx * dx + dy * dy);
+                        if (dist > BREAK_RANGE * BLOCK_SIZE * 1.5f) continue;
+                        // Validate: damage must match expected weapon value
+                        int expected = 1;
+                        BlockType tool = (BlockType)rp->inventory[rp->selectedSlot];
+                        if (IsTool(tool)) {
+                            if (tool == TOOL_WOOD_SWORD) expected = 3;
+                            else if (tool == TOOL_STONE_SWORD) expected = 4;
+                            else if (tool == TOOL_IRON_SWORD) expected = 6;
+                            else if (tool == TOOL_GOLD_SWORD) expected = 4;
+                            else if (tool == TOOL_DIAMOND_SWORD) expected = 8;
+                            else expected = 2;
+                            // Critical hit multiplier
+                            if (rp->velocity.y > CRIT_FALL_THRESHOLD)
+                                expected = (int)(expected * CRIT_DAMAGE_MULT);
+                        }
+                        // Allow ±2 tolerance (enchantment rounding, sharpness, etc.)
+                        int dmg = dm->damage;
+                        if (dmg < expected - 2 || dmg > expected + 10) dmg = expected;
+                        DamageMob(&mobs[dm->mobIndex], dmg);
                     }
                 } else if (type == PKT_ENTITY_PICKUP && size >= 1 + (int)sizeof(PktEntityPickup)) {
                     const PktEntityPickup *ep = (const PktEntityPickup *)((const uint8_t *)data + 1);
@@ -2181,7 +2652,8 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_PROJECTILE_SPAWN && size >= 1 + (int)sizeof(PktProjectileSpawn)) {
                     const PktProjectileSpawn *ps = (const PktProjectileSpawn *)((const uint8_t *)data + 1);
-                    SpawnProjectile(ps->x, ps->y, ps->vx, ps->vy, ps->fromPlayer);
+                    int si = SpawnProjectile(ps->x, ps->y, ps->vx, ps->vy, ps->fromPlayer);
+                    if (si >= 0 && ps->isFishing) projectiles[si].isFishing = true;
                     // Relay to other clients
                     uint8_t relayBuf[NET_PACKET_MAX];
                     relayBuf[0] = PKT_PROJECTILE_SPAWN;
@@ -2201,6 +2673,15 @@ void UpdateGame(float dt)
                         PackChestSync(&pkt, idx);
                         memcpy(sbuf + 1, &pkt, sizeof(pkt));
                         NetSendTo(fromId, sbuf, 1 + sizeof(pkt), true);
+                    }
+                } else if (type == PKT_SOUND_EVENT && size >= 1 + (int)sizeof(PktSoundEvent)) {
+                    const PktSoundEvent *se = (const PktSoundEvent *)((const uint8_t *)data + 1);
+                    switch (se->soundId) {
+                        case 0: PlaySoundBowFire(); break;
+                        case 1: PlaySoundHurt(); break;
+                        case 2: PlaySoundPickup(); break;
+                        case 3: PlaySoundSplash(); break;
+                        default: break;
                     }
                 } else if (type == PKT_CHEST_SYNC && size >= 1 + (int)sizeof(PktChestSync)) {
                     const PktChestSync *pkt = (const PktChestSync *)((const uint8_t *)data + 1);
@@ -2287,6 +2768,203 @@ void UpdateGame(float dt)
                             }
                         }
                     }
+                } else if (type == PKT_BOW_REQUEST && size >= 1 + (int)sizeof(PktBowRequest)) {
+                    const PktBowRequest *req = (const PktBowRequest *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        Player *rp = &players[fromId];
+                        if (TryFireBowRemote(rp, req)) {
+                            // Send authoritative inventory back to all clients
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                            // Broadcast projectile spawn to all clients
+                            uint8_t psbuf[NET_PACKET_MAX];
+                            psbuf[0] = PKT_PROJECTILE_SPAWN;
+                            PktProjectileSpawn ps;
+                            ps.x = req->spawnX; ps.y = req->spawnY;
+                            ps.vx = req->vx; ps.vy = req->vy;
+                            ps.fromPlayer = true; ps.playerId = (uint8_t)fromId;
+                            ps.isFishing = false;
+                            memcpy(psbuf + 1, &ps, sizeof(PktProjectileSpawn));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, psbuf, 1 + sizeof(PktProjectileSpawn), false);
+                                }
+                            }
+                            // Sound: bow fire
+                            BroadcastSound(0, rp->position.x, rp->position.y);
+                        }
+                    }
+                } else if (type == PKT_ENDER_PEARL_REQUEST && size >= 1 + (int)sizeof(PktEnderPearlRequest)) {
+                    const PktEnderPearlRequest *req = (const PktEnderPearlRequest *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        Player *rp = &players[fromId];
+                        float saveX = rp->position.x, saveY = rp->position.y;
+                        if (TryEnderPearlRemote(rp, req->targetX, req->targetY)) {
+                            // Broadcast authoritative inventory
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                            // Broadcast teleport to all clients
+                            uint8_t tpbuf[NET_PACKET_MAX];
+                            tpbuf[0] = PKT_PLAYER_TELEPORT;
+                            PktPlayerTeleport tp;
+                            tp.playerId = (uint8_t)fromId;
+                            tp.x = rp->position.x; tp.y = rp->position.y;
+                            memcpy(tpbuf + 1, &tp, sizeof(PktPlayerTeleport));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, tpbuf, 1 + sizeof(PktPlayerTeleport), false);
+                                }
+                            }
+                            // Apply teleport to host's remote player interpolation
+                            remotePlayers[fromId].interpX = rp->position.x;
+                            remotePlayers[fromId].interpY = rp->position.y;
+                            // Sound: ender pearl teleport
+                            BroadcastSound(1, rp->position.x, rp->position.y);
+                        }
+                    }
+                } else if (type == PKT_ENCHANT_REQUEST && size >= 1 + (int)sizeof(PktEnchantRequest)) {
+                    const PktEnchantRequest *req = (const PktEnchantRequest *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        Player *rp = &players[fromId];
+                        if (TryEnchantRemote(rp, req->blockX, req->blockY, req->enchantType, req->enchantLevel, req->xpCost)) {
+                            // Broadcast authoritative inventory
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                        }
+                    }
+                } else if (type == PKT_FISHING_REQUEST && size >= 1 + (int)sizeof(PktFishingRequest)) {
+                    const PktFishingRequest *req = (const PktFishingRequest *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        Player *rp = &players[fromId];
+                        if (TryFishingRemote(rp, req->action, req->vx, req->vy)) {
+                            // Broadcast inventory sync
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                            // Broadcast projectile spawn (fishing bobber)
+                            if (req->action == 0) {
+                                uint8_t psbuf[NET_PACKET_MAX];
+                                psbuf[0] = PKT_PROJECTILE_SPAWN;
+                                PktProjectileSpawn ps;
+                                float px = rp->position.x + PLAYER_WIDTH / 2.0f;
+                                float py = rp->position.y + PLAYER_HEIGHT / 2.0f;
+                                float aimDist = sqrtf(req->vx * req->vx + req->vy * req->vy);
+                                float speed = PROJECTILE_SPEED * 0.8f;
+                                ps.x = px; ps.y = py;
+                                ps.vx = aimDist > 0.01f ? (req->vx / aimDist) * speed : 0;
+                                ps.vy = aimDist > 0.01f ? (req->vy / aimDist) * speed : 0;
+                                ps.fromPlayer = false; ps.playerId = 0;
+                                ps.isFishing = true;
+                                memcpy(psbuf + 1, &ps, sizeof(PktProjectileSpawn));
+                                for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                    if (players[r].netControlled) {
+                                        NetSendTo(r, psbuf, 1 + sizeof(PktProjectileSpawn), false);
+                                    }
+                                }
+                                // Sound: fishing cast
+                                BroadcastSound(3, rp->position.x, rp->position.y);
+                            } // else retract handled by TryFishingRemote's catch logic
+                        }
+                    }
+                } else if (type == PKT_CAULDRON_SYNC && size >= 1 + (int)sizeof(PktCauldronSync)) {
+                    const PktCauldronSync *req = (const PktCauldronSync *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        Player *rp = &players[fromId];
+                        if (TryCauldronInteractRemote(rp, (int)req->x, (int)req->y)) {
+                            // Broadcast cauldron state to all clients
+                            int cdIdx = -1;
+                            for (int ci = 0; ci < cauldronCount; ci++) {
+                                if (cauldrons[ci].x == (int)req->x && cauldrons[ci].y == (int)req->y) {
+                                    cdIdx = ci;
+                                    break;
+                                }
+                            }
+                            if (cdIdx >= 0) {
+                                uint8_t csbuf[NET_PACKET_MAX];
+                                csbuf[0] = PKT_CAULDRON_SYNC;
+                                PktCauldronSync cs;
+                                cs.x = cauldrons[cdIdx].x; cs.y = cauldrons[cdIdx].y;
+                                cs.fillLevel = cauldrons[cdIdx].fillLevel;
+                                memcpy(csbuf + 1, &cs, sizeof(PktCauldronSync));
+                                for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                    if (players[r].netControlled) {
+                                        NetSendTo(r, csbuf, 1 + sizeof(PktCauldronSync), true);
+                                    }
+                                }
+                            }
+                            // Broadcast inventory sync
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                        }
+                    }
+                } else if (type == PKT_ITEM_DROP && size >= 1 + (int)sizeof(PktItemDrop)) {
+                    const PktItemDrop *req = (const PktItemDrop *)((const uint8_t *)data + 1);
+                    if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
+                        Player *rp = &players[fromId];
+                        if (TryItemDropRemote(rp, req->slot)) {
+                            // Broadcast authoritative inventory
+                            uint8_t sbuf[NET_PACKET_MAX];
+                            sbuf[0] = PKT_INVENTORY_SYNC;
+                            PktInventorySync ipkt;
+                            PackInventorySync(&ipkt, fromId);
+                            memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                                if (players[r].netControlled) {
+                                    NetSendTo(r, sbuf, 1 + sizeof(ipkt), true);
+                                }
+                            }
+                        }
+                    }
+                } else if (type == PKT_ACHIEVEMENT_UNLOCK && size >= 1 + (int)sizeof(PktAchievementUnlock)) {
+                    const PktAchievementUnlock *au = (const PktAchievementUnlock *)((const uint8_t *)data + 1);
+                    // Relay to all other clients
+                    uint8_t relayBuf[NET_PACKET_MAX];
+                    relayBuf[0] = PKT_ACHIEVEMENT_UNLOCK;
+                    memcpy(relayBuf + 1, au, sizeof(PktAchievementUnlock));
+                    for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                        if (r != fromId && players[r].netControlled) {
+                            NetSendTo(r, relayBuf, 1 + sizeof(PktAchievementUnlock), true);
+                        }
+                    }
                 } else if (type == PKT_CHAT && size >= 1 + (int)sizeof(PktChat)) {
                     const PktChat *pkt = (const PktChat *)((const uint8_t *)data + 1);
                     if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
@@ -2336,6 +3014,7 @@ void UpdateGame(float dt)
             }
             UpdateMobs(dt);
             UpdateProjectiles(dt);
+            ProcessPendingProjectileHits();
             UpdateXpOrbs(dt);
             UpdateEntities(dt);
             UpdateParticles(dt);
@@ -2546,7 +3225,8 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_PROJECTILE_SPAWN && size >= 1 + (int)sizeof(PktProjectileSpawn)) {
                     const PktProjectileSpawn *ps = (const PktProjectileSpawn *)((const uint8_t *)data + 1);
-                    SpawnProjectile(ps->x, ps->y, ps->vx, ps->vy, ps->fromPlayer);
+                    int si = SpawnProjectile(ps->x, ps->y, ps->vx, ps->vy, ps->fromPlayer);
+                    if (si >= 0 && ps->isFishing) projectiles[si].isFishing = true;
                 } else if (type == PKT_TIME_SYNC && size >= 1 + (int)sizeof(PktTimeSync)) {
                     const PktTimeSync *ts = (const PktTimeSync *)((const uint8_t *)data + 1);
                     dayNight.timeOfDay = ts->timeOfDay;
@@ -2556,6 +3236,23 @@ void UpdateGame(float dt)
                     weather.duration = ws->duration;
                     weather.transitionTimer = 0;
                     weather.rainAlpha = (weather.type == WEATHER_CLEAR) ? 0 : 1;
+                } else if (type == PKT_CAULDRON_SYNC && size >= 1 + (int)sizeof(PktCauldronSync)) {
+                    const PktCauldronSync *cs = (const PktCauldronSync *)((const uint8_t *)data + 1);
+                    int cdIdx = -1;
+                    for (int ci = 0; ci < cauldronCount; ci++) {
+                        if (cauldrons[ci].x == (int)cs->x && cauldrons[ci].y == (int)cs->y) {
+                            cdIdx = ci;
+                            break;
+                        }
+                    }
+                    if (cdIdx < 0 && cauldronCount < MAX_CAULDRONS) {
+                        cdIdx = cauldronCount++;
+                        cauldrons[cdIdx].x = (int)cs->x;
+                        cauldrons[cdIdx].y = (int)cs->y;
+                    }
+                    if (cdIdx >= 0) {
+                        cauldrons[cdIdx].fillLevel = cs->fillLevel;
+                    }
                 } else if (type == PKT_DAMAGE_PLAYER && size >= 1 + (int)sizeof(PktDamagePlayer)) {
                     const PktDamagePlayer *dp = (const PktDamagePlayer *)((const uint8_t *)data + 1);
                     if (dp->playerId == localPlayerId) {
@@ -2563,6 +3260,33 @@ void UpdateGame(float dt)
                         player.velocity.x += dp->knockbackX;
                         player.velocity.y += dp->knockbackY;
                         player.damageFlashTimer = 0.3f;
+                    }
+                } else if (type == PKT_PLAYER_TELEPORT && size >= 1 + (int)sizeof(PktPlayerTeleport)) {
+                    const PktPlayerTeleport *tp = (const PktPlayerTeleport *)((const uint8_t *)data + 1);
+                    if (tp->playerId < MAX_NET_PLAYERS) {
+                        if (tp->playerId == localPlayerId) {
+                            // Host teleported us; apply to local player
+                            player.position.x = tp->x;
+                            player.position.y = tp->y;
+                            player.velocity.x = 0;
+                            player.velocity.y = 0;
+                        } else if (players[tp->playerId].netControlled) {
+                            // Remote player teleported; update interpolation
+                            players[tp->playerId].position.x = tp->x;
+                            players[tp->playerId].position.y = tp->y;
+                            remotePlayers[tp->playerId].interpX = tp->x;
+                            remotePlayers[tp->playerId].interpY = tp->y;
+                        }
+                    }
+                } else if (type == PKT_ACHIEVEMENT_UNLOCK && size >= 1 + (int)sizeof(PktAchievementUnlock)) {
+                    const PktAchievementUnlock *au = (const PktAchievementUnlock *)((const uint8_t *)data + 1);
+                    if (au->achievementId < ACH_COUNT) {
+                        if (!achievements[au->achievementId]) {
+                            achievements[au->achievementId] = true;
+                            ShowMessage(S(GetAchString((Achievement)au->achievementId)),
+                                       (Color){255, 215, 0, 255});
+                            PlaySoundXP();
+                        }
                     }
                 } else if (type == PKT_DISCONNECT && size >= 2) {
                     // Host disconnected, return to menu
@@ -2655,6 +3379,7 @@ void UpdateGame(float dt)
             if (!chatOpen) UpdatePlayer(dt);
             UpdateMobs(dt);
             UpdateProjectiles(dt);
+            ProcessPendingProjectileHits();
             UpdateXpOrbs(dt);
             UpdateEntities(dt);
             UpdateParticles(dt);

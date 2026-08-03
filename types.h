@@ -214,6 +214,7 @@ void InitWin32WheelHook(void);
 #define FISHING_MAX_DELAY       30.0f
 #define PROJECTILE_LIFETIME 3.0f
 #define ARROW_GRAVITY       400.0f
+#define BOW_CHARGE_MAX      1.5f    // seconds to full charge
 
 // Creeper explosion
 #define CREEPER_FUSE_TIME    1.5f
@@ -1146,6 +1147,8 @@ typedef struct {
     float cameraShakeIntensity;
     float cameraShakeTimer;
     float attackCooldown;
+    float bowChargeTimer;     // 0.0 to 1.0 (full charge)
+    bool bowCharging;         // true while holding right-click with bow
     int spawnX, spawnY;      // bed spawn point (-1 = use default)
     // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
     uint8_t armor[4];
@@ -1373,6 +1376,9 @@ extern Color messageColor;
 
 extern Mob mobs[MAX_MOBS];
 extern Projectile projectiles[MAX_PROJECTILES];
+extern int pendingProjectileHitCount;
+extern int pendingProjectileHitIndex[MAX_PROJECTILES];
+extern int pendingProjectileHitDamage[MAX_PROJECTILES];
 extern float mobSpawnTimer;
 
 extern Particle particles[MAX_PARTICLES];

@@ -1175,6 +1175,18 @@ void PlayerBlockInteraction(void)
                 // Check if target position is safe (not inside solid blocks)
                 float targetX = player.position.x + dx - PLAYER_WIDTH / 2.0f;
                 float targetY = player.position.y + dy - PLAYER_HEIGHT / 2.0f;
+                if (NetIsClient()) {
+                    // Send ender pearl request to host
+                    uint8_t buf[64];
+                    PktEnderPearlRequest preq;
+                    preq.targetX = targetX;
+                    preq.targetY = targetY;
+                    buf[0] = PKT_ENDER_PEARL_REQUEST;
+                    memcpy(buf + 1, &preq, sizeof(PktEnderPearlRequest));
+                    NetSendToServer(buf, 1 + sizeof(PktEnderPearlRequest), true);
+                    return;
+                }
+                // Host/local: validate and teleport
                 // Check AABB collision at target with bounds clamp
                 int tlx = (int)(targetX) / BLOCK_SIZE;
                 int trx = (int)(targetX + PLAYER_WIDTH - 0.01f) / BLOCK_SIZE;
@@ -1247,74 +1259,48 @@ void PlayerBlockInteraction(void)
             return;
         }
 
-        // Fire bow
-        if (selectedTool == ITEM_BOW) {
-            // Find arrows in inventory
-            int arrowSlot = -1;
-            for (int i = 0; i < INVENTORY_SLOTS; i++) {
-                if (player.inventory[i] == ITEM_ARROW && player.inventoryCount[i] > 0) {
-                    arrowSlot = i;
-                    break;
-                }
-            }
-            if (arrowSlot >= 0) {
-                // Fire toward mouse
-                float px = player.position.x + PLAYER_WIDTH / 2.0f;
-                float py = player.position.y + PLAYER_HEIGHT / 2.0f;
-                float dx = mouseWorld.x - px;
-                float dy = mouseWorld.y - py;
-                float aimDist = sqrtf(dx * dx + dy * dy);
-                if (aimDist > 1.0f) {
-                    float speed = PROJECTILE_SPEED * 1.5f;
-                    int arrowIdx = SpawnProjectile(px, py, (dx / aimDist) * speed, (dy / aimDist) * speed, true);
-                    // Power enchantment: +2 arrow damage per level
-                    if (arrowIdx >= 0) {
-                        uint16_t be = player.itemEnchantments[player.selectedSlot];
-                        if (ENCH_TYPE(be) == ENCH_POWER)
-                            projectiles[arrowIdx].damage = PROJECTILE_DAMAGE + ENCH_LEVEL(be) * 2;
-                    }
-                    // Sync projectile to network
-                    if (NetIsClient()) {
-                        uint8_t buf[64];
-                        PktProjectileSpawn ps;
-                        ps.x = px; ps.y = py;
-                        ps.vx = (dx / aimDist) * speed; ps.vy = (dy / aimDist) * speed;
-                        ps.fromPlayer = true; ps.playerId = (uint8_t)localPlayerId;
-                        buf[0] = PKT_PROJECTILE_SPAWN;
-                        memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
-                        NetSendToServer(buf, 1 + sizeof(PktProjectileSpawn), false);
-                    }
-                    PlaySoundBowFire();
-                    // Consume arrow
-                    player.inventoryCount[arrowSlot]--;
-                    if (player.inventoryCount[arrowSlot] <= 0)
-                        player.inventory[arrowSlot] = BLOCK_AIR;
-                    // Bow durability (Unbreaking check)
-                    {
-                        uint16_t bowEnch = player.itemEnchantments[player.selectedSlot];
-                        bool skipBowDur = false;
-                        if (ENCH_TYPE(bowEnch) == ENCH_UNBREAKING) {
-                            skipBowDur = (rand() % (ENCH_LEVEL(bowEnch) + 1)) != 0;
-                        }
-                        if (!skipBowDur) player.toolDurability[player.selectedSlot]--;
-                        if (player.toolDurability[player.selectedSlot] <= 0) {
-                            player.inventory[player.selectedSlot] = BLOCK_AIR;
-                            player.inventoryCount[player.selectedSlot] = 0;
-                            player.toolDurability[player.selectedSlot] = 0;
-                            player.itemEnchantments[player.selectedSlot] = 0;
-                            ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
-                        }
-                    }
-                }
-                return;
-            } else {
-                ShowMessage(S(STR_MSG_NO_ARROWS), (Color){240, 80, 80, 255});
-                return;
-            }
-        }
+        // Bow: handled in UpdatePlayer with charge mechanic
+        if (selectedTool == ITEM_BOW) return;
 
         // Fishing rod
         if (selectedTool == ITEM_FISHING_ROD) {
+            if (NetIsClient()) {
+                // Check for existing fishing line to retract
+                bool hasFishing = false;
+                for (int i = 0; i < MAX_PROJECTILES; i++) {
+                    if (projectiles[i].active && projectiles[i].isFishing) {
+                        hasFishing = true;
+                        break;
+                    }
+                }
+                if (hasFishing) {
+                    // RETRACT
+                    uint8_t buf[64];
+                    PktFishingRequest freq;
+                    freq.action = 1; freq.vx = 0; freq.vy = 0;
+                    buf[0] = PKT_FISHING_REQUEST;
+                    memcpy(buf + 1, &freq, sizeof(PktFishingRequest));
+                    NetSendToServer(buf, 1 + sizeof(PktFishingRequest), false);
+                } else {
+                    // CAST
+                    float px = player.position.x + PLAYER_WIDTH / 2.0f;
+                    float py = player.position.y + PLAYER_HEIGHT / 2.0f;
+                    float dx = mouseWorld.x - px;
+                    float dy = mouseWorld.y - py;
+                    float castDist = sqrtf(dx * dx + dy * dy);
+                    if (castDist > 1.0f) {
+                        uint8_t buf[64];
+                        PktFishingRequest freq;
+                        freq.action = 0;
+                        freq.vx = (dx / castDist); freq.vy = (dy / castDist);
+                        buf[0] = PKT_FISHING_REQUEST;
+                        memcpy(buf + 1, &freq, sizeof(PktFishingRequest));
+                        NetSendToServer(buf, 1 + sizeof(PktFishingRequest), false);
+                    }
+                }
+                return;
+            }
+            // Host/local: fishing rod logic
             // Check for existing fishing line to retract
             for (int i = 0; i < MAX_PROJECTILES; i++) {
                 if (projectiles[i].active && projectiles[i].isFishing) {
@@ -1371,6 +1357,18 @@ void PlayerBlockInteraction(void)
 
         // Cauldron interaction
         if (world[blockX][blockY] == BLOCK_CAULDRON) {
+            if (NetIsClient()) {
+                // Send cauldron interaction to host
+                uint8_t buf[64];
+                PktCauldronSync cs;
+                cs.x = (int16_t)blockX; cs.y = (int16_t)blockY;
+                cs.fillLevel = 0; // Server will determine the new fill level
+                buf[0] = PKT_CAULDRON_SYNC;
+                memcpy(buf + 1, &cs, sizeof(PktCauldronSync));
+                NetSendToServer(buf, 1 + sizeof(PktCauldronSync), true);
+                return;
+            }
+            // Host/local: cauldron interaction
             int cdIdx = -1;
             for (int ci = 0; ci < cauldronCount; ci++) {
                 if (cauldrons[ci].x == blockX && cauldrons[ci].y == blockY) {
@@ -1645,10 +1643,158 @@ int GetMiningBlockY(void)
 //----------------------------------------------------------------------------------
 // Player Update
 //----------------------------------------------------------------------------------
+// Fire bow with charge mechanic (0.15 = min, 1.5 = max for BOW_CHARGE_MAX=1.5)
+// Charge affects: speed (0.5x to 1.5x), damage (critical at full charge)
+static void FireBowWithCharge(float charge)
+{
+    // Find arrows in inventory
+    int arrowSlot = -1;
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+        if (player.inventory[i] == ITEM_ARROW && player.inventoryCount[i] > 0) {
+            arrowSlot = i;
+            break;
+        }
+    }
+    if (arrowSlot < 0) return;
+
+    float px = player.position.x + PLAYER_WIDTH / 2.0f;
+    float py = player.position.y + PLAYER_HEIGHT / 2.0f;
+
+    // Compute aim direction
+    Vector2 mouseWorld = GetScreenToWorld2D(Win32GetMousePosition(), camera);
+    float dx = mouseWorld.x - px;
+    float dy = mouseWorld.y - py;
+    float aimDist = sqrtf(dx * dx + dy * dy);
+    if (aimDist <= 1.0f) return;
+
+    // Speed: 50% at min charge, 150% at max charge, linear scale
+    float chargeFactor = charge / BOW_CHARGE_MAX; // 0.0 to 1.0
+    float speedMult = 0.5f + chargeFactor;         // 0.5x to 1.5x
+    float speed = PROJECTILE_SPEED * 1.5f * speedMult;
+    float vx = (dx / aimDist) * speed;
+    float vy = (dy / aimDist) * speed;
+
+    if (NetIsClient()) {
+        // Send bow request to host
+        uint8_t buf[64];
+        PktBowRequest breq;
+        breq.spawnX = px; breq.spawnY = py;
+        breq.vx = vx; breq.vy = vy;
+        breq.charge = charge;
+        buf[0] = PKT_BOW_REQUEST;
+        memcpy(buf + 1, &breq, sizeof(PktBowRequest));
+        NetSendToServer(buf, 1 + sizeof(PktBowRequest), true);
+        PlaySoundBowFire();
+        return;
+    }
+
+    // Host/local: fire arrow
+    int arrowIdx = SpawnProjectile(px, py, vx, vy, true);
+
+    // Power enchantment and critical hit at full charge
+    if (arrowIdx >= 0) {
+        int baseDmg = PROJECTILE_DAMAGE;
+        uint16_t be = player.itemEnchantments[player.selectedSlot];
+        if (ENCH_TYPE(be) == ENCH_POWER)
+            baseDmg += ENCH_LEVEL(be) * 2;
+        // Critical hit: +50% damage at full charge
+        if (charge >= BOW_CHARGE_MAX * 0.95f) {
+            baseDmg = (int)(baseDmg * 1.5f);
+            // Spawn critical particles
+            for (int pi = 0; pi < 5; pi++) {
+                SpawnDamageParticles(px + rand() % 8 - 4, py + rand() % 8 - 4,
+                                     (Color){255, 255, 100, 200});
+            }
+        }
+        projectiles[arrowIdx].damage = baseDmg;
+    }
+
+    // Sync projectile to network
+    if (NetIsHost()) {
+        uint8_t buf[64];
+        PktProjectileSpawn ps;
+        ps.x = px; ps.y = py;
+        ps.vx = vx; ps.vy = vy;
+        ps.fromPlayer = true; ps.playerId = (uint8_t)localPlayerId;
+        ps.isFishing = false;
+        buf[0] = PKT_PROJECTILE_SPAWN;
+        memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
+        NetSendToAll(buf, 1 + sizeof(PktProjectileSpawn), false);
+    }
+
+    PlaySoundBowFire();
+
+    // Consume arrow
+    player.inventoryCount[arrowSlot]--;
+    if (player.inventoryCount[arrowSlot] <= 0)
+        player.inventory[arrowSlot] = BLOCK_AIR;
+
+    // Bow durability (Unbreaking check)
+    {
+        uint16_t bowEnch = player.itemEnchantments[player.selectedSlot];
+        bool skipBowDur = false;
+        if (ENCH_TYPE(bowEnch) == ENCH_UNBREAKING) {
+            skipBowDur = (rand() % (ENCH_LEVEL(bowEnch) + 1)) != 0;
+        }
+        if (!skipBowDur) player.toolDurability[player.selectedSlot]--;
+        if (player.toolDurability[player.selectedSlot] <= 0) {
+            player.inventory[player.selectedSlot] = BLOCK_AIR;
+            player.inventoryCount[player.selectedSlot] = 0;
+            player.toolDurability[player.selectedSlot] = 0;
+            player.itemEnchantments[player.selectedSlot] = 0;
+            ShowMessage(S(STR_MSG_TOOL_BROKE), (Color){240, 80, 80, 255});
+        }
+    }
+}
+
 void UpdatePlayer(float dt)
 {
     if (player.playerDead) return;
     PlayerPhysics(dt);
+
+    // Bow charging mechanic
+    if (!gamePaused && !inventoryOpen && !player.netControlled) {
+        BlockType selectedTool = (BlockType)player.inventory[player.selectedSlot];
+        if (selectedTool == ITEM_BOW) {
+            if (Win32IsMouseButtonDown(MOUSE_BUTTON_RIGHT)) {
+                if (!player.bowCharging) {
+                    // Start charging: check for arrows
+                    int arrowSlot = -1;
+                    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+                        if (player.inventory[i] == ITEM_ARROW && player.inventoryCount[i] > 0) {
+                            arrowSlot = i;
+                            break;
+                        }
+                    }
+                    if (arrowSlot < 0) {
+                        ShowMessage(S(STR_MSG_NO_ARROWS), (Color){240, 80, 80, 255});
+                    } else {
+                        player.bowCharging = true;
+                        player.bowChargeTimer = 0.0f;
+                    }
+                }
+                // Increment charge timer
+                if (player.bowCharging) {
+                    player.bowChargeTimer += dt;
+                    if (player.bowChargeTimer >= BOW_CHARGE_MAX) {
+                        player.bowChargeTimer = BOW_CHARGE_MAX;
+                    }
+                }
+            } else if (player.bowCharging) {
+                // Released: fire arrow with accumulated charge
+                float charge = player.bowChargeTimer;
+                if (charge < 0.15f) charge = 0.15f; // minimum charge
+                FireBowWithCharge(charge);
+                player.bowCharging = false;
+                player.bowChargeTimer = 0.0f;
+            }
+        } else {
+            // Cancel charging if weapon changed
+            player.bowCharging = false;
+            player.bowChargeTimer = 0.0f;
+        }
+    }
+
     PlayerBlockInteraction();
 }
 
@@ -1949,6 +2095,15 @@ void UpdateHotbar(void)
         int slot = player.selectedSlot;
         uint8_t item = player.inventory[slot];
         if (item != BLOCK_AIR) {
+            if (NetIsClient()) {
+                // Send drop request to host
+                uint8_t buf[64];
+                PktItemDrop drop;
+                drop.slot = slot;
+                buf[0] = PKT_ITEM_DROP;
+                memcpy(buf + 1, &drop, sizeof(PktItemDrop));
+                NetSendToServer(buf, 1 + sizeof(PktItemDrop), true);
+            } else {
             int count = player.inventoryCount[slot];
             float px = player.position.x + PLAYER_WIDTH / 2;
             float py = player.position.y + PLAYER_HEIGHT / 2;
@@ -1958,6 +2113,7 @@ void UpdateHotbar(void)
             player.toolDurability[slot] = 0;
             player.itemEnchantments[slot] = 0;
             PlaySoundDrop();
+            }
         }
     }
 }

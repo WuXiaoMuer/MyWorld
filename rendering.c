@@ -4483,7 +4483,25 @@ void DrawEnchantingTableUI(void)
                      GetMouseY() >= oy && GetMouseY() <= oy + optH;
 
         if (hover && canAfford) {
-            // Apply enchantment
+            if (NetIsClient()) {
+                // Send enchant request to host
+                uint8_t buf[64];
+                PktEnchantRequest ereq;
+                ereq.optionIndex = i;
+                ereq.blockX = localEnchantSession.blockX;
+                ereq.blockY = localEnchantSession.blockY;
+                ereq.enchantType = eo->type;
+                ereq.enchantLevel = eo->level;
+                ereq.xpCost = eo->xpCost;
+                buf[0] = PKT_ENCHANT_REQUEST;
+                memcpy(buf + 1, &ereq, sizeof(PktEnchantRequest));
+                NetSendToServer(buf, 1 + sizeof(PktEnchantRequest), true);
+                // Close UI immediately (host response will sync inventory)
+                localEnchantSession.open = false;
+                inventoryOpen = false;
+                localEnchantSession.optionCount = 0;
+            } else {
+            // Apply enchantment locally
             player.xp -= eo->xpCost;
             player.itemEnchantments[localEnchantSession.heldItemSlot] = ENCH_PACK(eo->type, eo->level);
             UnlockAchievement(ACH_ENCHANTER);
@@ -4502,6 +4520,7 @@ void DrawEnchantingTableUI(void)
             localEnchantSession.open = false;
             inventoryOpen = false;
             localEnchantSession.optionCount = 0;
+            }
         }
     }
 }

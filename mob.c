@@ -153,7 +153,12 @@ void UpdateProjectiles(float dt)
                 int mh = GetMobH(&mobs[m]);
                 if (p->position.x >= mobs[m].position.x && p->position.x <= mobs[m].position.x + mw &&
                     p->position.y >= mobs[m].position.y && p->position.y <= mobs[m].position.y + mh) {
-                    DamageMob(&mobs[m], p->damage);
+                    // Track hit for authoritative damage processing (game.c)
+                    if (pendingProjectileHitCount < MAX_PROJECTILES) {
+                        pendingProjectileHitIndex[pendingProjectileHitCount] = m;
+                        pendingProjectileHitDamage[pendingProjectileHitCount] = p->damage;
+                        pendingProjectileHitCount++;
+                    }
                     SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
                     p->active = false;
                     break;
@@ -537,6 +542,7 @@ static void UpdateSkeletonAI(Mob *mob, float dt)
                     ps.x = arrowX; ps.y = arrowY;
                     ps.vx = vx; ps.vy = vy;
                     ps.fromPlayer = false; ps.playerId = 0;
+                    ps.isFishing = false;
                     buf[0] = PKT_PROJECTILE_SPAWN;
                     memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
                     NetSendToAll(buf, 1 + sizeof(PktProjectileSpawn), false);

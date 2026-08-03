@@ -313,6 +313,9 @@ float mobSpawnTimer = 0.0f;
 
 ItemEntity entities[MAX_ENTITIES];
 Projectile projectiles[MAX_PROJECTILES];
+int pendingProjectileHitCount = 0;
+int pendingProjectileHitIndex[MAX_PROJECTILES];
+int pendingProjectileHitDamage[MAX_PROJECTILES];
 
 CraftingRecipe craftRecipes[MAX_CRAFT_RECIPES];
 int craftRecipeCount = 0;

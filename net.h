@@ -34,6 +34,15 @@ typedef enum {
     PKT_DAMAGE_PLAYER,      // Server -> Client: player took damage
     PKT_INVENTORY_SYNC,     // Bidirectional: full inventory sync
     PKT_CRAFT_REQUEST,      // Client -> Server: request to craft a recipe
+    PKT_BOW_REQUEST,        // Client -> Server: fire an arrow
+    PKT_ENDER_PEARL_REQUEST,// Client -> Server: use ender pearl
+    PKT_PLAYER_TELEPORT,    // Server -> Client: player was teleported
+    PKT_ENCHANT_REQUEST,    // Client -> Server: apply enchantment
+    PKT_FISHING_REQUEST,    // Client -> Server: cast/retract fishing rod
+    PKT_CAULDRON_SYNC,      // Bidirectional: cauldron state sync
+    PKT_ITEM_DROP,          // Client -> Server: drop item from inventory
+    PKT_ACHIEVEMENT_UNLOCK, // Bidirectional: achievement unlocked
+    PKT_SOUND_EVENT,        // Server -> Client: play sound at position
     PKT_TIME_SYNC,          // Server -> Client: day/night time
     PKT_WEATHER_SYNC,       // Server -> Client: weather change
     PKT_CHAT,               // Bidirectional: chat message
@@ -141,6 +150,8 @@ typedef struct {
 typedef struct {
     uint16_t entityIndex;
     uint8_t playerId;
+    uint8_t itemType;       // Added for Milestone 2: what was picked up
+    int count;              // Added for Milestone 2: how many
 } PktEntityPickup;
 
 // PKT_PROJECTILE_SPAWN
@@ -149,6 +160,7 @@ typedef struct {
     float vx, vy;
     bool fromPlayer;
     uint8_t playerId;       // which player fired (if fromPlayer)
+    bool isFishing;         // true = fishing rod bobber (added for Milestone 2)
 } PktProjectileSpawn;
 
 // PKT_DAMAGE_MOB
@@ -240,6 +252,62 @@ typedef struct {
     int recipeIndex;
     int count;          // 1 for single craft, >1 for shift-click craft-all (capped by host)
 } PktCraftRequest;
+
+// PKT_BOW_REQUEST - Client -> Server: fire an arrow
+typedef struct {
+    float spawnX, spawnY;   // Projectile spawn position
+    float vx, vy;           // Projectile velocity (normalized direction * speed)
+    float charge;           // 0.0-1.0 charge level (affects speed/damage)
+} PktBowRequest;
+
+// PKT_ENDER_PEARL_REQUEST - Client -> Server: use ender pearl
+typedef struct {
+    float targetX, targetY; // Desired teleport destination
+} PktEnderPearlRequest;
+
+// PKT_PLAYER_TELEPORT - Server -> Client: player was teleported
+typedef struct {
+    uint8_t playerId;
+    float x, y;
+} PktPlayerTeleport;
+
+// PKT_ENCHANT_REQUEST - Client -> Server: apply enchantment
+typedef struct {
+    int optionIndex;        // 0-2 index into the enchant session options
+    int blockX, blockY;     // Enchanting table position
+    int enchantType;        // EnchantmentType (sent so host can validate)
+    int enchantLevel;       // 1-3
+    int xpCost;             // XP cost the client was quoted
+} PktEnchantRequest;
+
+// PKT_FISHING_REQUEST - Client -> Server: cast or retract fishing rod
+typedef struct {
+    uint8_t action;         // 0 = CAST, 1 = RETRACT
+    float vx, vy;           // Cast direction (only for CAST)
+} PktFishingRequest;
+
+// PKT_CAULDRON_SYNC - Bidirectional: cauldron state sync
+typedef struct {
+    int16_t x, y;
+    int fillLevel;          // 0-3
+} PktCauldronSync;
+
+// PKT_ITEM_DROP - Client -> Server: drop item from inventory
+typedef struct {
+    int slot;               // Inventory slot to drop
+} PktItemDrop;
+
+// PKT_ACHIEVEMENT_UNLOCK - Bidirectional: achievement notification
+typedef struct {
+    uint8_t achievementId;
+} PktAchievementUnlock;
+
+// PKT_SOUND_EVENT - Server -> Client: play sound at position
+// Sound IDs: 0=bow fire, 1=teleport/hurt, 2=fishing catch, 3=splash
+typedef struct {
+    uint8_t soundId;
+    float x, y;         // World position (0,0 = centered, ignore position)
+} PktSoundEvent;
 
 //----------------------------------------------------------------------------------
 // Functions
