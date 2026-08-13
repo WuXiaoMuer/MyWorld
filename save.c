@@ -3,6 +3,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+__declspec(dllimport) int __stdcall MoveFileExA(const char*, const char*, unsigned long);
+#define MOVEFILE_REPLACE_EXISTING 1
+#endif
+
+#define SAVE_TRAILER_MAGIC 0x4D59574C  // "MYWL" in little-endian
 
 //----------------------------------------------------------------------------------
 // Save File Format v14:
@@ -273,17 +279,34 @@ bool SaveWorld(const char *path)
 
     fclose(f);
 
+    // Append integrity trailer
+    if (ok) {
+        f = fopen(tmpPath, "ab");
+        if (f) {
+            uint32_t trailer = SAVE_TRAILER_MAGIC;
+            if (fwrite(&trailer, sizeof(uint32_t), 1, f) != 1) ok = false;
+            fclose(f);
+        }
+    }
+
     if (!ok) {
         remove(tmpPath);
         return false;
     }
 
-    // Atomic replace: remove old file, rename tmp
+    // Atomic replace: use MoveFileEx on Windows for true atomicity
+#ifdef _WIN32
+    if (!MoveFileExA(tmpPath, path, MOVEFILE_REPLACE_EXISTING)) {
+        remove(tmpPath);
+        return false;
+    }
+#else
     remove(path);
     if (rename(tmpPath, path) != 0) {
         remove(tmpPath);
         return false;
     }
+#endif
     return true;
 }
 
@@ -616,6 +639,15 @@ bool LoadWorld(const char *path)
                 if (fread(&g, sizeof(uint8_t), 1, f) != 1) break;
                 SetCropGrowth((int)cx, (int)cy, (int)g);
             }
+        }
+    }
+
+    // Verify integrity trailer
+    {
+        uint32_t trailer = 0;
+        if (fread(&trailer, sizeof(uint32_t), 1, f) != 1 || trailer != SAVE_TRAILER_MAGIC) {
+            fclose(f);
+            return false;
         }
     }
 

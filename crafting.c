@@ -740,72 +740,141 @@ void DrawTradeUI(void)
 {
     if (!tradeOpen) return;
 
-    int panelW = 350, panelH = 400;
+    int panelW = 440, panelH = 480;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
     int panelY = (SCREEN_HEIGHT - panelH) / 2;
 
-    DrawRectangle(panelX, panelY, panelW, panelH, (Color){30, 28, 38, 240});
-    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){80, 70, 100, 200});
+    // Panel: dark elegant card with gold accent
+    DrawRectangle(panelX, panelY, panelW, panelH, (Color){17, 14, 26, 252});
+    // Gold top bar
+    DrawRectangle(panelX, panelY, panelW, 38, (Color){28, 22, 12, 250});
+    DrawRectangle(panelX, panelY, panelW, 2, (Color){210, 170, 50, 160});
+    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){80, 68, 48, 220});
 
-    DrawGameText(S(STR_MOB_VILLAGER), panelX + panelW / 2 - 30, panelY + 10, 18, (Color){220, 200, 160, 255});
+    // Title
+    DrawGameText(S(STR_MOB_VILLAGER), panelX + 18, panelY + 8, 20, (Color){240, 215, 140, 255});
 
-    int slotH = 40, pad = 8;
-    int startY = panelY + 40;
+    // ---- Close Button (X) ----
+    Vector2 mouse = Win32GetMousePosition();
+    int closeSize = 28;
+    int closeX = panelX + panelW - closeSize - 10;
+    int closeY = panelY + 5;
+    Color closeBg = (Color){40, 30, 25, 220};
+    bool closeHovered = mouse.x >= closeX && mouse.x <= closeX + closeSize &&
+                        mouse.y >= closeY && mouse.y <= closeY + closeSize;
+    Color closeHover = (Color){180, 60, 50, 240};
+    DrawRectangle(closeX, closeY, closeSize, closeSize, closeHovered ? closeHover : closeBg);
+    DrawRectangleLines(closeX, closeY, closeSize, closeSize, (Color){120, 100, 70, 180});
+    // X shape
+    Color xColor = closeHovered ? (Color){255, 240, 230, 255} : (Color){180, 160, 130, 220};
+    int xPad = 8;
+    DrawLineEx((Vector2){closeX + xPad, closeY + xPad}, (Vector2){closeX + closeSize - xPad, closeY + closeSize - xPad}, 2, xColor);
+    DrawLineEx((Vector2){closeX + closeSize - xPad, closeY + xPad}, (Vector2){closeX + xPad, closeY + closeSize - xPad}, 2, xColor);
+    if (closeHovered && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+        tradeOpen = false;
+        inventoryOpen = false;
+        gamePaused = false;
+        PlaySoundUIClick();
+        return;
+    }
+
+    int lineY = panelY + 42;
+    DrawRectangle(panelX + 14, lineY, panelW - 28, 1, (Color){55, 48, 38, 140});
+
+    int slotH = 62, pad = 6;
+    int startY = panelY + 54;
+    int slotW = panelW - 28;
 
     for (int i = 0; i < tradeCount; i++) {
         int ty = startY + i * (slotH + pad);
-        if (ty + slotH > panelY + panelH - 10) break;
+        if (ty + slotH > panelY + panelH - 56) break;
 
-        bool hover = Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-                     GetMouseX() >= panelX + 10 && GetMouseX() <= panelX + panelW - 10 &&
-                     GetMouseY() >= ty && GetMouseY() <= ty + slotH;
+        int sx = panelX + 14;
+        bool hover = mouse.x >= sx && mouse.x <= sx + slotW &&
+                     mouse.y >= ty && mouse.y <= ty + slotH;
+        bool click = hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 
-        Color bg = hover ? (Color){60, 55, 75, 255} : (Color){45, 42, 55, 255};
-        DrawRectangle(panelX + 10, ty, panelW - 20, slotH, bg);
+        int have = 0;
+        for (int s = 0; s < INVENTORY_SLOTS; s++) {
+            if (player.inventory[s] == trades[i].giveItem) have += player.inventoryCount[s];
+        }
+        bool canAfford = have >= trades[i].giveCount;
 
-        // Give item
-        DrawGameText(TextFormat("%dx %s", trades[i].giveCount, GetBlockName((BlockType)trades[i].giveItem)),
-                     panelX + 20, ty + 8, 12, (Color){255, 120, 120, 255});
-
-        // Arrow
-        DrawGameText("->", panelX + panelW / 2 - 10, ty + 8, 12, (Color){200, 200, 200, 255});
-
-        // Receive item
-        DrawGameText(TextFormat("%dx %s", trades[i].receiveCount, GetBlockName((BlockType)trades[i].receiveItem)),
-                     panelX + panelW / 2 + 20, ty + 8, 12, (Color){120, 255, 120, 255});
-
-        // Execute trade on click
+        // Card
+        Color cardBg = hover ? (canAfford ? (Color){48, 54, 42, 255} : (Color){54, 46, 50, 255})
+                             : (canAfford ? (Color){38, 44, 34, 240} : (Color){44, 38, 42, 240});
+        DrawRectangle(sx, ty, slotW, slotH, cardBg);
         if (hover) {
-            // Check if player has enough of the give item
-            int have = 0;
-            for (int s = 0; s < INVENTORY_SLOTS; s++) {
-                if (player.inventory[s] == trades[i].giveItem) have += player.inventoryCount[s];
+            Color hoverBorder = canAfford ? (Color){90, 190, 70, 200} : (Color){130, 90, 100, 180};
+            DrawRectangleLines(sx, ty, slotW, slotH, hoverBorder);
+            if (canAfford) {
+                for (int gl = 2; gl > 0; gl--) {
+                    DrawRectangleLines(sx - gl, ty - gl, slotW + gl * 2, slotH + gl * 2,
+                        (Color){70, 180, 60, (unsigned char)(30 / gl)});
+                }
             }
-            if (have >= trades[i].giveCount) {
-                // Remove give items
-                int remaining = trades[i].giveCount;
-                for (int s = 0; s < INVENTORY_SLOTS && remaining > 0; s++) {
-                    if (player.inventory[s] == trades[i].giveItem) {
-                        int take = remaining > player.inventoryCount[s] ? player.inventoryCount[s] : remaining;
-                        player.inventoryCount[s] -= take;
-                        remaining -= take;
-                        if (player.inventoryCount[s] <= 0) {
-                            player.inventory[s] = BLOCK_AIR;
-                            player.inventoryCount[s] = 0;
-                        }
+        }
+
+        // --- Give Item ---
+        if (blockAtlas.id > 0) {
+            Rectangle src = { (float)(trades[i].giveItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+            Rectangle dst = { (float)(sx + 12), (float)(ty + 14), 24, 24 };
+            DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, canAfford ? WHITE : (Color){170, 160, 160, 200});
+        }
+        char giveText[64];
+        snprintf(giveText, sizeof(giveText), "%dx %s", trades[i].giveCount, GetBlockName((BlockType)trades[i].giveItem));
+        DrawGameText(giveText, sx + 42, ty + 12, 13, canAfford ? (Color){245, 210, 170, 255} : (Color){200, 135, 115, 220});
+
+        char haveText[32];
+        snprintf(haveText, sizeof(haveText), "(%d)", have);
+        Color haveColor = canAfford ? (Color){160, 200, 150, 190} : (Color){210, 115, 95, 170};
+        DrawGameText(haveText, sx + 42, ty + 30, 10, haveColor);
+
+        // Separator
+        int sepX = sx + slotW / 2 - 10;
+        DrawRectangle(sepX - 12, ty + 8, 1, slotH - 16, (Color){45, 42, 35, 120});
+        DrawGameText("\x1e", sepX - 4, ty + 18, 14, (Color){190, 180, 150, 220});
+
+        // --- Receive Item ---
+        int rx = sx + slotW / 2 + 6;
+        if (blockAtlas.id > 0) {
+            Rectangle src = { (float)(trades[i].receiveItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
+            Rectangle dst = { (float)(rx), (float)(ty + 14), 24, 24 };
+            DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+        }
+        char recvText[64];
+        snprintf(recvText, sizeof(recvText), "%dx %s", trades[i].receiveCount, GetBlockName((BlockType)trades[i].receiveItem));
+        DrawGameText(recvText, rx + 30, ty + 18, 13, (Color){130, 240, 130, 245});
+
+        if (click && canAfford) {
+            int remaining = trades[i].giveCount;
+            for (int s = 0; s < INVENTORY_SLOTS && remaining > 0; s++) {
+                if (player.inventory[s] == trades[i].giveItem) {
+                    int take = remaining > player.inventoryCount[s] ? player.inventoryCount[s] : remaining;
+                    player.inventoryCount[s] -= take;
+                    remaining -= take;
+                    if (player.inventoryCount[s] <= 0) {
+                        player.inventory[s] = BLOCK_AIR;
+                        player.inventoryCount[s] = 0;
                     }
                 }
-                // Add receive items
-                AddToInventoryCount((BlockType)trades[i].receiveItem, trades[i].receiveCount);
-                PlaySoundCraft();
-                ShowMessage(Sf(STR_MSG_TRADE, GetBlockName((BlockType)trades[i].giveItem), GetBlockName((BlockType)trades[i].receiveItem)), (Color){100, 255, 100, 255});
-            } else {
-                ShowMessage(S(STR_MSG_NOT_ENOUGH_ITEMS), (Color){240, 80, 80, 255});
             }
+            AddToInventoryCount((BlockType)trades[i].receiveItem, trades[i].receiveCount);
+            PlaySoundCraft();
+            ShowMessage(Sf(STR_MSG_TRADE, GetBlockName((BlockType)trades[i].giveItem), GetBlockName((BlockType)trades[i].receiveItem)), (Color){100, 255, 100, 255});
+        } else if (click && !canAfford) {
+            ShowMessage(S(STR_MSG_NOT_ENOUGH_ITEMS), (Color){240, 80, 80, 255});
         }
     }
 
-    // Close button
+    // Footer
+    int footY = panelY + panelH - 28;
+    char hint[48];
+    snprintf(hint, sizeof(hint), "ESC / X  Close  |  Click to Trade");
+    int hintW = MeasureGameTextWidth(hint, 11);
+    DrawGameText(hint, panelX + panelW - hintW - 16, footY, 11, (Color){110, 105, 140, 170});
+
+    // Keyboard close
     if (Win32IsKeyPressed(KEY_ESCAPE) || Win32IsKeyPressed(KEY_E)) {
         tradeOpen = false;
         inventoryOpen = false;

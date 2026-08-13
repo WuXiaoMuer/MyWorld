@@ -1056,7 +1056,7 @@ static void TrySpawnMobs(float dt)
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
-                if (world[bx][y] == BLOCK_GRASS && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     uint8_t light = GetLightLevel(bx, y - 1);
                     if (light >= 8) {
                         SpawnMob(MOB_PIG, spawnX, (y - 2) * BLOCK_SIZE);
@@ -1159,7 +1159,7 @@ static void TrySpawnMobs(float dt)
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
-                if (world[bx][y] == BLOCK_GRASS && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     int biome = GetBiomeAtX(bx);
                     int roll = rand() % 100;
                     MobType spawnType;
@@ -1280,11 +1280,9 @@ void UpdateMobs(float dt)
         // Fire Aspect damage
         if (mob->fireTimer > 0.0f) {
             mob->fireTimer -= dt;
-            // Deal fire damage every 0.5s
-            static float fireDmgAccum = 0.0f;
-            fireDmgAccum += dt;
-            if (fireDmgAccum >= 0.5f) {
-                fireDmgAccum -= 0.5f;
+            mob->fireDmgAccum += dt;
+            if (mob->fireDmgAccum >= 0.5f) {
+                mob->fireDmgAccum -= 0.5f;
                 DamageMob(mob, 1);
             }
         }

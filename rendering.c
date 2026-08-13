@@ -84,6 +84,58 @@ static void DrawRoundedRect(int x, int y, int w, int h, float radius, Color colo
     }
 }
 
+// Polished UI button: rounded rect + glow + hover + click detection
+static bool DrawButton(int x, int y, int w, int h, const char *label, Color accent,
+                       bool enabled, int hoverId, float animAlpha)
+{
+    Vector2 mouse = Win32GetMousePosition();
+    bool hover = CheckCollisionPointRec(mouse, (Rectangle){(float)x, (float)y, (float)w, (float)h});
+    bool click = hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+    float hA = GetHoverAlpha(hoverId, hover && enabled, GetFrameTime());
+    if (animAlpha < 0.01f) return false;
+
+    if (!enabled) {
+        DrawRoundedRect(x, y, w, h, 0.1f, (Color){16, 14, 22, (unsigned char)(100 * animAlpha)});
+        int tw = MeasureGameTextWidth(label, 15);
+        DrawGameText(label, x + (w - tw) / 2, y + (h - 15) / 2, 15, (Color){60, 58, 72, (unsigned char)(110 * animAlpha)});
+        return false;
+    }
+
+    // Shadow
+    DrawRoundedRect(x + 3, y + 3, w, h, 0.1f, (Color){0, 0, 0, (unsigned char)(45 * animAlpha)});
+    // Bg — dark card tinted by accent
+    Color bg = {
+        (unsigned char)((10 + accent.r * 0.18f) * animAlpha),
+        (unsigned char)((8 + accent.g * 0.18f) * animAlpha),
+        (unsigned char)((14 + accent.b * 0.18f) * animAlpha), 245
+    };
+    DrawRoundedRect(x, y, w, h, 0.1f, bg);
+
+    // Hover glow layers
+    if (hA > 0.01f) {
+        for (int gl = 3; gl > 0; gl--) {
+            DrawRoundedRect(x - gl, y - gl, w + gl * 2, h + gl * 2, 0.1f,
+                (Color){accent.r, accent.g, accent.b, (unsigned char)(18 * hA / gl * animAlpha)});
+        }
+    }
+
+    // Border + top accent line
+    DrawRectangleLines(x, y, w, h, (Color){
+        (unsigned char)(accent.r * 0.45f), (unsigned char)(accent.g * 0.45f),
+        (unsigned char)(accent.b * 0.45f), (unsigned char)(160 * animAlpha)});
+    DrawRectangle(x + 10, y, w - 20, 1, (Color){
+        (unsigned char)(accent.r * 0.6f), (unsigned char)(accent.g * 0.6f),
+        (unsigned char)(accent.b * 0.6f), (unsigned char)(80 * animAlpha)});
+
+    // Label
+    int tw = MeasureGameTextWidth(label, 15);
+    Color txt = hover ? (Color){255, 252, 245, (unsigned char)(255 * animAlpha)}
+                     : (Color){210, 208, 225, (unsigned char)(230 * animAlpha)};
+    DrawGameText(label, x + (w - tw) / 2, y + (h - 15) / 2, 15, txt);
+
+    return click && enabled;
+}
+
 // Draw text with a left-to-right gradient
 static void DrawGradientText(const char *text, int x, int y, int fontSize, Color colorLeft, Color colorRight)
 {
@@ -2004,7 +2056,6 @@ void DrawRemotePlayers(void)
 {
     if (!NetIsConnected()) return;
 
-    float time = (float)GetTime();
     float dt = GetFrameTime();
     float lerpSpeed = 12.0f; // Smooth interpolation speed
 
@@ -2020,10 +2071,16 @@ void DrawRemotePlayers(void)
         remotePlayers[i].interpY += (targetY - remotePlayers[i].interpY) * lerpSpeed * dt;
         float px = remotePlayers[i].interpX;
         float py = remotePlayers[i].interpY;
+
+        // Per-player animation — simple linear swing
+        float walkT = players[i].walkTimer;
         bool moving = fabsf(players[i].velocity.x) > 10.0f;
         bool facing = players[i].facingRight;
-        float armSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
-        float legSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
+        bool sprinting = players[i].sprinting && moving;
+        float armShift = moving ? sinf(walkT) * (sprinting ? 4.5f : 3.5f) : 0;
+        float legShift = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 3.5f : 2.5f) : 0;
+        float sneakShrink = players[i].sneaking ? 4.0f : 0;
+        float bobY = py - sneakShrink;
 
         // Different shirt colors per player
         Color skin = (Color){220, 180, 140, 255};
@@ -2043,52 +2100,35 @@ void DrawRemotePlayers(void)
         }
 
         float centerX = px + PLAYER_WIDTH / 2.0f;
-        float footY = py + PLAYER_HEIGHT;
+        float footY = bobY + PLAYER_HEIGHT;
+        int torsoY = (int)(bobY + 10);
 
         // Shadow
         DrawEllipse((int)centerX, (int)footY, 8, 3, (Color){0, 0, 0, 50});
 
-        // Legs
-        float legOffset = legSwing;
-        DrawRectangle((int)(centerX - 4), (int)(footY - 12 + legOffset * 0.5f), 4, 12, pants);
-        DrawRectangle((int)(centerX + 1), (int)(footY - 12 - legOffset * 0.5f), 4, 12, pants);
+        // Legs — linear swing
+        DrawRectangle((int)(centerX - 4), (int)(bobY + 17 + legShift), 4, 12, pants);
+        DrawRectangle((int)(centerX + 1), (int)(bobY + 17 - legShift), 4, 12, pants);
 
         // Body
-        DrawRectangle((int)(centerX - 5), (int)(py + 10), 11, 14, shirt);
+        DrawRectangle((int)(centerX - 5), (int)(bobY + 10), 11, 14, shirt);
 
-        // Armor overlay (simplified)
-        for (int a = 0; a < 4; a++) {
-            if (players[i].armor[a] != BLOCK_AIR) {
-                BlockType at = (BlockType)players[i].armor[a];
-                Color ac;
-                if (at <= ARMOR_STONE_BOOTS) ac = (Color){140, 140, 140, 180};
-                else if (at <= ARMOR_IRON_BOOTS) ac = (Color){200, 210, 220, 180};
-                else if (at <= ARMOR_GOLD_BOOTS) ac = (Color){220, 180, 50, 180};
-                else ac = (Color){80, 220, 230, 180};
-                if (a == 0) DrawRectangle((int)(centerX - 4), (int)(py + 2), 9, 5, ac);
-                else if (a == 1) DrawRectangle((int)(centerX - 5), (int)(py + 10), 11, 8, ac);
-                else if (a == 2) DrawRectangle((int)(centerX - 5), (int)(py + 18), 11, 6, ac);
-                else if (a == 3) DrawRectangle((int)(centerX - 4), (int)(footY - 4), 4, 4, ac);
-            }
-        }
-
-        // Arms
-        float armX = facing ? 1.0f : -1.0f;
-        DrawRectangle((int)(centerX - 7 + armX * armSwing * 0.3f), (int)(py + 11), 3, 11, skin);
-        DrawRectangle((int)(centerX + 5 - armX * armSwing * 0.3f), (int)(py + 11), 3, 11, skin);
+        // Arms — linear swing
+        DrawRectangle((int)(centerX - 7), (int)(bobY + 11 + armShift), 3, 11, skin);
+        DrawRectangle((int)(centerX + 5), (int)(bobY + 11 - armShift), 3, 11, skin);
 
         // Head
-        DrawRectangle((int)(centerX - 4), (int)(py + 2), 9, 8, skin);
+        DrawRectangle((int)(centerX - 4), (int)(bobY + 2), 9, 8, skin);
         // Hair
-        DrawRectangle((int)(centerX - 4), (int)(py + 2), 9, 3, hair);
+        DrawRectangle((int)(centerX - 4), (int)(bobY + 2), 9, 3, hair);
         // Eyes
         int eyeX = facing ? (int)(centerX + 1) : (int)(centerX - 3);
-        DrawRectangle(eyeX, (int)(py + 6), 2, 2, (Color){40, 40, 40, 255});
+        DrawRectangle(eyeX, (int)(bobY + 6), 2, 2, (Color){40, 40, 40, 255});
 
         // Name tag
         const char *nameTag = players[i].playerName[0] ? players[i].playerName : "Player";
         int nameW = MeasureGameTextWidth(nameTag, 12);
-        DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(py - 8), 12,
+        DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(bobY - 6), 12,
                      (Color){255, 255, 255, 200});
     }
 }
@@ -2100,11 +2140,21 @@ void DrawPlayerSprite(void)
 {
     float px = player.position.x;
     float py = player.position.y;
-    float time = (float)GetTime();
+    float walkT = player.walkTimer;
     bool moving = fabsf(player.velocity.x) > 10.0f;
     bool facing = player.facingRight;
-    float armSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
-    float legSwing = moving ? sinf(time * 10.0f) * 4.0f : 0;
+    bool sprinting = player.sprinting && moving;
+
+    // Simple arm swing: forward arm goes UP, back arm goes DOWN (2D side-view)
+    float armShift = moving ? sinf(walkT) * (sprinting ? 5.0f : 4.0f) : 0;
+
+    // Body bob: removed — torso stays still, only limbs move
+    float sneakShrink = player.sneaking ? 4.0f : 0;
+    float bobY = py - sneakShrink;
+
+    // Held item wobble + rotation
+    float itemBob = moving ? cosf(walkT + 1.2f) * 0.3f : 0;
+    float itemAngle = moving ? sinf(walkT) * (sprinting ? 10.0f : 8.0f) : 0;
 
     // Sprint dust is spawned by PlayerPhysics, not here (avoid duplicates)
 
@@ -2154,93 +2204,102 @@ void DrawPlayerSprite(void)
     }
 
     if (facing) {
-        // Facing right
-        DrawRectangle((int)(px + 2), (int)py, 8, 8, skin);
-        DrawRectangle((int)(px + 2), (int)py, 8, 3, hair);
+        // Facing right — body bobs vertically via bobY
+        DrawRectangle((int)(px + 2), (int)bobY, 8, 8, skin);
+        DrawRectangle((int)(px + 2), (int)bobY, 8, 3, hair);
         // Helmet overlay
         if (helmetColor.a > 0) {
-            DrawRectangle((int)(px + 1), (int)(py - 1), 10, 5, helmetColor);
-            DrawRectangle((int)(px + 2), (int)(py + 4), 8, 2, helmetColor);
+            DrawRectangle((int)(px + 1), (int)(bobY - 1), 10, 5, helmetColor);
+            DrawRectangle((int)(px + 2), (int)(bobY + 4), 8, 2, helmetColor);
         }
-        DrawRectangle((int)(px + 3), (int)(py + 4), 2, 2, (Color){40, 40, 40, 255});
-        DrawRectangle((int)(px + 7), (int)(py + 4), 2, 2, (Color){40, 40, 40, 255});
-        DrawRectangle((int)(px + 1), (int)(py + 8), 10, 10, shirt);
+        DrawRectangle((int)(px + 3), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
+        DrawRectangle((int)(px + 7), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
+        // Body (chest)
+        DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 10, shirt);
         // Chestplate overlay
         if (chestColor.a > 0) {
-            DrawRectangle((int)(px), (int)(py + 7), 12, 11, chestColor);
-            DrawRectangle((int)(px + 1), (int)(py + 8), 10, 9, (Color){
+            DrawRectangle((int)(px), (int)(bobY + 6), 12, 11, chestColor);
+            DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 9, (Color){
                 (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
             });
         }
-        // Back arm (no item)
-        DrawRectangle((int)(px - 2), (int)(py + 8 + armSwing), 3, 10, skin);
-        // Front arm (holds item)
-        DrawRectangle((int)(px + 11), (int)(py + 8 - armSwing), 3, 10, skin);
-        // Legs
-        DrawRectangle((int)(px + 1), (int)(py + 18 + legSwing), 4, 10, pants);
-        DrawRectangle((int)(px + 7), (int)(py + 18 - legSwing), 4, 10, pants);
-        // Leggings overlay
-        if (legColor.a > 0) {
-            DrawRectangle((int)(px), (int)(py + 18 + legSwing), 5, 10, legColor);
-            DrawRectangle((int)(px + 6), (int)(py + 18 - legSwing), 5, 10, legColor);
-        }
-        // Boots overlay
-        if (bootColor.a > 0) {
-            DrawRectangle((int)(px), (int)(py + 25 + legSwing), 5, 3, bootColor);
-            DrawRectangle((int)(px + 6), (int)(py + 25 - legSwing), 5, 3, bootColor);
+        // Back arm — goes DOWN when forward (behind body in side view)
+        DrawRectangle((int)(px - 2), (int)(bobY + 8 + armShift), 3, 10, skin);
+        // Front arm — goes UP when forward (held item side)
+        DrawRectangle((int)(px + 11), (int)(bobY + 8 - armShift), 3, 10, skin);
+        // Legs — cross pattern: back leg UP when front arm UP
+        {
+            float legShift = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 4.0f : 3.0f) : 0;
+            DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 4, 10, pants);
+            DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 4, 10, pants);
+            // Leggings
+            if (legColor.a > 0) {
+                DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 5, 10, legColor);
+                DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 5, 10, legColor);
+            }
+            // Boots
+            if (bootColor.a > 0) {
+                DrawRectangle((int)(px + 1), (int)(bobY + 28 + legShift), 5, 3, bootColor);
+                DrawRectangle((int)(px + 7), (int)(bobY + 28 - legShift), 5, 3, bootColor);
+            }
         }
     } else {
         // Facing left (mirrored)
-        DrawRectangle((int)(px + 2), (int)py, 8, 8, skin);
-        DrawRectangle((int)(px + 2), (int)py, 8, 3, hair);
+        DrawRectangle((int)(px + 2), (int)bobY, 8, 8, skin);
+        DrawRectangle((int)(px + 2), (int)bobY, 8, 3, hair);
         // Helmet overlay
         if (helmetColor.a > 0) {
-            DrawRectangle((int)(px + 1), (int)(py - 1), 10, 5, helmetColor);
-            DrawRectangle((int)(px + 2), (int)(py + 4), 8, 2, helmetColor);
+            DrawRectangle((int)(px + 1), (int)(bobY - 1), 10, 5, helmetColor);
+            DrawRectangle((int)(px + 2), (int)(bobY + 4), 8, 2, helmetColor);
         }
-        DrawRectangle((int)(px + 3), (int)(py + 4), 2, 2, (Color){40, 40, 40, 255});
-        DrawRectangle((int)(px + 7), (int)(py + 4), 2, 2, (Color){40, 40, 40, 255});
-        DrawRectangle((int)(px + 1), (int)(py + 8), 10, 10, shirt);
+        DrawRectangle((int)(px + 3), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
+        DrawRectangle((int)(px + 7), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
+        // Body (chest)
+        DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 10, shirt);
         // Chestplate overlay
         if (chestColor.a > 0) {
-            DrawRectangle((int)(px), (int)(py + 7), 12, 11, chestColor);
-            DrawRectangle((int)(px + 1), (int)(py + 8), 10, 9, (Color){
+            DrawRectangle((int)(px), (int)(bobY + 6), 12, 11, chestColor);
+            DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 9, (Color){
                 (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
             });
         }
-        // Front arm (holds item) - left side when facing left
-        DrawRectangle((int)(px - 2), (int)(py + 8 - armSwing), 3, 10, skin);
-        // Back arm
-        DrawRectangle((int)(px + 11), (int)(py + 8 + armSwing), 3, 10, skin);
+        // Front arm (holds item) - left side
+        DrawRectangle((int)(px - 2), (int)(bobY + 8 - armShift), 3, 10, skin);
+        // Back arm - right side, behind body
+        DrawRectangle((int)(px + 11), (int)(bobY + 8 + armShift), 3, 10, skin);
         // Legs
-        DrawRectangle((int)(px + 1), (int)(py + 18 + legSwing), 4, 10, pants);
-        DrawRectangle((int)(px + 7), (int)(py + 18 - legSwing), 4, 10, pants);
-        // Leggings overlay
-        if (legColor.a > 0) {
-            DrawRectangle((int)(px), (int)(py + 18 + legSwing), 5, 10, legColor);
-            DrawRectangle((int)(px + 6), (int)(py + 18 - legSwing), 5, 10, legColor);
-        }
-        // Boots overlay
-        if (bootColor.a > 0) {
-            DrawRectangle((int)(px), (int)(py + 25 + legSwing), 5, 3, bootColor);
-            DrawRectangle((int)(px + 6), (int)(py + 25 - legSwing), 5, 3, bootColor);
+        {
+            float legShift = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 4.0f : 3.0f) : 0;
+            DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 4, 10, pants);
+            DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 4, 10, pants);
+            if (legColor.a > 0) {
+                DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 5, 10, legColor);
+                DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 5, 10, legColor);
+            }
+            if (bootColor.a > 0) {
+                DrawRectangle((int)(px + 1), (int)(bobY + 28 + legShift), 5, 3, bootColor);
+                DrawRectangle((int)(px + 7), (int)(bobY + 28 - legShift), 5, 3, bootColor);
+            }
         }
     }
 
-    // Draw held item
+    // Draw held item — follows front arm
     int slotItem = player.inventory[player.selectedSlot];
     if (slotItem != BLOCK_AIR && slotItem < BLOCK_COUNT && blockAtlas.id > 0) {
-        int itemX, itemY;
+        int itemSize = 13;
+        float itemX, itemY;
         if (facing) {
-            itemX = (int)(px + 12);
-            itemY = (int)(py + 6 - armSwing);
+            itemX = px + 11 + itemSize * 0.5f;
+            itemY = bobY + 5 - armShift + itemSize * 0.5f;
         } else {
-            itemX = (int)(px - 6);
-            itemY = (int)(py + 6 - armSwing);
+            itemX = px - 7 + itemSize * 0.5f;
+            itemY = bobY + 5 - armShift + itemSize * 0.5f;
         }
+        float rot = (player.attackCooldown > 0.0f) ? sinf(player.attackCooldown * 12.0f) * 25.0f : 0;
         Rectangle src = { (float)(slotItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
-        Rectangle dst = { (float)itemX, (float)itemY, 8, 8 };
-        DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+        Rectangle dst = { itemX, itemY, (float)itemSize, (float)itemSize };
+        Vector2 origin = { itemSize * 0.5f, itemSize * 0.5f };
+        DrawTexturePro(blockAtlas, src, dst, origin, rot, WHITE);
     }
 }
 
@@ -2254,6 +2313,39 @@ void DrawHotbar(void)
     int totalW = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * padding;
     int startX = (SCREEN_WIDTH - totalW) / 2;
     int startY = SCREEN_HEIGHT - slotSize - 12;
+
+    // --- XP Bar above hotbar ---
+    int xpBarW = totalW;
+    int xpBarH = 4;
+    int xpBarX = startX;
+    int xpBarY = startY - xpBarH - 4;
+    float xpPct = (float)player.xp / MAX_XP;
+    if (xpPct > 1.0f) xpPct = 1.0f;
+    DrawRectangle(xpBarX - 1, xpBarY - 1, xpBarW + 2, xpBarH + 2, (Color){0, 0, 0, 100});
+    DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){30, 30, 30, 200});
+    // Gradient fill: green → bright green
+    int fillW = (int)(xpBarW * xpPct);
+    if (fillW > 0) {
+        DrawRectangle(xpBarX, xpBarY, fillW, xpBarH / 2, (Color){80, 220, 80, 220});
+        DrawRectangle(xpBarX, xpBarY + xpBarH / 2, fillW, xpBarH / 2, (Color){60, 200, 60, 220});
+    }
+    // XP text
+    char xpText[32];
+    snprintf(xpText, sizeof(xpText), "%d XP", player.xp);
+    int xpTextW = MeasureGameTextWidth(xpText, 10);
+
+    // Inventory count on left, XP on right — both below the bar
+    int labelY = xpBarY + xpBarH + 2;
+    {
+        int cnt = 0;
+        for (int s = 0; s < INVENTORY_SLOTS; s++) {
+            if (player.inventory[s] != BLOCK_AIR) cnt++;
+        }
+        char invCount[24];
+        snprintf(invCount, sizeof(invCount), "%d/%d", cnt, INVENTORY_SLOTS);
+        DrawGameText(invCount, xpBarX, labelY, 9, (Color){140, 135, 160, 170});
+    }
+    DrawGameText(xpText, xpBarX + xpBarW - xpTextW, labelY, 9, (Color){170, 220, 170, 190});
 
     Vector2 mouse = Win32GetMousePosition();
     int hoveredSlot = -1;
@@ -2377,6 +2469,19 @@ void DrawHotbar(void)
         DrawGameText(TextFormat("%d", i + 1), x + 3, drawY + 2, 10, numColor);
     }
 
+    // Smooth sliding selection indicator bar
+    {
+        static float selBarX = -1;
+        if (selBarX < 0) selBarX = (float)(startX + player.selectedSlot * (slotSize + padding));
+        float targetX = (float)(startX + player.selectedSlot * (slotSize + padding));
+        selBarX += (targetX - selBarX) * 12.0f * GetFrameTime();
+        int barH = 2;
+        int barY = startY + slotSize + 4;
+        DrawRectangle((int)selBarX, barY + 1, slotSize, barH, (Color){0, 0, 0, 60});
+        DrawRectangle((int)selBarX, barY, slotSize, barH, (Color){100, 160, 255, 220});
+        DrawRectangle((int)(selBarX + slotSize * 0.2f), barY, (int)(slotSize * 0.6f), barH, (Color){160, 210, 255, 240});
+    }
+
     // Tooltip for hovered slot
     if (hoveredSlot >= 0) {
         int item = player.inventory[hoveredSlot];
@@ -2401,8 +2506,7 @@ void DrawHotbar(void)
             } else if (IsTool((BlockType)item)) {
                 int maxDur = GetToolMaxDurability((BlockType)item);
                 if (maxDur > 0) {
-                    int pct = player.toolDurability[hoveredSlot] * 100 / maxDur;
-                    snprintf(info, sizeof(info), S(STR_TOOLTIP_DUR_SHORT), pct);
+                    snprintf(info, sizeof(info), "%d/%d", player.toolDurability[hoveredSlot], maxDur);
                 }
             }
             if (info[0]) {
@@ -2455,10 +2559,41 @@ void DrawPlayerStatus(void)
     int startX = (SCREEN_WIDTH - totalW) / 2;
     int barY = SCREEN_HEIGHT - slotSize - 48;
 
-    int iconSize = 10;
-    int iconPad = 2;
+    int iconSize = 12;
+    int iconPad = 3;
     int barX = startX;
+
+    // ---- Helper: draw a heart at (cx, cy) ----
+    #define DRAW_HEART(cx, cy, col, outline) do { \
+        float hx = (float)(cx), hy = (float)(cy); \
+        DrawCircle((int)(hx - 2.5f), (int)(hy - 1.5f), 2.5f, col); \
+        DrawCircle((int)(hx + 2.5f), (int)(hy - 1.5f), 2.5f, col); \
+        DrawTriangle((Vector2){hx - 5, hy - 0.5f}, (Vector2){hx + 5, hy - 0.5f}, (Vector2){hx, hy + 5}, col); \
+        if (outline.a > 0) { \
+            DrawCircleLines((int)(hx - 2.5f), (int)(hy - 1.5f), 2.5f, outline); \
+            DrawCircleLines((int)(hx + 2.5f), (int)(hy - 1.5f), 2.5f, outline); \
+            DrawTriangleLines((Vector2){hx - 5, hy - 0.5f}, (Vector2){hx + 5, hy - 0.5f}, (Vector2){hx, hy + 5}, outline); \
+        } \
+    } while(0)
+
     float time = (float)GetTime();
+
+    // ---- Armor bar (Minecraft-style, above hearts) ----
+    int armorVal = GetTotalArmorPoints();
+    if (armorVal > 0) {
+        int armorY = barY - iconSize - 4;
+        for (int i = 0; i < 10; i++) {
+            int ax = barX + i * (iconSize + iconPad);
+            bool filled = armorVal >= (i + 1) * 2;
+            bool half = !filled && armorVal >= i * 2 + 1;
+            Color ac = filled ? (Color){160, 165, 175, 240} : (half ? (Color){100, 105, 115, 180} : (Color){40, 42, 48, 100});
+            // Simple chestplate icon (rectangle + lines)
+            DrawRectangle(ax + 2, armorY + 1, 8, 9, ac);
+            DrawRectangle(ax + 3, armorY, 6, 3, ac);
+            DrawRectangleLines(ax + 3, armorY, 6, 3, (Color){(unsigned char)(ac.r+30), (unsigned char)(ac.g+30), (unsigned char)(ac.b+30), ac.a});
+            DrawRectangleLines(ax + 2, armorY + 1, 8, 9, (Color){(unsigned char)(ac.r+25), (unsigned char)(ac.g+25), (unsigned char)(ac.b+25), ac.a});
+        }
+    }
 
     // Health hearts with damage pulse and low-health flash
     static float heartPulse = 0.0f;
@@ -2473,10 +2608,12 @@ void DrawPlayerStatus(void)
     float healthFlash = healthLow ? (sinf(time * 4.0f) * 0.3f + 0.7f) : 1.0f;
 
     for (int i = 0; i < MAX_HEALTH / 2; i++) {
-        int x = barX + i * (iconSize + iconPad);
+        float cx = barX + i * (iconSize + iconPad) + iconSize / 2.0f;
+        float cy = barY + iconSize / 2.0f + 2;
         bool filled = player.health >= (i + 1) * 2;
         bool half = !filled && player.health >= i * 2 + 1;
         Color c = filled ? (Color){220, 60, 60, 255} : (half ? (Color){170, 50, 50, 230} : (Color){55, 25, 25, 160});
+        Color outline = filled ? (Color){140, 30, 30, 200} : (Color){80, 20, 20, 120};
         if (filled) {
             float flash = 1.0f + heartPulse * 0.5f;
             float brightness = flash * healthFlash;
@@ -2484,17 +2621,15 @@ void DrawPlayerStatus(void)
             c.g = (unsigned char)(c.g * brightness > 255 ? 255 : c.g * brightness);
             c.b = (unsigned char)(c.b * brightness > 255 ? 255 : c.b * brightness);
         }
-        // Diamond shape for hearts
-        DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
-        DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){100, 35, 35, 160});
+        DRAW_HEART(cx, cy, c, outline);
     }
 
-    // Hunger
-    int hungerX = barX + (MAX_HEALTH / 2) * (iconSize + iconPad) + 12;
+    // Hunger drumsticks
+    int hungerX = barX + (MAX_HEALTH / 2) * (iconSize + iconPad) + 16;
     bool hungerLow = player.hunger <= 6;
     float hungerFlash = hungerLow ? (sinf(time * 4.0f) * 0.3f + 0.7f) : 1.0f;
     for (int i = 0; i < MAX_HUNGER / 2; i++) {
-        int x = hungerX + i * (iconSize + iconPad);
+        int dx = hungerX + i * (iconSize + iconPad);
         bool filled = player.hunger >= (i + 1) * 2;
         bool half = !filled && player.hunger >= i * 2 + 1;
         Color c = filled ? (Color){200, 140, 50, 255} : (half ? (Color){130, 90, 35, 230} : (Color){50, 32, 14, 160});
@@ -2503,20 +2638,28 @@ void DrawPlayerStatus(void)
             c.g = (unsigned char)(c.g * hungerFlash);
             c.b = (unsigned char)(c.b * hungerFlash);
         }
-        DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
-        DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){80, 55, 20, 160});
+        // Drumstick shape: bone handle + meat body
+        DrawRectangle(dx + 1, barY, 3, 8, (Color){200, 180, 150, 200}); // bone
+        DrawRectangle(dx + 4, barY + 1, 8, 10, c); // meat
+        DrawRectangleLines(dx + 4, barY + 1, 8, 10, (Color){100, 60, 20, 120});
     }
 
-    // Oxygen (only show when underwater or not full)
+    // Oxygen bubbles (only show when underwater or not full)
     if (player.oxygen < MAX_OXYGEN) {
-        int oxyX = hungerX + (MAX_HUNGER / 2) * (iconSize + iconPad) + 12;
+        int oxyX = hungerX + (MAX_HUNGER / 2) * (iconSize + iconPad) + 16;
         for (int i = 0; i < MAX_OXYGEN / 2; i++) {
-            int x = oxyX + i * (iconSize + iconPad);
+            int bx = oxyX + i * (iconSize + iconPad) + iconSize / 2;
+            int by = barY + iconSize / 2 + 1;
             bool filled = player.oxygen >= (i + 1) * 2;
             bool half = !filled && player.oxygen >= i * 2 + 1;
             Color c = filled ? (Color){80, 180, 240, 255} : (half ? (Color){55, 130, 200, 230} : (Color){28, 55, 95, 160});
-            DrawRectangle(x + 1, barY + 1, iconSize - 2, iconSize - 2, c);
-            DrawRectangleLines(x + 1, barY + 1, iconSize - 2, iconSize - 2, (Color){40, 75, 115, 160});
+            Color outline = filled ? (Color){40, 100, 160, 200} : (Color){20, 40, 70, 120};
+            // Bubble: filled circle + highlight
+            DrawCircle(bx, by, 4.5f, c);
+            DrawCircleLines(bx, by, 4.5f, outline);
+            if (filled) {
+                DrawCircle(bx - 1, by - 2, 1.5f, (Color){160, 220, 255, 180}); // highlight
+            }
         }
     }
 
@@ -2760,7 +2903,7 @@ void DrawPauseMenu(void)
     Color bgmHandleColor = (activeSlider == 0 || bgmHover) ? (Color){180, 200, 200, 255} : (Color){120, 150, 140, 200};
     DrawRectangle((int)(sliderX + bgmVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, bgmHandleColor);
     char bgmText[16];
-    sprintf(bgmText, "%d%%", (int)(bgmVolumeSlider * 100));
+    snprintf(bgmText, sizeof(bgmText), "%d%%", (int)(bgmVolumeSlider * 100));
     DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){130, 150, 150, 160});
 
     // SFX Volume
@@ -2784,7 +2927,7 @@ void DrawPauseMenu(void)
     Color sfxHandleColor = (activeSlider == 1 || sfxHover) ? (Color){200, 180, 210, 255} : (Color){150, 120, 160, 200};
     DrawRectangle((int)(sliderX + sfxVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, sfxHandleColor);
     char sfxText[16];
-    sprintf(sfxText, "%d%%", (int)(sfxVolumeSlider * 100));
+    snprintf(sfxText, sizeof(sfxText), "%d%%", (int)(sfxVolumeSlider * 100));
     DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){150, 130, 160, 160});
 
     // --- Controls ---

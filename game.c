@@ -1908,11 +1908,16 @@ static bool ProcessChatCommand(const char *msg)
 
     if (strcmp(cmd, "/list") == 0) {
         char listBuf[256] = "";
-        int count = 0;
+        int count = 0, remaining = (int)sizeof(listBuf) - 1;
         for (int i = 0; i < MAX_NET_PLAYERS; i++) {
             if (i == 0 || players[i].netControlled) {
-                if (count > 0) strcat(listBuf, ", ");
-                strcat(listBuf, players[i].playerName[0] ? players[i].playerName : "Host");
+                const char *name = players[i].playerName[0] ? players[i].playerName : "Host";
+                int prefixLen = count > 0 ? 2 : 0; // ", "
+                int needed = prefixLen + (int)strlen(name);
+                if (needed >= remaining) break;
+                if (count > 0) { strcat(listBuf, ", "); remaining -= 2; }
+                strcat(listBuf, name);
+                remaining -= (int)strlen(name);
                 count++;
             }
         }
@@ -2249,7 +2254,7 @@ void UpdateGame(float dt)
         autoSaveTimer += dt;
         if (autoSaveTimer >= 300.0f) {
             autoSaveTimer = 0.0f;
-            if (!player.playerDead && currentSavePath[0]) {
+            if (!player.playerDead && currentSavePath[0] && !NetIsClient()) {
                 SaveWorld(currentSavePath);
                 ShowMessage(S(STR_MSG_GAME_SAVED), (Color){100, 200, 100, 255});
             }
@@ -2340,6 +2345,10 @@ void UpdateGame(float dt)
             ReturnHeldItem();
             craftSearchLen = 0;
             craftSearchBuf[0] = '\0';
+        } else if (tradeOpen) {
+            // Close trade
+            tradeOpen = false;
+            inventoryOpen = false;
         } else {
             inventoryOpen = !inventoryOpen;
             if (inventoryOpen) {
@@ -2376,6 +2385,10 @@ void UpdateGame(float dt)
             ReturnHeldItem();
             craftSearchLen = 0;
             craftSearchBuf[0] = '\0';
+        } else if (tradeOpen) {
+            tradeOpen = false;
+            inventoryOpen = false;
+            gamePaused = false;
         } else if (inventoryOpen) {
             inventoryOpen = false;
             craftingTableOpen = false;

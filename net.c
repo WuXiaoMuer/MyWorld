@@ -322,6 +322,11 @@ void NetSendTo(int playerId, const void *data, int size, bool reliable)
 
     // Store in retransmission buffer for reliable packets
     if (reliable && hdr->seq > 0) {
+        int nextHead = (reliableBufHead + 1) % RELIABLE_BUF_SIZE;
+        if (reliableBuf[nextHead].active) {
+            // Buffer full, skip (don't overwrite pending ACK entry)
+            return;
+        }
         ReliablePacket *rp = &reliableBuf[reliableBufHead];
         memcpy(rp->data, buf, totalSize);
         rp->size = totalSize;
@@ -329,7 +334,7 @@ void NetSendTo(int playerId, const void *data, int size, bool reliable)
         rp->seq = hdr->seq;
         rp->sendTime = (float)GetNetTimeSeconds();
         rp->active = true;
-        reliableBufHead = (reliableBufHead + 1) % RELIABLE_BUF_SIZE;
+        reliableBufHead = nextHead;
     }
 }
 

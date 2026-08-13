@@ -95,7 +95,7 @@ void InitPlayer(void)
 
     // Preserve player name across respawns/init if already set; default otherwise.
     if (player.playerName[0] == '\0') {
-        strcpy(player.playerName, "Player");
+        snprintf(player.playerName, sizeof(player.playerName), "Player");
     }
 
     for (int i = 0; i < 4; i++) {
@@ -468,18 +468,24 @@ void PlayerPhysics(float dt)
             wantsSprint = player.sprinting;
             targetSpeed = player.moveInput * MOVE_SPEED;
         } else {
-            // Local keyboard input
-            wantsSprint = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
+            // Local keyboard input: Ctrl=sprint, Shift=sneak
+            wantsSprint = Win32IsKeyDown(KEY_LEFT_CONTROL) || Win32IsKeyDown(KEY_RIGHT_CONTROL);
+            player.sneaking = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
             bool left = Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
             bool right = Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
             if (left && !right) targetSpeed = -MOVE_SPEED;
             else if (right && !left) targetSpeed = MOVE_SPEED;
         }
-        player.sprinting = wantsSprint && player.onGround && player.hunger > 0;
+        player.sprinting = wantsSprint && player.onGround && player.hunger > 0 && !player.sneaking;
 
-        // Apply sprint multiplier to target, not to velocity
+        // Apply sprint multiplier
         if (player.sprinting && targetSpeed != 0.0f) {
             targetSpeed *= SPRINT_SPEED_MULT;
+        }
+
+        // Apply sneak speed reduction
+        if (player.sneaking && targetSpeed != 0.0f) {
+            targetSpeed *= SNEAK_SPEED_MULT;
         }
 
         float accel = (targetSpeed != 0.0f) ? MOVE_ACCEL : MOVE_DECEL;
@@ -517,6 +523,14 @@ void PlayerPhysics(float dt)
         }
     } else {
         player.footstepTimer = 0.0f;
+    }
+
+    // Walk animation timer (target ~1.5 Hz at normal walk, ~2.4 Hz sprint)
+    {
+        float walkSpeed = fabsf(player.velocity.x);
+        float animRate = (walkSpeed > 10.0f) ? walkSpeed * 0.08f : 0.0f;
+        player.walkTimer += animRate * dt;
+        while (player.walkTimer > 6.283185307f) player.walkTimer -= 6.283185307f;
     }
 
     // Water physics
@@ -746,6 +760,7 @@ void PlayerBlockInteraction(void)
 {
     if (inventoryOpen || gamePaused) return;
     if (player.netControlled) return; // Skip block interaction for remote players
+    if (player.selectedSlot < 0 || player.selectedSlot >= INVENTORY_SLOTS) return;
 
     Vector2 mouseWorld = GetScreenToWorld2D(Win32GetMousePosition(), camera);
     int blockX = (int)(mouseWorld.x / BLOCK_SIZE);
@@ -1552,7 +1567,7 @@ void PlayerBlockInteraction(void)
 
         // Seeds: plant on farmland
         if (selectedTool == ITEM_WHEAT_SEEDS) {
-            if (world[blockX][blockY] == BLOCK_FARMLAND && world[blockX][blockY - 1] == BLOCK_AIR) {
+            if (world[blockX][blockY] == BLOCK_FARMLAND && blockY > 0 && world[blockX][blockY - 1] == BLOCK_AIR) {
                 world[blockX][blockY - 1] = BLOCK_CROPS;
                 SetCropGrowth(blockX, blockY - 1, 0); // fresh plant starts at stage 0
                 RegisterCrop(blockX, blockY - 1);     // track for growth (see UpdateCrops)
@@ -1964,25 +1979,47 @@ void UpdatePlayerStatus(float dt)
 
 void RespawnPlayer(void)
 {
-    // Lose non-hotbar items on death
+    // Drop non-hotbar items and armor as entities (don't destroy them)
+    float px = player.position.x + PLAYER_WIDTH / 2;
+    float py = player.position.y + PLAYER_HEIGHT / 2;
     for (int i = HOTBAR_SLOTS; i < INVENTORY_SLOTS; i++) {
+        if (player.inventory[i] != BLOCK_AIR && player.inventoryCount[i] > 0) {
+            SpawnItemEntity(player.inventory[i], player.inventoryCount[i],
+                            px + (float)(rand() % 32 - 16), py + (float)(rand() % 16));
+        }
         player.inventory[i] = BLOCK_AIR;
         player.inventoryCount[i] = 0;
         player.toolDurability[i] = 0;
     }
-    // Lose all armor on death
+    // Drop armor
     for (int i = 0; i < 4; i++) {
+        if (player.armor[i] != BLOCK_AIR) {
+            SpawnItemEntity(player.armor[i], 1, px + (float)(rand() % 32 - 16), py + (float)(rand() % 16));
+        }
         player.armor[i] = BLOCK_AIR;
         player.armorDurability[i] = 0;
         player.armorEnchantments[i] = 0;
     }
     int spawnX, spawnY;
+    bool bedValid = false;
     if (player.spawnX >= 0 && player.spawnY >= 0 &&
         player.spawnX < WORLD_WIDTH && player.spawnY + 1 < WORLD_HEIGHT &&
         world[player.spawnX][player.spawnY + 1] == BLOCK_BED) {
-        spawnX = player.spawnX;
-        spawnY = player.spawnY;
-    } else {
+        // Check if spawn area is clear (2-block space above bed)
+        bool clear = true;
+        for (int bx = player.spawnX; bx < player.spawnX + 1 && clear; bx++) {
+            for (int by = player.spawnY - 1; by >= player.spawnY - 3 && clear; by--) {
+                if (by < 0 || by >= WORLD_HEIGHT) continue;
+                if (IsBlockSolid(bx, by)) clear = false;
+            }
+        }
+        if (clear) {
+            spawnX = player.spawnX;
+            spawnY = player.spawnY;
+            bedValid = true;
+        }
+    }
+    if (!bedValid) {
         player.spawnX = -1;
         player.spawnY = -1;
         FindSpawnPoint(&spawnX, &spawnY);
@@ -2043,6 +2080,15 @@ void UpdateCameraSystem(float dt)
     playerCenter.x += currentLookahead;
 
     camera.target = Vector2Lerp(camera.target, playerCenter, 8.0f * dt);
+
+    // Subtle camera vertical bob when walking on ground
+    {
+        bool walking = fabsf(player.velocity.x) > 10.0f && player.onGround;
+        if (walking && !player.netControlled) {
+            float bobAmp = player.sprinting ? 0.12f : 0.08f;
+            camera.target.y -= (1.0f - cosf(player.walkTimer * 2.0f)) * bobAmp;
+        }
+    }
 
     // Camera shake with smooth decay
     if (player.cameraShakeIntensity > 0.01f) {

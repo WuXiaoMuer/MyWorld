@@ -96,6 +96,7 @@ void InitWin32WheelHook(void);
 #define JUMP_VELOCITY       -380.0f
 #define MOVE_SPEED          120.0f
 #define SPRINT_SPEED_MULT   1.6f
+#define SNEAK_SPEED_MULT    0.3f
 
 // Player feel
 #define COYOTE_TIME         0.1f
@@ -1088,7 +1089,8 @@ typedef struct {
     float contactCooldown;
     float deathTimer;   // >0 = dying
     float burnTimer;    // sunlight damage accumulator
-    float fireTimer;    // fire aspect damage accumulator (counts down)
+    float fireTimer;        // fire aspect damage accumulator (counts down)
+    float fireDmgAccum;     // per-mob fire damage tick accumulator
     float attackTimer;  // cooldown for ranged attacks / creeper fuse
     float fuseTimer;    // creeper explosion fuse countdown
     float despawnTimer; // time-based despawn to prevent mob cap saturation
@@ -1149,6 +1151,8 @@ typedef struct {
     float attackCooldown;
     float bowChargeTimer;     // 0.0 to 1.0 (full charge)
     bool bowCharging;         // true while holding right-click with bow
+    bool sneaking;            // shift key held — crouch
+    float walkTimer;          // accumulated walk cycle timer (for animation)
     int spawnX, spawnY;      // bed spawn point (-1 = use default)
     // Armor slots: 0=helmet, 1=chestplate, 2=leggings, 3=boots
     uint8_t armor[4];
