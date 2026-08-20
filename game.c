@@ -53,6 +53,12 @@ void ApplyWindowMode(int mode)
 
 char currentSavePath[256] = { 0 };
 
+GameMode gameMode = GAME_SURVIVAL;
+int pendingGameMode = 0;
+bool creativeOpen = false;
+bool menuPartyMode = false;
+int menuTitleClicks = 0;
+
 // Join Game state
 static char joinIpBuf[64] = "127.0.0.1";
 static int joinIpLen = 8;
@@ -221,10 +227,12 @@ void InitGame(void)
 
     GetSavePath(selectedSaveSlot, currentSavePath, sizeof(currentSavePath));
 
+    gameMode = GAME_SURVIVAL; // LoadWorld overrides this for v15+ saves
     if (SaveExists(currentSavePath) && LoadWorld(currentSavePath)) {
         // Loaded successfully - day/night and weather restored from save
     } else {
         GenerateWorld(worldSeed);
+        gameMode = (GameMode)pendingGameMode;
         InitPlayer();
         InitDayNight();
         InitWeather();
@@ -505,6 +513,29 @@ static void UpdateSlotSelect(float dt)
         }
     }
 
+    // Game mode toggle (new game only): Survival / Creative (same row as seed box)
+    if (slotSelectMode == 0) {
+        int seedBoxW = 240;
+        int seedBoxX = (SCREEN_WIDTH - seedBoxW) / 2;
+        int modeX = seedBoxX + seedBoxW + 20;
+        Rectangle survBtn = { (float)(modeX + 50), 126.0f, 88.0f, 22.0f };
+        Rectangle creatBtn = { (float)(modeX + 50 + 88 + 6), 126.0f, 88.0f, 22.0f };
+        Vector2 mmouse = Win32GetMousePosition();
+        if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (CheckCollisionPointRec(mmouse, survBtn)) {
+                pendingGameMode = GAME_SURVIVAL;
+                PlaySoundUIClick();
+            } else if (CheckCollisionPointRec(mmouse, creatBtn)) {
+                pendingGameMode = GAME_CREATIVE;
+                PlaySoundUIClick();
+            }
+        }
+        if (Win32IsKeyPressed(KEY_LEFT) || Win32IsKeyPressed(KEY_RIGHT)) {
+            pendingGameMode = !pendingGameMode;
+            PlaySoundUIClick();
+        }
+    }
+
     // Keyboard navigation
     if (Win32IsKeyPressed(KEY_DOWN) || Win32IsKeyPressed(KEY_S)) {
         menuSelection++;
@@ -524,6 +555,7 @@ static void UpdateSlotSelect(float dt)
     // ESC to go back
     if (Win32IsKeyPressed(KEY_ESCAPE)) {
         pendingHostMode = false;
+        pendingGameMode = GAME_SURVIVAL;
         StartTransition(STATE_MENU);
         menuSelection = 0;
         seedInputLen = 0;
@@ -607,6 +639,7 @@ static void UpdateSlotSelect(float dt)
         if (CheckCollisionPointRec(mouse, backBtn) && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             StartTransition(STATE_MENU);
             menuSelection = 0;
+            pendingGameMode = GAME_SURVIVAL;
             seedInputLen = 0;
             seedInputBuf[0] = '\0';
             PlaySoundUIClick();
@@ -619,6 +652,46 @@ static void UpdateMainMenu(float dt)
     (void)dt;
 
     int btnCount = 6; // New, Load, Host, Join, Settings, Quit
+
+    // ============================================================
+    // Easter eggs
+    // ============================================================
+    {
+        // Konami code: Up Up Down Down Left Right Left Right B A -> party mode
+        static int konamiIdx = 0;
+        static const int konamiSeq[10] = { KEY_UP, KEY_UP, KEY_DOWN, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_LEFT, KEY_RIGHT, KEY_B, KEY_A };
+        int kkey = -1;
+        if (Win32IsKeyPressed(KEY_UP)) kkey = KEY_UP;
+        else if (Win32IsKeyPressed(KEY_DOWN)) kkey = KEY_DOWN;
+        else if (Win32IsKeyPressed(KEY_LEFT)) kkey = KEY_LEFT;
+        else if (Win32IsKeyPressed(KEY_RIGHT)) kkey = KEY_RIGHT;
+        else if (Win32IsKeyPressed(KEY_B)) kkey = KEY_B;
+        else if (Win32IsKeyPressed(KEY_A)) kkey = KEY_A;
+        if (kkey >= 0) {
+            if (kkey == konamiSeq[konamiIdx]) {
+                konamiIdx++;
+                if (konamiIdx >= 10) {
+                    konamiIdx = 0;
+                    menuPartyMode = !menuPartyMode;
+                    PlaySoundUIClick();
+                    ShowMessage(menuPartyMode ? S(STR_EGG_KONAMI_ON) : S(STR_EGG_KONAMI_OFF),
+                                (Color){255, 205, 90, 255});
+                }
+            } else if (kkey == konamiSeq[0]) {
+                konamiIdx = 1;
+            } else {
+                konamiIdx = 0;
+            }
+        }
+
+        // P key: random fun fact
+        if (Win32IsKeyPressed(KEY_P)) {
+            int fact = rand() % 3;
+            const char *f = (fact == 0) ? S(STR_EGG_FACT1) : (fact == 1 ? S(STR_EGG_FACT2) : S(STR_EGG_FACT3));
+            ShowMessage(f, (Color){120, 200, 235, 255});
+            PlaySoundUIClick();
+        }
+    }
 
     // Keyboard navigation
     if (Win32IsKeyPressed(KEY_DOWN) || Win32IsKeyPressed(KEY_S)) {
@@ -635,6 +708,7 @@ static void UpdateMainMenu(float dt)
         if (menuSelection == 0) {
             // New Game -> slot select
             slotSelectMode = 0;
+            pendingGameMode = GAME_SURVIVAL;
             menuSelection = 0;
             StartTransition(STATE_SLOT_SELECT);
             return;
@@ -655,6 +729,7 @@ static void UpdateMainMenu(float dt)
             // Host Game -> slot select (need world first)
             pendingHostMode = true;
             slotSelectMode = 0;
+            pendingGameMode = GAME_SURVIVAL;
             menuSelection = 0;
             StartTransition(STATE_SLOT_SELECT);
             return;
@@ -703,8 +778,18 @@ static void UpdateMainMenu(float dt)
 
         // Click
         if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            // Easter egg: poke the title 5 times
+            if (mouse.y >= 55 && mouse.y <= 140 && mouse.x >= (SCREEN_WIDTH - 400) / 2 && mouse.x <= (SCREEN_WIDTH + 400) / 2) {
+                menuTitleClicks++;
+                if (menuTitleClicks >= 5) {
+                    menuTitleClicks = 0;
+                    ShowMessage(S(STR_EGG_TITLE_CLICK), (Color){255, 190, 120, 255});
+                    PlaySoundUIClick();
+                }
+            }
             if (CheckCollisionPointRec(mouse, btns[0])) {
                 slotSelectMode = 0;
+                pendingGameMode = GAME_SURVIVAL;
                 menuSelection = 0;
                 StartTransition(STATE_SLOT_SELECT);
                 return;
@@ -725,6 +810,7 @@ static void UpdateMainMenu(float dt)
             if (CheckCollisionPointRec(mouse, btns[2])) {
                 pendingHostMode = true;
                 slotSelectMode = 0;
+                pendingGameMode = GAME_SURVIVAL;
                 menuSelection = 0;
                 StartTransition(STATE_SLOT_SELECT);
                 return;
@@ -1113,13 +1199,15 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
     if (slot < 0 || slot >= INVENTORY_SLOTS) return false;
 
     uint8_t item = p->inventory[slot];
-    if (item == BLOCK_AIR || p->inventoryCount[slot] <= 0) return false;
+    if (item == BLOCK_AIR) return false;
+    // Creative mode: infinite blocks, no need to have a stack in the slot
+    if (p->inventoryCount[slot] <= 0 && gameMode != GAME_CREATIVE) return false;
 
     // Bucket special cases
     if (item == ITEM_WATER_BUCKET) {
         if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
         SetWaterSource(bx, by);
-        p->inventory[slot] = ITEM_BUCKET;
+        if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
         NetSyncBlockChange(bx, by, BLOCK_WATER);
         return true;
     }
@@ -1127,7 +1215,7 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
         if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
         if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
         SetLavaSource(bx, by);
-        p->inventory[slot] = ITEM_BUCKET;
+        if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
         NetSyncBlockChange(bx, by, BLOCK_LAVA);
         return true;
     }
@@ -1155,11 +1243,13 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
     if (wasWater) RemoveWaterAt(bx, by);
     world[bx][by] = item;
 
-    // Consume item
-    p->inventoryCount[slot]--;
-    if (p->inventoryCount[slot] <= 0) {
-        p->inventory[slot] = BLOCK_AIR;
-        p->inventoryCount[slot] = 0;
+    // Consume item (creative mode: infinite blocks)
+    if (gameMode != GAME_CREATIVE) {
+        p->inventoryCount[slot]--;
+        if (p->inventoryCount[slot] <= 0) {
+            p->inventory[slot] = BLOCK_AIR;
+            p->inventoryCount[slot] = 0;
+        }
     }
 
     // Side effects
@@ -1226,7 +1316,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
     if (item == ITEM_WATER_BUCKET) {
         if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
             SetWaterSource(bx, by);
-            p->inventory[slot] = ITEM_BUCKET;
+            if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
             NetSyncBlockChange(bx, by, BLOCK_WATER);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -1237,7 +1327,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
         if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
             if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
             SetLavaSource(bx, by);
-            p->inventory[slot] = ITEM_BUCKET;
+            if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
             NetSyncBlockChange(bx, by, BLOCK_LAVA);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -1247,7 +1337,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
     if (item == ITEM_BUCKET) {
         if (world[bx][by] == BLOCK_WATER) {
             RemoveWaterAt(bx, by);
-            p->inventory[slot] = ITEM_WATER_BUCKET;
+            if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_WATER_BUCKET;
             NetSyncBlockChange(bx, by, BLOCK_AIR);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -1255,7 +1345,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
         }
         if (world[bx][by] == BLOCK_LAVA) {
             RemoveLavaAt(bx, by);
-            p->inventory[slot] = ITEM_LAVA_BUCKET;
+            if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_LAVA_BUCKET;
             NetSyncBlockChange(bx, by, BLOCK_AIR);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -1270,12 +1360,14 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
             NetSyncBlockChange(bx, by, BLOCK_FARMLAND);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
-            p->toolDurability[slot]--;
-            if (p->toolDurability[slot] <= 0) {
-                p->inventory[slot] = BLOCK_AIR;
-                p->inventoryCount[slot] = 0;
-                p->toolDurability[slot] = 0;
-                p->itemEnchantments[slot] = 0;
+            if (gameMode != GAME_CREATIVE) { // Creative: tools never wear
+                p->toolDurability[slot]--;
+                if (p->toolDurability[slot] <= 0) {
+                    p->inventory[slot] = BLOCK_AIR;
+                    p->inventoryCount[slot] = 0;
+                    p->toolDurability[slot] = 0;
+                    p->itemEnchantments[slot] = 0;
+                }
             }
             return true;
         }
@@ -1290,10 +1382,13 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
             NetSyncBlockChange(bx, by - 1, BLOCK_CROPS);
             UpdateLightAt(bx, by - 1);
             InvalidateChunkAt(bx, by - 1);
-            p->inventoryCount[slot]--;
-            if (p->inventoryCount[slot] <= 0) {
-                p->inventory[slot] = BLOCK_AIR;
-                p->inventoryCount[slot] = 0;
+            // Creative mode: seeds are infinite
+            if (gameMode != GAME_CREATIVE) {
+                p->inventoryCount[slot]--;
+                if (p->inventoryCount[slot] <= 0) {
+                    p->inventory[slot] = BLOCK_AIR;
+                    p->inventoryCount[slot] = 0;
+                }
             }
             return true;
         }
@@ -1577,8 +1672,10 @@ static bool TryEnderPearlRemote(Player *p, float targetX, float targetY)
     if (p->inventoryCount[slot] <= 0) {
         p->inventory[slot] = BLOCK_AIR;
     }
-    p->health -= 2;
-    p->damageFlashTimer = 0.3f;
+    if (gameMode != GAME_CREATIVE) { // Creative: no pearl fall damage
+        p->health -= 2;
+        p->damageFlashTimer = 0.3f;
+    }
 
     return true;
 }
@@ -1820,7 +1917,39 @@ static bool ProcessChatCommand(const char *msg)
     if (!cmd) return false;
 
     if (strcmp(cmd, "/help") == 0) {
-        AddChatMessage(255, "Commands: /help /tp x y /give id count /time day|night /weather clear|rain|thunder /heal /list");
+        AddChatMessage(255, "Commands:");
+        AddChatMessage(255, "/tp x y  /give id count  /heal  /list");
+        AddChatMessage(255, "/time day|night|noon|midnight|value");
+        AddChatMessage(255, "/weather clear|rain|thunder");
+        AddChatMessage(255, "/gamemode survival|creative  /mode");
+        return true;
+    }
+
+    if (strcmp(cmd, "/mode") == 0 || strcmp(cmd, "/gamemode") == 0) {
+        char *sarg = strtok(NULL, " ");
+        GameMode newMode;
+        if (sarg && (strcmp(sarg, "creative") == 0 || strcmp(sarg, "c") == 0 || strcmp(sarg, "1") == 0)) {
+            newMode = GAME_CREATIVE;
+        } else if (sarg && (strcmp(sarg, "survival") == 0 || strcmp(sarg, "s") == 0 || strcmp(sarg, "0") == 0)) {
+            newMode = GAME_SURVIVAL;
+        } else {
+            AddChatMessage(255, gameMode == GAME_CREATIVE
+                           ? "Current mode: Creative"
+                           : "Current mode: Survival");
+            AddChatMessage(255, "Usage: /gamemode survival|creative");
+            return true;
+        }
+        gameMode = newMode;
+        // Broadcast the change to all clients.
+        if (NetIsHost()) {
+            uint8_t mbuf[NET_PACKET_MAX];
+            mbuf[0] = PKT_GAMEMODE_SYNC;
+            mbuf[1] = (uint8_t)gameMode;
+            NetSendToAll(mbuf, 2, true);
+        }
+        AddChatMessage(255, gameMode == GAME_CREATIVE
+                       ? "Game mode: Creative (E opens creative inventory)"
+                       : "Game mode: Survival");
         return true;
     }
 
@@ -2091,6 +2220,7 @@ void UpdateGame(float dt)
                 welcome.weatherDuration = weather.duration;
                 welcome.spawnX = player.position.x;
                 welcome.spawnY = player.position.y;
+                welcome.gameMode = (uint8_t)gameMode;
                 uint8_t buf[NET_PACKET_MAX];
                 buf[0] = PKT_WELCOME;
                 memcpy(buf + 1, &welcome, sizeof(welcome));
@@ -2222,6 +2352,7 @@ void UpdateGame(float dt)
                     dayNight.timeOfDay = w->timeOfDay;
                     weather.type = (WeatherType)w->weatherType;
                     weather.duration = w->weatherDuration;
+                    gameMode = (GameMode)w->gameMode;
                     RecalculateAllLight();
                     InitCameraSystem();
                     InitChunkTable();
@@ -2349,6 +2480,11 @@ void UpdateGame(float dt)
             // Close trade
             tradeOpen = false;
             inventoryOpen = false;
+        } else if (gameMode == GAME_CREATIVE) {
+            // Creative: E toggles the block/item palette
+            creativeOpen = !creativeOpen;
+            inventoryOpen = false;
+            gamePaused = false;
         } else {
             inventoryOpen = !inventoryOpen;
             if (inventoryOpen) {
@@ -2388,6 +2524,9 @@ void UpdateGame(float dt)
         } else if (tradeOpen) {
             tradeOpen = false;
             inventoryOpen = false;
+            gamePaused = false;
+        } else if (creativeOpen) {
+            creativeOpen = false;
             gamePaused = false;
         } else if (inventoryOpen) {
             inventoryOpen = false;
@@ -2435,8 +2574,8 @@ void UpdateGame(float dt)
         }
     }
 
-    // Don't update gameplay when paused or inventory open (but allow furnace to tick)
-    if (!gamePaused && !inventoryOpen) {
+    // Don't update gameplay when paused, inventory open, or creative palette open
+    if (!gamePaused && !inventoryOpen && !creativeOpen) {
         if (NetIsHost()) {
             // Host mode: poll client inputs, run authoritative logic, broadcast state
             NetPoll();
@@ -2465,6 +2604,7 @@ void UpdateGame(float dt)
                     welcome.weatherDuration = weather.duration;
                     welcome.spawnX = player.position.x;
                     welcome.spawnY = player.position.y;
+                    welcome.gameMode = (uint8_t)gameMode;
                     uint8_t wbuf[NET_PACKET_MAX];
                     wbuf[0] = PKT_WELCOME;
                     memcpy(wbuf + 1, &welcome, sizeof(welcome));
@@ -3112,8 +3252,9 @@ void UpdateGame(float dt)
         } else if (NetIsClient()) {
             // Client mode: send input, receive state
             NetPoll();
-            // Send local input to server
-            if (!chatOpen) {
+            // Send local input to server (skip while any UI overlay is open so
+            // opening inventory/creative palette doesn't also trigger a use action)
+            if (!chatOpen && !inventoryOpen && !creativeOpen) {
                 inputTickTimer += dt;
                 if (inputTickTimer >= NET_TICK_INTERVAL) {
                     inputTickTimer = 0.0f;
@@ -3268,7 +3409,7 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_DAMAGE_PLAYER && size >= 1 + (int)sizeof(PktDamagePlayer)) {
                     const PktDamagePlayer *dp = (const PktDamagePlayer *)((const uint8_t *)data + 1);
-                    if (dp->playerId == localPlayerId) {
+                    if (dp->playerId == localPlayerId && gameMode != GAME_CREATIVE) {
                         player.health -= dp->damage;
                         player.velocity.x += dp->knockbackX;
                         player.velocity.y += dp->knockbackY;
@@ -3308,6 +3449,20 @@ void UpdateGame(float dt)
                     StartTransition(STATE_MENU);
                     menuSelection = 0;
                     return;
+                } else if (type == PKT_GAMEMODE_SYNC && size >= 2) {
+                    // Host changed the game mode
+                    uint8_t gm = ((const uint8_t *)data)[1];
+                    if (gm < GAME_MODE_COUNT) {
+                        gameMode = (GameMode)gm;
+                        AddChatMessage(255, gameMode == GAME_CREATIVE
+                                       ? "Game mode: Creative (E opens creative inventory)"
+                                       : "Game mode: Survival");
+                        // Creative palette state is per-client UI; close it if we left creative.
+                        if (gameMode != GAME_CREATIVE) {
+                            creativeOpen = false;
+                            gamePaused = false;
+                        }
+                    }
                 } else if (type == PKT_CHEST_SYNC && size >= 1 + (int)sizeof(PktChestSync)) {
                     const PktChestSync *pkt = (const PktChestSync *)((const uint8_t *)data + 1);
                     ApplyChestSync(pkt);
@@ -3519,10 +3674,19 @@ void DrawGame(void)
         // Dark overlay
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 160});
         if (!joinConnecting) {
+            // Modern dark-flat panel behind the join form
+            int jPanelW = 440, jPanelH = 250;
+            int jPanelX = (SCREEN_WIDTH - jPanelW) / 2;
+            int jPanelY = 175;
+            DrawRectangle(jPanelX + 3, jPanelY + 3, jPanelW, jPanelH, (Color){0, 0, 0, 60});
+            DrawRectangle(jPanelX, jPanelY, jPanelW, jPanelH, (Color){31, 39, 52, 240});
+            DrawRectangleLines(jPanelX, jPanelY, jPanelW, jPanelH, (Color){58, 71, 92, 255});
+            DrawRectangle(jPanelX + 12, jPanelY, jPanelW - 24, 1, (Color){255, 255, 255, 16});
+
             // Title
             const char *title = S(STR_JOIN_TITLE);
             int titleW = MeasureGameTextWidth(title, 32);
-            DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 200, 32, (Color){200, 220, 255, 255});
+            DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 200, 32, (Color){235, 235, 235, 255});
             // IP hint
             const char *hint = S(STR_JOIN_IP_HINT);
             int hintW = MeasureGameTextWidth(hint, 20);
@@ -3531,9 +3695,10 @@ void DrawGame(void)
             int boxW = 300, boxH = 36;
             int boxX = (SCREEN_WIDTH - boxW) / 2;
             int boxY = 250; // above IP
-            Color nameCol = (joinInputFocus == 0) ? (Color){180, 230, 180, 200} : (Color){100, 140, 200, 200};
-            DrawRectangle(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){20, 25, 40, 220});
-            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2, nameCol);
+            bool nameFocused = (joinInputFocus == 0);
+            DrawRectangle(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){24, 29, 38, 230});
+            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2,
+                nameFocused ? (Color){56, 217, 169, 255} : (Color){58, 71, 92, 220});
             DrawGameText(joinNameBuf, boxX + 10, boxY + 8, 20, (Color){220, 230, 255, 255});
             if (joinInputFocus == 0) {
                 float blink = sinf((float)GetTime() * 4.0f) * 0.5f + 0.5f;
@@ -3542,9 +3707,10 @@ void DrawGame(void)
             }
             // IP input box
             boxY = 300;
-            Color ipCol = (joinInputFocus == 1) ? (Color){180, 230, 180, 200} : (Color){100, 140, 200, 200};
-            DrawRectangle(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){20, 25, 40, 220});
-            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2, ipCol);
+            bool ipFocused = (joinInputFocus == 1);
+            DrawRectangle(boxX + 1, boxY + 1, boxW - 2, boxH - 2, (Color){24, 29, 38, 230});
+            DrawRectangleLinesEx((Rectangle){(float)boxX, (float)boxY, (float)boxW, (float)boxH}, 2,
+                ipFocused ? (Color){56, 217, 169, 255} : (Color){58, 71, 92, 220});
             DrawGameText(joinIpBuf, boxX + 10, boxY + 8, 20, (Color){220, 230, 255, 255});
             if (joinInputFocus == 1) {
                 float blink = sinf((float)GetTime() * 4.0f) * 0.5f + 0.5f;
@@ -3638,10 +3804,17 @@ void DrawGame(void)
     DrawChatUI();
 
     DrawInventoryScreen();
+    DrawCreativeScreen();
     DrawTradeUI();
     DrawEnchantingTableUI();
     DrawPauseMenu();
     DrawDeathScreen(GetFrameTime());
+
+    // Sleep transition overlay (fade to black while sleeping)
+    if (sleepFade > 0.01f) {
+        unsigned char sleepA = (unsigned char)(sleepFade * 255);
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, sleepA});
+    }
 
     // Large map overlay (draws on top of everything)
     if (showLargeMap) DrawLargeMap();

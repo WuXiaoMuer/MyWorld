@@ -176,13 +176,15 @@ void UpdateProjectiles(float dt)
                 else if (gameDifficulty == DIFFICULTY_HARD) arrowDamage = arrowDamage * 3 / 2;
                 int finalDamage = (int)(arrowDamage * (1.0f - reduction));
                 if (finalDamage < 1) finalDamage = 1;
-                player.health -= finalDamage;
-                if (player.health < 0) player.health = 0;
-                if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_SKELETON);
-                DamageArmor();
-                player.damageFlashTimer = 0.3f;
-                SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
-                PlaySoundHurt();
+                if (gameMode != GAME_CREATIVE) { // Creative: invincible
+                    player.health -= finalDamage;
+                    if (player.health < 0) player.health = 0;
+                    if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_SKELETON);
+                    DamageArmor();
+                    player.damageFlashTimer = 0.3f;
+                    SpawnDamageParticles(p->position.x, p->position.y, (Color){200, 50, 50, 255});
+                    PlaySoundHurt();
+                }
                 p->active = false;
             }
         }
@@ -595,15 +597,17 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                     else if (gameDifficulty == DIFFICULTY_HARD) creeperDmg = creeperDmg * 3 / 2;
                     int finalDamage = (int)(creeperDmg * (1.0f - reduction));
                     if (finalDamage < 1) finalDamage = 1;
-                    player.health -= finalDamage;
-                    if (player.health < 0) player.health = 0;
-                    if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_CREEPER);
-                    DamageArmor();
-                    player.damageFlashTimer = 0.5f;
-                    player.knockbackTimer = 0.3f;
-                    player.velocity.x = (pdx > 0 ? 1 : -1) * 300.0f;
-                    player.velocity.y = -250.0f;
-                    PlaySoundHurt();
+                    if (gameMode != GAME_CREATIVE) { // Creative: invincible
+                        player.health -= finalDamage;
+                        if (player.health < 0) player.health = 0;
+                        if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_CREEPER);
+                        DamageArmor();
+                        player.damageFlashTimer = 0.5f;
+                        player.knockbackTimer = 0.3f;
+                        player.velocity.x = (pdx > 0 ? 1 : -1) * 300.0f;
+                        player.velocity.y = -250.0f;
+                        PlaySoundHurt();
+                    }
                 }
 
                 // Destroy nearby blocks
@@ -854,20 +858,22 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
         float reduction = GetArmorDamageReduction();
         int finalDamage = (int)(rawDamage * (1.0f - reduction));
         if (finalDamage < 1) finalDamage = 1;
-        player.health -= finalDamage;
-        if (player.health < 0) player.health = 0;
-        if (player.health <= 0) {
-            switch (mob->type) {
-                case MOB_ZOMBIE: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
-                case MOB_SKELETON: SetDeathCause(STR_DEATH_MOB_SKELETON); break;
-                case MOB_CREEPER: SetDeathCause(STR_DEATH_MOB_CREEPER); break;
-                case MOB_SPIDER: SetDeathCause(STR_DEATH_MOB_SPIDER); break;
-                case MOB_SLIME: SetDeathCause(STR_DEATH_MOB_SLIME); break;
-                case MOB_ENDERMAN: SetDeathCause(STR_DEATH_MOB_ENDERMAN); break;
-                default: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
+        if (gameMode != GAME_CREATIVE) { // Creative: invincible
+            player.health -= finalDamage;
+            if (player.health < 0) player.health = 0;
+            if (player.health <= 0) {
+                switch (mob->type) {
+                    case MOB_ZOMBIE: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
+                    case MOB_SKELETON: SetDeathCause(STR_DEATH_MOB_SKELETON); break;
+                    case MOB_CREEPER: SetDeathCause(STR_DEATH_MOB_CREEPER); break;
+                    case MOB_SPIDER: SetDeathCause(STR_DEATH_MOB_SPIDER); break;
+                    case MOB_SLIME: SetDeathCause(STR_DEATH_MOB_SLIME); break;
+                    case MOB_ENDERMAN: SetDeathCause(STR_DEATH_MOB_ENDERMAN); break;
+                    default: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
+                }
             }
+            DamageArmor();
         }
-        DamageArmor();
         mob->contactCooldown = MOB_CONTACT_COOLDOWN;
 
         // Knockback

@@ -2946,7 +2946,7 @@ void ExplodeAt(float worldX, float worldY, int radius)
         if (gameDifficulty == DIFFICULTY_EASY) dmg = dmg * 3 / 4;
         else if (gameDifficulty == DIFFICULTY_HARD) dmg = dmg * 3 / 2;
         dmg = (int)(dmg * (1.0f - GetArmorDamageReduction()));
-        if (dmg > 0) {
+        if (dmg > 0 && gameMode != GAME_CREATIVE) { // Creative: invincible
             player.health -= dmg;
             if (player.health < 0) player.health = 0;
             if (player.health <= 0) SetDeathCause(STR_DEATH_MOB_CREEPER);

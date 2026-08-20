@@ -1,16 +1,51 @@
 #include "types.h"
 
+// Sleep transition: fade to black, skip the night, fade back in
+#define SLEEP_FADE_TIME 0.8f
+
+bool isSleeping = false;
+float sleepFade = 0.0f;
+
+static void UpdateSleep(float dt)
+{
+    if (!isSleeping) return;
+
+    if (sleepFade < 1.0f) {
+        // Phase A: fading out
+        sleepFade += dt / SLEEP_FADE_TIME;
+        if (sleepFade >= 1.0f) {
+            sleepFade = 1.0f;
+            // Night skipped: snap to dawn under the cover of blackness
+            dayNight.timeOfDay = 0.25f;
+        }
+    } else {
+        // Phase B: fading back in
+        sleepFade -= dt / SLEEP_FADE_TIME;
+        if (sleepFade <= 0.0f) {
+            sleepFade = 0.0f;
+            isSleeping = false;
+        }
+    }
+}
+
 void InitDayNight(void)
 {
     dayNight.timeOfDay = 0.35f;
     dayNight.daySpeed = 0.008f;
     dayNight.lightLevel = 1.0f;
+    isSleeping = false;
+    sleepFade = 0.0f;
 }
 
 void UpdateDayNight(float dt)
 {
-    dayNight.timeOfDay += dayNight.daySpeed * dt;
-    if (dayNight.timeOfDay >= 1.0f) dayNight.timeOfDay -= 1.0f;
+    // Sleep transition runs first; while sleeping the sky clock is frozen
+    UpdateSleep(dt);
+
+    if (!isSleeping) {
+        dayNight.timeOfDay += dayNight.daySpeed * dt;
+        if (dayNight.timeOfDay >= 1.0f) dayNight.timeOfDay -= 1.0f;
+    }
 
     float t = dayNight.timeOfDay;
     if (t < 0.2f) dayNight.lightLevel = 0.2f;
@@ -29,7 +64,9 @@ bool TrySleep(void)
 {
     float t = dayNight.timeOfDay;
     if (t < 0.2f || t >= 0.8f) {
-        dayNight.timeOfDay = 0.25f;
+        // Start the fade-to-black sleep transition instead of an instant time set
+        isSleeping = true;
+        sleepFade = 0.0f;
         return true;
     }
     return false;

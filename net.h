@@ -54,6 +54,7 @@ typedef enum {
     PKT_FURNACE_CLOSE,      // Client -> Server: closed furnace UI
     PKT_DISCONNECT,         // Bidirectional: disconnect notice
     PKT_PING,               // Bidirectional: keepalive
+    PKT_GAMEMODE_SYNC,      // Server -> Client: game mode changed
 } PacketType;
 
 //----------------------------------------------------------------------------------
@@ -83,6 +84,7 @@ typedef struct {
     uint8_t weatherType;
     float weatherDuration;
     float spawnX, spawnY;       // Host's player spawn position
+    uint8_t gameMode;           // 0=survival, 1=creative
 } PktWelcome;
 
 // PKT_INPUT

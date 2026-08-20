@@ -130,7 +130,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        14
+#define SAVE_VERSION        15
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -685,6 +685,7 @@ typedef enum {
     STR_DBG_UNDERWATER,
     STR_DBG_SEED,
     STR_DBG_WEATHER,
+    STR_DBG_MODE,
     STR_WEATHER_CLEAR,
     STR_WEATHER_RAIN,
     STR_WEATHER_THUNDER,
@@ -1026,6 +1027,29 @@ typedef enum {
     STR_MSG_CACTUS_DAMAGE,
     STR_MSG_CANT_SLEEP_MOBS,
 
+    // Creative mode
+    STR_GAMEMODE,
+    STR_MODE_SURVIVAL,
+    STR_MODE_CREATIVE,
+    STR_MSG_FLIGHT_ON,
+    STR_MSG_FLIGHT_OFF,
+    STR_CREATIVE_TITLE,
+    STR_CREATIVE_SELECTED,
+    STR_CREATIVE_SELECT_HINT,
+    STR_CREATIVE_SEARCH,
+    STR_CREATIVE_NO_MATCH,
+    STR_MODE_SET,
+    STR_CREATIVE_BACKPACK,
+    STR_HINT_SCROLL,
+    STR_MSG_HOST_ONLY,
+    // Easter eggs
+    STR_EGG_KONAMI_ON,
+    STR_EGG_KONAMI_OFF,
+    STR_EGG_TITLE_CLICK,
+    STR_EGG_FACT1,
+    STR_EGG_FACT2,
+    STR_EGG_FACT3,
+
     STR_COUNT
 } StringId;
 
@@ -1163,6 +1187,9 @@ typedef struct {
     float moveInput;         // -1.0 to 1.0, used when netControlled
     bool jumpHeld;           // jump key state from network
     char playerName[32];     // display name in multiplayer
+    // Creative flight
+    bool flying;             // true = creative flight active
+    float lastJumpTapTimer;  // time since last jump tap (for double-tap toggle)
 } Player;
 
 //----------------------------------------------------------------------------------
@@ -1233,6 +1260,12 @@ typedef enum {
     DIFFICULTY_HARD,
     DIFFICULTY_COUNT
 } Difficulty;
+
+typedef enum {
+    GAME_SURVIVAL = 0,
+    GAME_CREATIVE,
+    GAME_MODE_COUNT
+} GameMode;
 
 typedef enum {
     ACH_FIRST_STEPS = 0,    // Craft a wooden pickaxe
@@ -1362,6 +1395,8 @@ extern int localPlayerId;
 extern RemotePlayer remotePlayers[MAX_NET_PLAYERS];
 extern Camera2D camera;
 extern DayNightCycle dayNight;
+extern bool isSleeping;
+extern float sleepFade;
 
 extern Texture2D blockAtlas;
 #define CRACK_STAGES 10
@@ -1389,6 +1424,11 @@ extern Particle particles[MAX_PARTICLES];
 extern ItemEntity entities[MAX_ENTITIES];
 extern GameState gameState;
 extern Difficulty gameDifficulty;
+extern GameMode gameMode;
+extern int pendingGameMode; // survival/creative selected on the new-game screen
+extern bool creativeOpen;   // creative inventory palette overlay
+extern bool menuPartyMode;  // Konami-code easter egg: confetti rain on the main menu
+extern int menuTitleClicks; // consecutive clicks on the main-menu title
 
 // Achievement tracking
 extern bool achievements[ACH_COUNT];
@@ -1652,6 +1692,9 @@ void DrawCrosshair(void);
 void DrawDebugInfo(void);
 void DrawInventoryScreen(void);
 void SortInventory(void);
+void DrawUiButton(float x, float y, float w, float h, const char *label,
+                  int fontSize, bool hover, bool selected, bool enabled, float alpha);
+void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha);
 void DrawMessage(void);
 void DrawPauseMenu(void);
 void DrawDeathScreen(float dt);
@@ -1664,6 +1707,7 @@ void DrawBackground(void);
 void DrawMinimap(void);
 void DrawLargeMap(void);
 void DrawSettingsScreen(void);
+void DrawCreativeScreen(void);
 void ReturnHeldItem(void);
 void ShowMessage(const char *msg, Color color);
 void AddChatMessage(uint8_t playerId, const char *msg);

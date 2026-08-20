@@ -707,8 +707,8 @@ void PlayerPhysics(float dt)
                                      player.velocity.y / 400.0f);
                 }
             }
-            // Fall damage
-            if (player.fallPeakVel > 300.0f) {
+            // Fall damage (creative: invincible)
+            if (player.fallPeakVel > 300.0f && gameMode != GAME_CREATIVE) {
                 int damage = (int)((player.fallPeakVel - 300.0f) / 100.0f);
                 if (damage > 0) {
                     float reduction = GetArmorDamageReduction();
@@ -758,7 +758,7 @@ static float miningProgress = 0.0f;
 
 void PlayerBlockInteraction(void)
 {
-    if (inventoryOpen || gamePaused) return;
+    if (inventoryOpen || gamePaused || creativeOpen) return;
     if (player.netControlled) return; // Skip block interaction for remote players
     if (player.selectedSlot < 0 || player.selectedSlot >= INVENTORY_SLOTS) return;
 
@@ -869,6 +869,8 @@ void PlayerBlockInteraction(void)
                 miningProgress = 0.0f;
                 lastParticleThreshold = 0.0f;
             }
+            // Creative mode: instant break
+            if (gameMode == GAME_CREATIVE) miningProgress = 1.0f;
             float dt = GetFrameTime();
             float baseMineTime = 0.4f; // seconds for bare hands
             miningProgress += (dt * toolSpeed) / baseMineTime;
@@ -903,7 +905,8 @@ void PlayerBlockInteraction(void)
                 if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Ore drop special cases (only if tool tier is sufficient)
-                if (CanToolMineBlock(selectedTool, bt) || bt == BLOCK_CROPS || bt == BLOCK_FARMLAND) {
+                // Creative mode: no item drops (infinite inventory)
+                if ((CanToolMineBlock(selectedTool, bt) || bt == BLOCK_CROPS || bt == BLOCK_FARMLAND) && gameMode != GAME_CREATIVE) {
                     // Check for Silk Touch on the mining tool
                     uint16_t silkEnch = player.itemEnchantments[player.selectedSlot];
                     bool hasSilkTouch = (ENCH_TYPE(silkEnch) == ENCH_SILK_TOUCH);
@@ -976,8 +979,8 @@ void PlayerBlockInteraction(void)
                     AddToInventory(FOOD_APPLE);
                 }
 
-                // Consume tool durability (Unbreaking check)
-                if (IsTool(selectedTool)) {
+                // Consume tool durability (Unbreaking check). Creative: tools never wear.
+                if (IsTool(selectedTool) && gameMode != GAME_CREATIVE) {
                     int slot = player.selectedSlot;
                     uint16_t ench = player.itemEnchantments[slot];
                     bool skipDur = false;
@@ -1263,11 +1266,13 @@ void PlayerBlockInteraction(void)
                     if (player.inventoryCount[player.selectedSlot] <= 0) {
                         player.inventory[player.selectedSlot] = BLOCK_AIR;
                     }
-                    // Small fall damage on landing
-                    player.health -= 2;
-                    if (player.health < 0) player.health = 0;
-                    player.damageFlashTimer = 0.3f;
-                    PlaySoundHurt();
+                    // Small fall damage on landing (creative: none)
+                    if (gameMode != GAME_CREATIVE) {
+                        player.health -= 2;
+                        if (player.health < 0) player.health = 0;
+                        player.damageFlashTimer = 0.3f;
+                        PlaySoundHurt();
+                    }
                     ShowMessage(S(STR_MSG_ENDER_PEARL), (Color){100, 200, 255, 255});
                 }
             }
@@ -1430,7 +1435,7 @@ void PlayerBlockInteraction(void)
         if (selectedTool == ITEM_WATER_BUCKET) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 SetWaterSource(blockX, blockY);
-                player.inventory[player.selectedSlot] = ITEM_BUCKET; // Empty bucket
+                if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_BUCKET; // Empty bucket
                 PlaySoundPlace(BLOCK_WATER);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -1441,7 +1446,7 @@ void PlayerBlockInteraction(void)
         if (selectedTool == ITEM_BUCKET) {
             if (world[blockX][blockY] == BLOCK_WATER) {
                 RemoveWaterAt(blockX, blockY);
-                player.inventory[player.selectedSlot] = ITEM_WATER_BUCKET;
+                if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_WATER_BUCKET;
                 PlaySoundPlace(BLOCK_WATER);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -1449,7 +1454,7 @@ void PlayerBlockInteraction(void)
             }
             if (world[blockX][blockY] == BLOCK_LAVA) {
                 RemoveLavaAt(blockX, blockY);
-                player.inventory[player.selectedSlot] = ITEM_LAVA_BUCKET;
+                if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_LAVA_BUCKET;
                 PlaySoundPlace(BLOCK_LAVA);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -1461,7 +1466,7 @@ void PlayerBlockInteraction(void)
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 if (world[blockX][blockY] == BLOCK_WATER) RemoveWaterAt(blockX, blockY);
                 SetLavaSource(blockX, blockY);
-                player.inventory[player.selectedSlot] = ITEM_BUCKET;
+                if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_BUCKET;
                 PlaySoundPlace(BLOCK_LAVA);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -1575,9 +1580,12 @@ void PlayerBlockInteraction(void)
                 PlaySoundPlace(BLOCK_TALL_GRASS);
                 UpdateLightAt(blockX, blockY - 1);
                 InvalidateChunkAt(blockX, blockY - 1);
-                player.inventoryCount[player.selectedSlot]--;
-                if (player.inventoryCount[player.selectedSlot] <= 0) {
-                    player.inventory[player.selectedSlot] = BLOCK_AIR;
+                // Creative mode: seeds are infinite
+                if (gameMode != GAME_CREATIVE) {
+                    player.inventoryCount[player.selectedSlot]--;
+                    if (player.inventoryCount[player.selectedSlot] <= 0) {
+                        player.inventory[player.selectedSlot] = BLOCK_AIR;
+                    }
                 }
                 return;
             }
@@ -1585,7 +1593,8 @@ void PlayerBlockInteraction(void)
 
         if (IsTool(selectedTool) || IsFood(selectedTool) || IsArmor(selectedTool)) return; // Can't place tools, food, or armor
         if (selectedTool >= BLOCK_COUNT || !blockInfo[selectedTool].breakable) return; // Can't place non-block items
-        if (selectedTool != BLOCK_AIR && player.inventoryCount[player.selectedSlot] > 0) {
+        // Creative mode: can place from the palette even with an empty slot (infinite blocks)
+        if (selectedTool != BLOCK_AIR && (player.inventoryCount[player.selectedSlot] > 0 || gameMode == GAME_CREATIVE)) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 float bLeft = blockX * BLOCK_SIZE;
                 float bRight = bLeft + BLOCK_SIZE;
@@ -1603,9 +1612,12 @@ void PlayerBlockInteraction(void)
                     world[blockX][blockY] = selectedTool;
                     NetSyncBlockChange(blockX, blockY, selectedTool);
                     if (selectedTool == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(blockX, blockY);
-                    player.inventoryCount[player.selectedSlot]--;
-                    if (player.inventoryCount[player.selectedSlot] <= 0) {
-                        player.inventory[player.selectedSlot] = BLOCK_AIR;
+                    // Creative mode: infinite blocks, don't consume
+                    if (gameMode != GAME_CREATIVE) {
+                        player.inventoryCount[player.selectedSlot]--;
+                        if (player.inventoryCount[player.selectedSlot] <= 0) {
+                            player.inventory[player.selectedSlot] = BLOCK_AIR;
+                        }
                     }
                     PlaySoundPlace(selectedTool);
                     totalBlocksPlaced++;
@@ -1765,6 +1777,17 @@ static void FireBowWithCharge(float charge)
 void UpdatePlayer(float dt)
 {
     if (player.playerDead) return;
+
+    // Creative mode: fully healthy (no damage, hunger, or drowning can persist)
+    if (gameMode == GAME_CREATIVE) {
+        player.health = MAX_HEALTH;
+        player.hunger = MAX_HUNGER;
+        player.oxygen = MAX_OXYGEN;
+        player.hungerTimer = 0.0f;
+        player.hungerDamageTimer = 0.0f;
+        player.drownTimer = 0.0f;
+    }
+
     PlayerPhysics(dt);
 
     // Bow charging mechanic
@@ -1826,7 +1849,7 @@ bool IsPlayerUnderwater(void)
 
 void UpdatePlayerStatus(float dt)
 {
-    if (gamePaused || inventoryOpen || player.playerDead) return;
+    if (gamePaused || inventoryOpen || creativeOpen || player.playerDead) return;
 
     bool underwater = IsPlayerUnderwater();
 
@@ -1847,8 +1870,8 @@ void UpdatePlayerStatus(float dt)
             player.oxygenTimer -= 1.0f / OXYGEN_DRAIN_RATE;
             if (player.oxygen > 0) player.oxygen--;
         }
-        // Drowning damage when oxygen depleted
-        if (player.oxygen <= 0) {
+        // Drowning damage when oxygen depleted (creative: invincible)
+        if (player.oxygen <= 0 && gameMode != GAME_CREATIVE) {
             player.drownTimer += dt;
             if (player.drownTimer >= 1.0f / DROWN_DAMAGE_RATE) {
                 player.drownTimer -= 1.0f / DROWN_DAMAGE_RATE;
@@ -1872,11 +1895,11 @@ void UpdatePlayerStatus(float dt)
         }
     }
 
-    // --- Lava damage ---
+    // --- Lava damage (creative: invincible) ---
     {
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
-        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_LAVA) {
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_LAVA && gameMode != GAME_CREATIVE) {
             player.health -= 4.0f * dt; // 4 hearts/sec in lava
             if (player.health < 0) player.health = 0;
             if (!player.netControlled) pendingDeathCause = STR_DEATH_LAVA;
@@ -1889,12 +1912,12 @@ void UpdatePlayerStatus(float dt)
         }
     }
 
-    // --- Cactus damage ---
+    // --- Cactus damage (creative: invincible) ---
     {
         static float cactusTimer = 0.0f;
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
-        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_CACTUS) {
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_CACTUS && gameMode != GAME_CREATIVE) {
             cactusTimer += dt;
             if (cactusTimer >= 0.5f) {
                 cactusTimer = 0.0f;
@@ -1910,30 +1933,32 @@ void UpdatePlayerStatus(float dt)
         }
     }
 
-    // --- Hunger ---
+    // --- Hunger (creative: no hunger drain) ---
     float hungerRate = HUNGER_DRAIN_RATE;
     if (gameDifficulty == DIFFICULTY_PEACEFUL) hungerRate *= 0.25f;
     else if (gameDifficulty == DIFFICULTY_EASY) hungerRate *= 0.5f;
     else if (gameDifficulty == DIFFICULTY_HARD) hungerRate *= 1.5f;
     if (player.sprinting) hungerRate *= HUNGER_SPRINT_MULT;
-    player.hungerTimer += dt;
-    if (player.hungerTimer >= 1.0f / hungerRate) {
-        player.hungerTimer -= 1.0f / hungerRate;
-        if (player.hunger > 0) {
-            player.hunger--;
-            // Warn when hunger gets low (local player only)
-            if (!player.netControlled) {
-                if (player.hunger == 6) {
-                    ShowMessage(S(STR_MSG_HUNGRY), (Color){220, 180, 60, 255});
-                } else if (player.hunger == 2) {
-                    ShowMessage(S(STR_MSG_STARVING), (Color){240, 100, 60, 255});
+    if (gameMode != GAME_CREATIVE) {
+        player.hungerTimer += dt;
+        if (player.hungerTimer >= 1.0f / hungerRate) {
+            player.hungerTimer -= 1.0f / hungerRate;
+            if (player.hunger > 0) {
+                player.hunger--;
+                // Warn when hunger gets low (local player only)
+                if (!player.netControlled) {
+                    if (player.hunger == 6) {
+                        ShowMessage(S(STR_MSG_HUNGRY), (Color){220, 180, 60, 255});
+                    } else if (player.hunger == 2) {
+                        ShowMessage(S(STR_MSG_STARVING), (Color){240, 100, 60, 255});
+                    }
                 }
             }
         }
     }
 
-    // Hunger damage at 0 hunger
-    if (player.hunger <= 0) {
+    // Hunger damage at 0 hunger (creative: invincible)
+    if (player.hunger <= 0 && gameMode != GAME_CREATIVE) {
         player.hungerDamageTimer += dt;
         if (player.hungerDamageTimer >= 1.0f / HUNGER_DAMAGE_RATE) {
             player.hungerDamageTimer -= 1.0f / HUNGER_DAMAGE_RATE;
@@ -2115,7 +2140,8 @@ void TriggerCameraShake(float intensity, float duration)
 //----------------------------------------------------------------------------------
 void UpdateHotbar(void)
 {
-    if (inventoryOpen) return;
+    // Don't consume the mouse wheel while inventory or creative palette is open
+    if (inventoryOpen || creativeOpen) return;
 
     int oldSlot = player.selectedSlot;
 

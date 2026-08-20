@@ -197,6 +197,12 @@ bool SaveWorld(const char *path)
     ok = ok && fwrite(&weather.type, sizeof(int), 1, f) == 1;
     ok = ok && fwrite(&weather.duration, sizeof(float), 1, f) == 1;
 
+    // Game mode (v15+)
+    {
+        uint8_t gm = (uint8_t)gameMode;
+        ok = ok && fwrite(&gm, sizeof(uint8_t), 1, f) == 1;
+    }
+
     // Achievements (v9+)
     ok = ok && fwrite(achievements, sizeof(bool), ACH_COUNT, f) == ACH_COUNT;
     ok = ok && fwrite(&totalMobsKilled, sizeof(int), 1, f) == 1;
@@ -488,6 +494,14 @@ bool LoadWorld(const char *path)
             weather.rainAlpha = (weather.type == WEATHER_CLEAR) ? 0 : 1;
         } else {
             InitWeather();
+        }
+        // v15+: game mode
+        if (version >= 15) {
+            uint8_t gm;
+            if (fread(&gm, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            gameMode = (gm <= GAME_CREATIVE) ? (GameMode)gm : GAME_SURVIVAL;
+        } else {
+            gameMode = GAME_SURVIVAL;
         }
         // v9+: achievements. v9-v13 stored 6 achievements; v14+ stores ACH_COUNT.
         if (version >= 9) {
