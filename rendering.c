@@ -3134,8 +3134,8 @@ void DrawPauseMenu(void)
 
     int keyX = boxX + 30;
     int actX = boxX + 150;
-    const char *keys[] = { S(STR_KEY_WASD), S(STR_KEY_SPACE), S(STR_KEY_SHIFT), S(STR_KEY_LCLICK), S(STR_KEY_RCLICK), S(STR_KEY_E), S(STR_KEY_H), S(STR_KEY_F3), S(STR_KEY_ESC), S(STR_KEY_19) };
-    const char *acts[] = { S(STR_ACT_MOVE), S(STR_ACT_JUMP), S(STR_ACT_SPRINT), S(STR_ACT_BREAK), S(STR_ACT_PLACE), S(STR_ACT_INVENTORY), S(STR_ACT_HEAL), S(STR_ACT_DEBUG), S(STR_ACT_PAUSE), S(STR_ACT_HOTBAR) };
+    const char *keys[] = { S(STR_KEY_WASD), S(STR_KEY_SPACE), S(STR_KEY_CTRL), S(STR_KEY_SHIFT), S(STR_KEY_LCLICK), S(STR_KEY_RCLICK), S(STR_KEY_E), S(STR_KEY_H), S(STR_KEY_F3), S(STR_KEY_ESC), S(STR_KEY_19) };
+    const char *acts[] = { S(STR_ACT_MOVE), S(STR_ACT_JUMP), S(STR_ACT_SPRINT), S(STR_ACT_SNEAK), S(STR_ACT_BREAK), S(STR_ACT_PLACE), S(STR_ACT_INVENTORY), S(STR_ACT_HEAL), S(STR_ACT_DEBUG), S(STR_ACT_PAUSE), S(STR_ACT_HOTBAR) };
     int numControls = sizeof(keys) / sizeof(keys[0]);
 
     for (int i = 0; i < numControls; i++) {
@@ -3297,16 +3297,20 @@ void DrawDeathScreen(float dt)
         DrawGameText(scoreBuf, (SCREEN_WIDTH - scoreW) / 2, ty + 92, 16, (Color){220, 200, 120, textA});
     }
 
-    if (alpha > 0.8f) {
+    if (deathFadeTimer > DEATH_RESPAWN_READY_TIME) {
         float subFade = (alpha - 0.8f) * 5.0f;
         unsigned char subA = (unsigned char)(subFade * 255);
 
-        // Respawn button (MC-style; rect matches game.c hit-testing)
+        // Fixed logical button geometry keeps localization and scaling stable.
         const char *sub = S(STR_PRESS_SPACE_RESPAWN);
-        int subW = MeasureGameTextWidth(sub, 18);
-        float bounce = sinf(time * 3.0f) * 0.15f + 0.85f;
+        float bounce = sinf(time * 3.0f) * 0.08f + 0.92f;
         Vector2 dmouse = Win32GetMousePosition();
-        Rectangle respawnBtn = { (float)(SCREEN_WIDTH - subW) / 2, (float)(SCREEN_HEIGHT / 2 + 40), (float)subW, 30.0f };
+        Rectangle respawnBtn = {
+            (float)(SCREEN_WIDTH - DEATH_RESPAWN_BUTTON_W) / 2.0f,
+            (float)DEATH_RESPAWN_BUTTON_Y,
+            DEATH_RESPAWN_BUTTON_W,
+            DEATH_RESPAWN_BUTTON_H
+        };
         bool respawnHover = CheckCollisionPointRec(dmouse, respawnBtn);
         DrawUiButton(respawnBtn.x, respawnBtn.y, respawnBtn.width, respawnBtn.height,
                      sub, 18, respawnHover, false, true, subA * bounce);
@@ -3716,6 +3720,14 @@ void DrawMainMenu(void)
         DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 12, 18, 120});
     }
 
+    // Focused menu card: keeps the title and actions readable over the animated sky.
+    int menuCardX = (SCREEN_WIDTH - 560) / 2;
+    int menuCardY = 34;
+    DrawRoundedRect(menuCardX + 4, menuCardY + 6, 560, 650, 0.04f, (Color){0, 0, 0, 70});
+    DrawRoundedRect(menuCardX, menuCardY, 560, 650, 0.04f, (Color){14, 20, 32, 178});
+    DrawRectangleLines(menuCardX, menuCardY, 560, 650, (Color){110, 133, 164, 150});
+    DrawRectangle(menuCardX + 36, menuCardY + 2, 488, 2, (Color){84, 214, 160, 110});
+
     // ================================================================
     // Title — block-themed with decorative icons and sparkles
     // ================================================================
@@ -3872,7 +3884,7 @@ void DrawMainMenu(void)
         if (btnProgress > 1.0f) btnProgress = 1.0f;
         // Ease out quad
         float bp = 1.0f - (1.0f - btnProgress) * (1.0f - btnProgress);
-        float slideX = (1.0f - bp) * -50.0f;
+        float slideX = 0.0f;
         float btnAlpha = bp;
 
         int by = btnY + i * spacing;
@@ -3943,9 +3955,8 @@ void DrawMainMenu(void)
         DrawGameText(hint2, (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 12)) / 2, SCREEN_HEIGHT - 30, 12, (Color){100, 105, 120, (unsigned char)(hintFade * 90)});
     }
 
-    // Version — subtle
-    unsigned char va = (unsigned char)(hintFade * 80);
-    DrawGameText("v0.3", 12, SCREEN_HEIGHT - 16, 12, (Color){70, 72, 85, va});
+    // Version text intentionally omitted from the playable UI; keep the footer quiet.
+
 }
 
 //----------------------------------------------------------------------------------
@@ -3963,6 +3974,11 @@ void DrawSlotSelectScreen(void)
         unsigned char b = (unsigned char)(32 + t * 30 + sinf(time * 0.04f + y * 0.006f) * 6);
         DrawRectangle(0, y, SCREEN_WIDTH, 4, (Color){r, g, b, 255});
     }
+
+    // Shared screen card keeps slot content legible over the animated background.
+    DrawRoundedRect(270, 24, 740, 668, 0.035f, (Color){8, 14, 26, 185});
+    DrawRectangleLines(270, 24, 740, 668, (Color){88, 112, 145, 180});
+    DrawRectangle(320, 26, 640, 2, (Color){74, 157, 235, 120});
 
     // Title with gradient
     const char *title = (slotSelectMode == 0) ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
@@ -4226,9 +4242,9 @@ void DrawSettingsScreen(void)
 
     // Settings panel
     int panelW = 520;
-    int panelH = 620;
+    int panelH = 650;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
-    int panelY = 78;
+    int panelY = 60;
 
     // Panel shadow
     DrawRoundedRect(panelX + 3, panelY + 4, panelW, panelH, 0.03f, (Color){0, 0, 0, 45});
@@ -4334,7 +4350,23 @@ void DrawSettingsScreen(void)
     }
     sectionY += btnH + 10;
 
-    // DPI info
+    // Resolution presets keep the 1280x720 logical canvas intact.
+    DrawGameText(S(STR_RESOLUTION), leftX, sectionY, 13, (Color){170, 175, 190, 230});
+    sectionY += 20;
+    const char *resolutionNames[] = { S(STR_RES_960), S(STR_RES_1280), S(STR_RES_1600) };
+    int resolutionBtnW = 145;
+    for (int i = 0; i < 3; i++) {
+        int bx = leftX + i * (resolutionBtnW + btnGap);
+        Rectangle btn = { (float)bx, (float)sectionY, (float)resolutionBtnW, (float)btnH };
+        bool hover = CheckCollisionPointRec(mouse, btn);
+        bool sel = (resolutionPreset == i);
+        DrawUiButton(bx, sectionY, resolutionBtnW, btnH, resolutionNames[i], 13, hover, sel, true, 1.0f);
+        if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !sel) {
+            ApplyResolution(i);
+            PlaySoundUIClick();
+        }
+    }
+    sectionY += btnH + 10;
     Vector2 dpiScale = GetWindowScaleDPI();
     int mon = GetCurrentMonitor();
     int monW = GetMonitorWidth(mon);
@@ -4447,7 +4479,8 @@ void DrawSettingsScreen(void)
     const char *controls[] = {
         S(STR_KEY_WASD),    S(STR_ACT_MOVE),
         S(STR_KEY_SPACE),   S(STR_ACT_JUMP),
-        S(STR_KEY_SHIFT),   S(STR_ACT_SPRINT),
+        S(STR_KEY_CTRL),    S(STR_ACT_SPRINT),
+        S(STR_KEY_SHIFT),   S(STR_ACT_SNEAK),
         S(STR_KEY_LCLICK),  S(STR_ACT_BREAK),
         S(STR_KEY_RCLICK),  S(STR_ACT_PLACE),
         S(STR_KEY_E),       S(STR_ACT_INVENTORY),
@@ -4581,8 +4614,8 @@ void DrawEnchantingTableUI(void)
 
         // Click detection
         bool hover = Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
-                     GetMouseX() >= optX && GetMouseX() <= optX + optW &&
-                     GetMouseY() >= oy && GetMouseY() <= oy + optH;
+                     Win32GetMousePosition().x >= optX && Win32GetMousePosition().x <= optX + optW &&
+                     Win32GetMousePosition().y >= oy && Win32GetMousePosition().y <= oy + optH;
 
         if (hover && canAfford) {
             if (NetIsClient()) {

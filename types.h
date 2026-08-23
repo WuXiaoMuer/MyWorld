@@ -57,6 +57,12 @@ extern bool win32RMBPrev;
 
 // Win32 input functions
 void UpdateWin32Input(void);
+bool IsMoveLeftDown(void);
+bool IsMoveRightDown(void);
+bool IsJumpDown(void);
+bool IsJumpPressed(void);
+bool IsSprintDown(void);
+bool IsSneakDown(void);
 Vector2 Win32GetMousePosition(void);
 Vector2 Win32GetMouseDelta(void);
 bool Win32IsMouseButtonPressed(int button);
@@ -137,7 +143,10 @@ void InitWin32WheelHook(void);
 
 #define DEATH_Y             (WORLD_HEIGHT * BLOCK_SIZE + 500)
 #define MESSAGE_DURATION    2.0f
-
+#define DEATH_RESPAWN_BUTTON_W  300
+#define DEATH_RESPAWN_BUTTON_H  48
+#define DEATH_RESPAWN_BUTTON_Y  (SCREEN_HEIGHT / 2 + 28)
+#define DEATH_RESPAWN_READY_TIME 1.0f
 // Player status
 #define MAX_HEALTH          20
 #define MAX_HUNGER          20
@@ -501,6 +510,7 @@ typedef enum {
     STR_JOIN_CONNECTING,
     STR_HOST_PLAYERS_COUNT,
     STR_HOST_CANCEL_HINT,
+    STR_HOST_START_HINT,
     STR_JOIN_HELP_HINT,
     STR_JOIN_TAB_HINT,
     STR_OPEN_TO_LAN,
@@ -535,6 +545,7 @@ typedef enum {
     STR_KEY_WASD,
     STR_KEY_SPACE,
     STR_KEY_SHIFT,
+    STR_KEY_CTRL,
     STR_KEY_LCLICK,
     STR_KEY_RCLICK,
     STR_KEY_E,
@@ -547,6 +558,7 @@ typedef enum {
     STR_ACT_MOVE,
     STR_ACT_JUMP,
     STR_ACT_SPRINT,
+    STR_ACT_SNEAK,
     STR_ACT_BREAK,
     STR_ACT_PLACE,
     STR_ACT_INVENTORY,
@@ -613,6 +625,10 @@ typedef enum {
     STR_WINDOWED,
     STR_FULLSCREEN,
     STR_BORDERLESS,
+    STR_RESOLUTION,
+    STR_RES_960,
+    STR_RES_1280,
+    STR_RES_1600,
     STR_SECTION_LANGUAGE,
     STR_LANGUAGE,
     STR_SECTION_FONT,
@@ -1161,6 +1177,7 @@ typedef struct {
     float drownTimer;
     float hungerDamageTimer;
     float damageFlashTimer;  // Red flash when taking damage
+    float lavaDamageAccum;    // Fractional lava damage accumulator
     float knockbackTimer;    // Preserves horizontal velocity during knockback
     bool sprinting;
     bool playerDead;
@@ -1453,6 +1470,14 @@ extern int slotSelectMode; // 0=new game, 1=load game
 extern char currentSavePath[256];
 extern int slotScrollOffset;
 extern int windowMode; // 0=windowed, 1=fullscreen, 2=borderless
+extern int resolutionPreset; // 0=960x540, 1=1280x720, 2=1600x900
+extern RenderTexture2D logicalCanvas;
+extern bool logicalCanvasReady;
+extern Rectangle logicalViewport;
+extern float logicalScale;
+void ApplyResolution(int preset);
+void UpdateLogicalViewport(void);
+Vector2 Win32GetLogicalMousePosition(void);
 extern char seedInputBuf[32];
 extern int seedInputLen;
 

@@ -469,10 +469,10 @@ void PlayerPhysics(float dt)
             targetSpeed = player.moveInput * MOVE_SPEED;
         } else {
             // Local keyboard input: Ctrl=sprint, Shift=sneak
-            wantsSprint = Win32IsKeyDown(KEY_LEFT_CONTROL) || Win32IsKeyDown(KEY_RIGHT_CONTROL);
-            player.sneaking = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
-            bool left = Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
-            bool right = Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
+            wantsSprint = IsSprintDown();
+            player.sneaking = IsSneakDown();
+            bool left = IsMoveLeftDown();
+            bool right = IsMoveRightDown();
             if (left && !right) targetSpeed = -MOVE_SPEED;
             else if (right && !left) targetSpeed = MOVE_SPEED;
         }
@@ -568,8 +568,8 @@ void PlayerPhysics(float dt)
         jumpPressed = false; // jump is applied directly from network
         jumpHeld = player.jumpHeld;
     } else {
-        jumpPressed = Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE);
-        jumpHeld = Win32IsKeyDown(KEY_W) || Win32IsKeyDown(KEY_UP) || Win32IsKeyDown(KEY_SPACE);
+        jumpPressed = IsJumpPressed();
+        jumpHeld = IsJumpDown();
     }
     if (jumpPressed) {
         player.jumpBufferTimer = JUMP_BUFFER_TIME;
@@ -1009,6 +1009,7 @@ void PlayerBlockInteraction(void)
     }
 
     // Place block or eat food (right click, instant)
+    if (isSleeping) return;
     if (Win32IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
         // Interact with bed (set spawn point or sleep)
         if (blockX >= 0 && blockX < WORLD_WIDTH && blockY >= 0 && blockY < WORLD_HEIGHT) {
@@ -1435,7 +1436,14 @@ void PlayerBlockInteraction(void)
         if (selectedTool == ITEM_WATER_BUCKET) {
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 SetWaterSource(blockX, blockY);
-                if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_BUCKET; // Empty bucket
+                if (gameMode != GAME_CREATIVE) {
+                    if (player.inventoryCount[player.selectedSlot] > 1) {
+                        player.inventoryCount[player.selectedSlot]--;
+                    } else {
+                        player.inventory[player.selectedSlot] = ITEM_BUCKET;
+                        player.inventoryCount[player.selectedSlot] = 1;
+                    }
+                }
                 PlaySoundPlace(BLOCK_WATER);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -1466,7 +1474,14 @@ void PlayerBlockInteraction(void)
             if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
                 if (world[blockX][blockY] == BLOCK_WATER) RemoveWaterAt(blockX, blockY);
                 SetLavaSource(blockX, blockY);
-                if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_BUCKET;
+                if (gameMode != GAME_CREATIVE) {
+                    if (player.inventoryCount[player.selectedSlot] > 1) {
+                        player.inventoryCount[player.selectedSlot]--;
+                    } else {
+                        player.inventory[player.selectedSlot] = ITEM_BUCKET;
+                        player.inventoryCount[player.selectedSlot] = 1;
+                    }
+                }
                 PlaySoundPlace(BLOCK_LAVA);
                 UpdateLightAt(blockX, blockY);
                 InvalidateChunkAt(blockX, blockY);
@@ -1900,15 +1915,22 @@ void UpdatePlayerStatus(float dt)
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
         if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_LAVA && gameMode != GAME_CREATIVE) {
-            player.health -= 4.0f * dt; // 4 hearts/sec in lava
-            if (player.health < 0) player.health = 0;
-            if (!player.netControlled) pendingDeathCause = STR_DEATH_LAVA;
-            player.damageFlashTimer = 0.3f;
-            if (!player.netControlled && player.health > 0) PlaySoundHurt();
+            player.lavaDamageAccum += 4.0f * dt;
+            int damage = (int)player.lavaDamageAccum;
+            if (damage > 0) {
+                player.lavaDamageAccum -= damage;
+                player.health -= damage;
+                if (player.health < 0) player.health = 0;
+                if (!player.netControlled) pendingDeathCause = STR_DEATH_LAVA;
+                player.damageFlashTimer = 0.3f;
+                if (!player.netControlled && player.health > 0) PlaySoundHurt();
+            }
             // Fire particles
             SpawnDamageParticles(player.position.x + PLAYER_WIDTH / 2,
                                  player.position.y + PLAYER_HEIGHT / 2,
                                  (Color){255, 150, 30, 255});
+        } else {
+            player.lavaDamageAccum = 0.0f;
         }
     }
 
@@ -2061,8 +2083,8 @@ void RespawnPlayer(void)
     player.hungerTimer = 0.0f;
     player.regenTimer = 0.0f;
     player.drownTimer = 0.0f;
-    player.hungerDamageTimer = 0.0f;
     player.damageFlashTimer = 0.0f;
+    player.lavaDamageAccum = 0.0f;
     player.knockbackTimer = 0.0f;
     player.sprinting = false;
     player.playerDead = false;

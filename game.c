@@ -13,19 +13,39 @@
 // Window Mode Management
 //----------------------------------------------------------------------------------
 static int savedWinX = 0, savedWinY = 0, savedWinW = SCREEN_WIDTH, savedWinH = SCREEN_HEIGHT;
+static const int resolutionWidths[] = { 960, 1280, 1600 };
+static const int resolutionHeights[] = { 540, 720, 900 };
+
+void ApplyResolution(int preset)
+{
+    if (preset < 0 || preset >= 3) preset = 1;
+    resolutionPreset = preset;
+    if (windowMode == 0) {
+        int width = resolutionWidths[preset];
+        int height = resolutionHeights[preset];
+        int monW = GetMonitorWidth(GetCurrentMonitor());
+        int monH = GetMonitorHeight(GetCurrentMonitor());
+        if (width > monW - 32) width = monW - 32;
+        if (height > monH - 64) height = monH - 64;
+        if (width < 640) width = 640;
+        if (height < 360) height = 360;
+        SetWindowSize(width, height);
+    }
+}
+
 
 void ApplyWindowMode(int mode)
 {
-    if (mode == windowMode) return;
+    if (mode < 0 || mode > 2) mode = 0;
 
     int monW = GetMonitorWidth(GetCurrentMonitor());
     int monH = GetMonitorHeight(GetCurrentMonitor());
 
     if (mode == 0) {
-        // Windowed: restore previous size
+        // Windowed: restore the selected preset and previous position
         if (IsWindowFullscreen()) ToggleFullscreen();
         ClearWindowState(FLAG_WINDOW_UNDECORATED);
-        SetWindowSize(savedWinW, savedWinH);
+        SetWindowSize(resolutionWidths[resolutionPreset], resolutionHeights[resolutionPreset]);
         SetWindowPosition(savedWinX, savedWinY);
     } else if (mode == 1) {
         // Exclusive fullscreen
@@ -776,6 +796,23 @@ static void UpdateMainMenu(float dt)
             }
         }
 
+        // Play one click sound for the visible button that was activated.
+        if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            bool hasSave = false;
+            for (int s = 0; s < MAX_SAVE_SLOTS; s++) {
+                SaveSlotInfo info;
+                if (GetSlotInfo(s, &info) && info.exists) { hasSave = true; break; }
+            }
+            for (int i = 0; i < btnCount; i++) {
+                bool enabled = (i != 1 || hasSave);
+                Rectangle button = btns[i];
+                if (enabled && CheckCollisionPointRec(mouse, button)) {
+                    PlaySoundUIClick();
+                    break;
+                }
+            }
+        }
+
         // Click
         if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             // Easter egg: poke the title 5 times
@@ -1207,7 +1244,10 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
     if (item == ITEM_WATER_BUCKET) {
         if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
         SetWaterSource(bx, by);
-        if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
+        if (gameMode != GAME_CREATIVE) {
+            if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
+            else { p->inventory[slot] = ITEM_BUCKET; p->inventoryCount[slot] = 1; }
+        }
         NetSyncBlockChange(bx, by, BLOCK_WATER);
         return true;
     }
@@ -1215,7 +1255,10 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
         if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
         if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
         SetLavaSource(bx, by);
-        if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
+        if (gameMode != GAME_CREATIVE) {
+            if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
+            else { p->inventory[slot] = ITEM_BUCKET; p->inventoryCount[slot] = 1; }
+        }
         NetSyncBlockChange(bx, by, BLOCK_LAVA);
         return true;
     }
@@ -1316,7 +1359,10 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
     if (item == ITEM_WATER_BUCKET) {
         if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
             SetWaterSource(bx, by);
-            if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
+            if (gameMode != GAME_CREATIVE) {
+                if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
+                else { p->inventory[slot] = ITEM_BUCKET; p->inventoryCount[slot] = 1; }
+            }
             NetSyncBlockChange(bx, by, BLOCK_WATER);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -1327,7 +1373,10 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
         if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
             if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
             SetLavaSource(bx, by);
-            if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_BUCKET;
+            if (gameMode != GAME_CREATIVE) {
+                if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
+                else { p->inventory[slot] = ITEM_BUCKET; p->inventoryCount[slot] = 1; }
+            }
             NetSyncBlockChange(bx, by, BLOCK_LAVA);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -2258,7 +2307,9 @@ void UpdateGame(float dt)
             }
         }
         // Enter to start game (host can start alone or with players)
-        if (Win32IsKeyPressed(KEY_ENTER) || Win32IsKeyPressed(KEY_SPACE)) {
+        if (Win32IsKeyPressed(KEY_ENTER) || Win32IsKeyPressed(KEY_SPACE) ||
+            (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) &&
+             CheckCollisionPointRec(Win32GetMousePosition(), (Rectangle){370, 340, 540, 46}))) {
             localPlayerId = 0;
             StartTransition(STATE_PLAYING);
             PlaySoundUIClick();
@@ -2379,6 +2430,9 @@ void UpdateGame(float dt)
         return;
     }
 
+    // Sleep fade is a visual/time transition and must not be blocked by UI pause.
+    UpdateDayNight(dt);
+
     // Auto-save every 5 minutes
     {
         static float autoSaveTimer = 0.0f;
@@ -2397,6 +2451,16 @@ void UpdateGame(float dt)
 
     // Death respawn input
     if (player.playerDead) {
+        // Keep the world/server alive while the local player is dead. Do not
+        // process player input, but continue mob simulation and networking.
+        if (NetIsClient()) {
+            NetPoll();
+        } else {
+            UpdateMobs(dt);
+            UpdateProjectiles(dt);
+            UpdateEntities(dt);
+            UpdateParticles(dt);
+        }
         if (GetDeathFadeTimer() > 1.0f) {
             if (Win32IsKeyPressed(KEY_SPACE)) {
                 RespawnPlayer();
@@ -2404,8 +2468,12 @@ void UpdateGame(float dt)
             // Mouse click on respawn text
             Vector2 mpos = Win32GetMousePosition();
             const char *rsText = S(STR_PRESS_SPACE_RESPAWN);
-            int rsW = MeasureGameTextWidth(rsText, 18);
-            Rectangle rsRect = { (float)(SCREEN_WIDTH - rsW) / 2, (float)(SCREEN_HEIGHT / 2 + 40), (float)rsW, 30.0f };
+            Rectangle rsRect = {
+                (float)(SCREEN_WIDTH - DEATH_RESPAWN_BUTTON_W) / 2.0f,
+                (float)DEATH_RESPAWN_BUTTON_Y,
+                DEATH_RESPAWN_BUTTON_W,
+                DEATH_RESPAWN_BUTTON_H
+            };
             if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(mpos, rsRect)) {
                 RespawnPlayer();
             }
@@ -3174,7 +3242,6 @@ void UpdateGame(float dt)
             // Pickup items for host player only (clients pick up on their side)
             PickupAndSyncItems(player.position.x, player.position.y, 0);
             UpdateCameraSystem(dt);
-            UpdateDayNight(dt);
             UpdateWeather(dt);
             UpdateRainAmbient();
             UpdateAmbientSounds();
@@ -3259,13 +3326,13 @@ void UpdateGame(float dt)
                 if (inputTickTimer >= NET_TICK_INTERVAL) {
                     inputTickTimer = 0.0f;
                     // Capture raw keyboard state
-                    bool left = Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
-                    bool right = Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
+                    bool left = IsMoveLeftDown();
+                    bool right = IsMoveRightDown();
                     float moveX = 0.0f;
                     if (left && !right) moveX = -1.0f;
                     else if (right && !left) moveX = 1.0f;
-                    bool jumpKey = Win32IsKeyDown(KEY_W) || Win32IsKeyDown(KEY_UP) || Win32IsKeyDown(KEY_SPACE);
-                    bool sprintKey = Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
+                    bool jumpKey = IsJumpDown();
+                    bool sprintKey = IsSprintDown();
                     PktInput input;
                     input.moveX = moveX;
                     input.jump = jumpKey;
@@ -3553,7 +3620,6 @@ void UpdateGame(float dt)
             UpdateParticles(dt);
             PickupNearbyItems(player.position.x, player.position.y);
             UpdateCameraSystem(dt);
-            UpdateDayNight(dt);
             UpdateWeather(dt);
             UpdateRainAmbient();
             UpdateAmbientSounds();
@@ -3612,37 +3678,41 @@ void UpdateGame(float dt)
 void DrawGame(void)
 {
     BeginDrawing();
+    if (logicalCanvasReady) {
+        BeginTextureMode(logicalCanvas);
+    }
     ClearBackground(GetSkyColor());
 
     if (gameState == STATE_MENU) {
         DrawBackground();
         DrawMainMenu();
-        DrawFPS(SCREEN_WIDTH - 80, 10);
+        if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
         DrawTransition();
-        EndDrawing();
-        return;
+        goto draw_finish;
     }
 
     if (gameState == STATE_SLOT_SELECT) {
         DrawSlotSelectScreen();
-        DrawFPS(SCREEN_WIDTH - 80, 10);
+        if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
         DrawTransition();
-        EndDrawing();
-        return;
+        goto draw_finish;
     }
 
     if (gameState == STATE_SETTINGS) {
         DrawSettingsScreen();
-        DrawFPS(SCREEN_WIDTH - 80, 10);
+        if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
         DrawTransition();
-        EndDrawing();
-        return;
+        goto draw_finish;
     }
 
     if (gameState == STATE_HOST_WAITING) {
         DrawBackground();
         // Dark overlay
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 160});
+        // Centered host card and explicit start affordance.
+        DrawRectangle(300, 140, 680, 390, (Color){10, 16, 28, 225});
+        DrawRectangleLines(300, 140, 680, 390, (Color){88, 112, 145, 220});
+        DrawRectangle(350, 142, 580, 2, (Color){255, 185, 90, 180});
         // Title
         const char *title = S(STR_HOST_WAITING);
         int titleW = MeasureGameTextWidth(title, 32);
@@ -3658,15 +3728,16 @@ void DrawGame(void)
         char countMsg[64];
         snprintf(countMsg, sizeof(countMsg), S(STR_HOST_PLAYERS_COUNT), NetGetPlayerCount(), NET_MAX_PLAYERS);
         int countW = MeasureGameTextWidth(countMsg, 20);
-        DrawGameText(countMsg, (SCREEN_WIDTH - countW) / 2, 300, 20, (Color){160, 255, 160, 220});
+        const char *startHint = S(STR_HOST_START_HINT);
+        DrawUiButton((SCREEN_WIDTH - 300) / 2, 340, 300, 46, startHint, 16,
+                     false, true, true, 1.0f);
         // ESC hint
         const char *hint = S(STR_HOST_CANCEL_HINT);
         int hintW = MeasureGameTextWidth(hint, 18);
         DrawGameText(hint, (SCREEN_WIDTH - hintW) / 2, 400, 18, (Color){150, 150, 170, 180});
-        DrawFPS(SCREEN_WIDTH - 80, 10);
+        if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
         DrawTransition();
-        EndDrawing();
-        return;
+        goto draw_finish;
     }
 
     if (gameState == STATE_JOIN_GAME) {
@@ -3737,10 +3808,9 @@ void DrawGame(void)
             dotsBuf[dots] = '\0';
             DrawGameText(dotsBuf, (SCREEN_WIDTH + titleW) / 2 + 4, 260, 32, (Color){200, 220, 255, 200});
         }
-        DrawFPS(SCREEN_WIDTH - 80, 10);
+        if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
         DrawTransition();
-        EndDrawing();
-        return;
+        goto draw_finish;
     }
 
     DrawBackground();
@@ -3796,18 +3866,21 @@ void DrawGame(void)
         DrawRectangle(SCREEN_WIDTH - 30, 0, 30, SCREEN_HEIGHT, (Color){150, 0, 0, (unsigned char)(vignetteA * 0.6f)});
     }
 
-    DrawHotbar();
-    DrawPlayerStatus();
-    DrawDebugInfo();
-    DrawMinimap();
-    DrawMessage();
-    DrawChatUI();
+    bool deadModal = player.playerDead;
+    if (!deadModal) {
+        DrawHotbar();
+        DrawPlayerStatus();
+        DrawDebugInfo();
+        DrawMinimap();
+        DrawMessage();
+        DrawChatUI();
 
-    DrawInventoryScreen();
-    DrawCreativeScreen();
-    DrawTradeUI();
-    DrawEnchantingTableUI();
-    DrawPauseMenu();
+        DrawInventoryScreen();
+        DrawCreativeScreen();
+        DrawTradeUI();
+        DrawEnchantingTableUI();
+        DrawPauseMenu();
+    }
     DrawDeathScreen(GetFrameTime());
 
     // Sleep transition overlay (fade to black while sleeping)
@@ -3817,11 +3890,22 @@ void DrawGame(void)
     }
 
     // Large map overlay (draws on top of everything)
-    if (showLargeMap) DrawLargeMap();
+    if (!player.playerDead && showLargeMap) DrawLargeMap();
 
-    DrawFPS(SCREEN_WIDTH - 80, 10);
+    if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
 
     DrawTransition();
+draw_finish:
+    if (logicalCanvasReady) {
+        EndTextureMode();
+        int outputW = GetScreenWidth();
+        int outputH = GetScreenHeight();
+        UpdateLogicalViewport();
+        ClearBackground((Color){ 8, 10, 18, 255 });
+        Rectangle source = { 0, 0, (float)logicalCanvas.texture.width, -(float)logicalCanvas.texture.height };
+        Rectangle dest = logicalViewport;
+        DrawTexturePro(logicalCanvas.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
+    }
     EndDrawing();
 }
 
@@ -3839,6 +3923,7 @@ void UnloadGame(void)
             fprintf(f, "bgm_volume=%.2f\n", bgmVolumeSlider);
             fprintf(f, "sfx_volume=%.2f\n", sfxVolumeSlider);
             fprintf(f, "window_mode=%d\n", windowMode);
+            fprintf(f, "resolution=%d\n", resolutionPreset);
             fprintf(f, "difficulty=%d\n", (int)gameDifficulty);
             fprintf(f, "font_custom=%d\n", useCustomFont ? 1 : 0);
             if (customFontPath[0]) fprintf(f, "font_path=%s\n", customFontPath);
@@ -3886,6 +3971,9 @@ void LoadSettings(void)
         } else if (strncmp(line, "window_mode=", 12) == 0) {
             int v = atoi(line + 12);
             if (v >= 0 && v <= 2) windowMode = v;
+        } else if (strncmp(line, "resolution=", 11) == 0) {
+            int v = atoi(line + 11);
+            if (v >= 0 && v < 3) resolutionPreset = v;
         } else if (strncmp(line, "font_custom=", 12) == 0) {
             // Will be applied after font loading
         } else if (strncmp(line, "font_path=", 10) == 0) {

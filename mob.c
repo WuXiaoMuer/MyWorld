@@ -355,6 +355,11 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].burnTimer = 0.0f;
             mobs[i].fireTimer = 0.0f;
             mobs[i].despawnTimer = MOB_DESPAWN_TIME;
+    mobs[i].slimeType = 0;
+    mobs[i].fireDmgAccum = 0.0f;
+    mobs[i].loveTimer = 0.0f;
+    mobs[i].isBaby = false;
+    mobs[i].growTimer = 0.0f;
             mobs[i].active = true;
             return &mobs[i];
         }
@@ -393,18 +398,47 @@ static void UpdateMobPhysics(Mob *mob, float dt)
     }
 
     if (hBlocked) {
-        mob->velocity.x = 0;
-        // Try to jump over obstacle (zombies, creepers)
-        if (mob->onGround && (mob->type == MOB_ZOMBIE || mob->type == MOB_CREEPER)) {
-            mob->velocity.y = -300.0f;
-            mob->onGround = false;
+        bool stepped = false;
+        // Give every grounded mob a one-block step before turning. This keeps
+        // passive animals and skeletons from freezing against small rises.
+        if (mob->onGround) {
+            float stepY = mob->position.y - BLOCK_SIZE;
+            int stepMinBY = (int)stepY / BLOCK_SIZE;
+            int stepMaxBY = (int)(stepY + h - 1) / BLOCK_SIZE;
+            bool stepClear = stepY >= 0.0f;
+            for (int bx = minBX; bx <= maxBX && stepClear; bx++) {
+                for (int by = stepMinBY; by <= stepMaxBY; by++) {
+                    if (IsBlockSolid(bx, by)) { stepClear = false; break; }
+                }
+            }
+            if (stepClear) {
+                mob->position.x = newX;
+                mob->position.y = stepY;
+                mob->velocity.y = 0.0f;
+                stepped = true;
+            }
         }
-        // Spiders climb walls
-        if (mob->type == MOB_SPIDER) {
-            mob->velocity.y = SPIDER_WALL_CLIMB_VEL;
+        if (!stepped) {
+            mob->velocity.x = -mob->velocity.x;
+            if (fabsf(mob->velocity.x) < 1.0f) mob->velocity.x = mob->facingRight ? -mobSpeed[mob->type] * 0.5f : mobSpeed[mob->type] * 0.5f;
+            mob->facingRight = mob->velocity.x > 0.0f;
+            // Try to jump over obstacle (zombies, creepers)
+            if (mob->onGround && (mob->type == MOB_ZOMBIE || mob->type == MOB_CREEPER)) {
+                mob->velocity.y = -300.0f;
+                mob->onGround = false;
+            }
+            // Spiders climb walls
+            if (mob->type == MOB_SPIDER) mob->velocity.y = SPIDER_WALL_CLIMB_VEL;
         }
     } else {
         mob->position.x = newX;
+    }
+
+    // Clamp mobs back into the world if a collision left them at an edge.
+    if (mob->position.x < 0.0f) { mob->position.x = 0.0f; mob->velocity.x = fabsf(mob->velocity.x); }
+    if (mob->position.x + w > WORLD_WIDTH * BLOCK_SIZE) {
+        mob->position.x = WORLD_WIDTH * BLOCK_SIZE - w;
+        mob->velocity.x = -fabsf(mob->velocity.x);
     }
 
     // Vertical movement with collision
@@ -1237,6 +1271,7 @@ static void TrySpawnMobs(float dt)
 
 void UpdateMobs(float dt)
 {
+    static float lavaDamageAccum[MAX_MOBS] = { 0 };
     TrySpawnMobs(dt);
 
     float playerCX = player.position.x + PLAYER_WIDTH / 2;
@@ -1314,6 +1349,35 @@ void UpdateMobs(float dt)
             }
             continue;
         }
+
+        // Mobs take periodic damage while standing in lava. Use the same
+        // logical block coordinates as collision so every mob type is covered.
+        {
+            int minBX = (int)(mob->position.x / BLOCK_SIZE);
+            int maxBX = (int)((mob->position.x + GetMobWidth(mob->type) - 0.01f) / BLOCK_SIZE);
+            int minBY = (int)(mob->position.y / BLOCK_SIZE);
+            int maxBY = (int)((mob->position.y + GetMobHeight(mob->type) - 0.01f) / BLOCK_SIZE);
+            bool inLava = false;
+            for (int bx = minBX; bx <= maxBX && !inLava; bx++) {
+                for (int by = minBY; by <= maxBY; by++) {
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT &&
+                        world[bx][by] == BLOCK_LAVA) {
+                        inLava = true;
+                        break;
+                    }
+                }
+            }
+            if (inLava) {
+                lavaDamageAccum[i] += dt;
+                while (lavaDamageAccum[i] >= 0.5f && mob->deathTimer <= 0.0f) {
+                    DamageMob(mob, 2);
+                    lavaDamageAccum[i] -= 0.5f;
+                }
+            } else {
+                lavaDamageAccum[i] = 0.0f;
+            }
+        }
+        if (mob->deathTimer > 0.0f) continue;
 
         // AI
         if (mob->type == MOB_ZOMBIE) UpdateZombieAI(mob, dt);

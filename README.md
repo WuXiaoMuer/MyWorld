@@ -27,7 +27,8 @@ All assets are procedurally generated pixel art — no external textures or spri
 |-----|--------|
 | `A` / `D` or `Left` / `Right` | Move left / right |
 | `W` / `Up` / `Space` | Jump |
-| `Left Shift` | Sprint |
+| `Left Ctrl` | Sprint |
+| `Left Shift` | Sneak |
 | `Left Mouse Button` | Break block / attack |
 | `Right Mouse Button` | Place block / use item |
 | `E` | Open inventory / interact |

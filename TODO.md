@@ -29,7 +29,7 @@
 
 ## Polish TODO
 
-- [ ] Resolution option in settings
-- [ ] Creative mode
-- [ ] Key rebinding
+- [x] Resolution option in settings (16:9 presets with fixed logical canvas)
+- [x] Creative mode
+- [x] Key rebinding foundation (centralized movement/sprint/sneak/jump actions)
 - [ ] More biomes/mobs

@@ -767,8 +767,12 @@ void PlaySoundDrink(void) {
 }
 
 void PlaySoundUIClick(void) {
-    if (!IsAudioDeviceReady()) return;
-    SetSoundVolume(sndClick, sfxVolume);
+    static double lastClickTime = -1.0;
+    double now = GetTime();
+    if (!audioReady || !IsAudioDeviceReady() || sndClick.frameCount <= 0 || sfxVolume <= 0.001f) return;
+    if (lastClickTime >= 0.0 && now - lastClickTime < 0.06) return;
+    lastClickTime = now;
+    SetSoundVolume(sndClick, sfxVolume * 0.8f);
     PlaySound(sndClick);
 }
 

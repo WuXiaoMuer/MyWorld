@@ -61,8 +61,22 @@ static void ResetAllInputState(void)
     memset(keyPrev, 0, sizeof(keyPrev));
 }
 
+void UpdateLogicalViewport(void)
+{
+    int outputW = GetScreenWidth();
+    int outputH = GetScreenHeight();
+    if (outputW <= 0 || outputH <= 0) return;
+    logicalScale = fminf((float)outputW / SCREEN_WIDTH, (float)outputH / SCREEN_HEIGHT);
+    if (logicalScale <= 0.0f) logicalScale = 1.0f;
+    logicalViewport.width = SCREEN_WIDTH * logicalScale;
+    logicalViewport.height = SCREEN_HEIGHT * logicalScale;
+    logicalViewport.x = (outputW - logicalViewport.width) * 0.5f;
+    logicalViewport.y = (outputH - logicalViewport.height) * 0.5f;
+}
+
 void UpdateWin32Input(void)
 {
+    UpdateLogicalViewport();
     // Save previous mouse state
     win32MousePrevX = win32MouseX;
     win32MousePrevY = win32MouseY;
@@ -102,9 +116,53 @@ void UpdateWin32Input(void)
     win32RMB = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 }
 
-Vector2 Win32GetMousePosition(void)
+bool IsMoveLeftDown(void)
+{
+    return Win32IsKeyDown(KEY_A) || Win32IsKeyDown(KEY_LEFT);
+}
+
+bool IsMoveRightDown(void)
+{
+    return Win32IsKeyDown(KEY_D) || Win32IsKeyDown(KEY_RIGHT);
+}
+
+bool IsJumpDown(void)
+{
+    return Win32IsKeyDown(KEY_W) || Win32IsKeyDown(KEY_UP) || Win32IsKeyDown(KEY_SPACE);
+}
+
+bool IsJumpPressed(void)
+{
+    return Win32IsKeyPressed(KEY_W) || Win32IsKeyPressed(KEY_UP) || Win32IsKeyPressed(KEY_SPACE);
+}
+
+bool IsSprintDown(void)
+{
+    return Win32IsKeyDown(KEY_LEFT_CONTROL) || Win32IsKeyDown(KEY_RIGHT_CONTROL);
+}
+
+bool IsSneakDown(void)
+{
+    return Win32IsKeyDown(KEY_LEFT_SHIFT) || Win32IsKeyDown(KEY_RIGHT_SHIFT);
+}
+
+static Vector2 GetRawWin32MousePosition(void)
 {
     return (Vector2){ (float)win32MouseX, (float)win32MouseY };
+}
+
+Vector2 Win32GetMousePosition(void)
+{
+    return Win32GetLogicalMousePosition();
+}
+
+Vector2 Win32GetLogicalMousePosition(void)
+{
+    Vector2 mouse = GetRawWin32MousePosition();
+    if (logicalScale <= 0.0f) return mouse;
+    mouse.x = (mouse.x - logicalViewport.x) / logicalScale;
+    mouse.y = (mouse.y - logicalViewport.y) / logicalScale;
+    return mouse;
 }
 
 Vector2 Win32GetMouseDelta(void)
@@ -344,6 +402,11 @@ int selectedSaveSlot = -1;
 int slotSelectMode = 0; // 0=new game, 1=load game
 int slotScrollOffset = 0;
 int windowMode = 0; // 0=windowed, 1=fullscreen, 2=borderless
+int resolutionPreset = 1;
+RenderTexture2D logicalCanvas = { 0 };
+bool logicalCanvasReady = false;
+Rectangle logicalViewport = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+float logicalScale = 1.0f;
 char seedInputBuf[32] = { 0 };
 int seedInputLen = 0;
 
@@ -423,6 +486,9 @@ static void AudioLoadThread(void *arg)
 int main(void)
 {
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "MyWorld");
+    UpdateLogicalViewport();
+    logicalCanvas = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
+    logicalCanvasReady = logicalCanvas.texture.id != 0;
     SetTargetFPS(60);
     SetExitKey(0);
     SetWindowState(FLAG_WINDOW_ALWAYS_RUN);
@@ -433,6 +499,7 @@ int main(void)
 
     // Pre-init: load systems needed for menu rendering
     LoadSettings();
+    ApplyResolution(resolutionPreset);
     if (windowMode != 0) ApplyWindowMode(windowMode);
     LoadGameFont();
     GenerateBlockAtlas();
@@ -450,6 +517,7 @@ int main(void)
     }
 
     UnloadGame();
+    if (logicalCanvasReady) UnloadRenderTexture(logicalCanvas);
     CloseWindow();
     return 0;
 }

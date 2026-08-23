@@ -9,6 +9,8 @@ float sleepFade = 0.0f;
 static void UpdateSleep(float dt)
 {
     if (!isSleeping) return;
+    if (dt < 0.0f) dt = 0.0f;
+    if (dt > 0.1f) dt = 0.1f;
 
     if (sleepFade < 1.0f) {
         // Phase A: fading out
@@ -26,6 +28,8 @@ static void UpdateSleep(float dt)
             isSleeping = false;
         }
     }
+    if (sleepFade < 0.0f) sleepFade = 0.0f;
+    if (sleepFade > 1.0f) sleepFade = 1.0f;
 }
 
 void InitDayNight(void)
