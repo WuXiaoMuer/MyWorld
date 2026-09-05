@@ -406,17 +406,10 @@ void NetPoll(void)
 
             if (fromId >= 0) {
                 netClients[fromId].lastSeen = NetGetTime();
-                // Track highest received sequence for ACK
-                if (hdr->seq > 0 && hdr->seq > netClients[fromId].lastRecvSeq) {
-                    netClients[fromId].lastRecvSeq = hdr->seq;
-                }
             }
         } else {
             // Client: packets come from server (slot 0)
             fromId = 0;
-            if (hdr->seq > 0 && hdr->seq > netClients[0].lastRecvSeq) {
-                netClients[0].lastRecvSeq = hdr->seq;
-            }
         }
 
         if (fromId < 0) continue;
@@ -439,6 +432,10 @@ void NetPoll(void)
             if (diff <= 0 && diff > -32) {
                 continue; // Already received or too old
             }
+        }
+
+        if (hdr->seq > 0) {
+            netClients[fromId].lastRecvSeq = hdr->seq;
         }
 
         // Store in receive buffer

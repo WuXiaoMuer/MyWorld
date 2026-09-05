@@ -55,6 +55,9 @@ typedef enum {
     PKT_DISCONNECT,         // Bidirectional: disconnect notice
     PKT_PING,               // Bidirectional: keepalive
     PKT_GAMEMODE_SYNC,      // Server -> Client: game mode changed
+    PKT_FLUID_REQUEST,       // Client -> host: validated bucket action
+    PKT_FLUID_DELTA,         // Host -> clients: authoritative fluid cells
+    PKT_FLUID_SNAPSHOT       // Host -> joining client: fluid state batch
 } PacketType;
 
 //----------------------------------------------------------------------------------
@@ -66,9 +69,33 @@ typedef struct {
     uint16_t ack;           // Acknowledgment of last received seq
 } PacketHeader;
 
-//----------------------------------------------------------------------------------
-// Packet Payloads
-//----------------------------------------------------------------------------------
+#define FLUID_REQUEST_PLACE    0
+#define FLUID_REQUEST_COLLECT  1
+#define FLUID_REQUEST_BEGIN_SNAPSHOT 2
+#define FLUID_REQUEST_ACK_SNAPSHOT   3
+
+typedef struct {
+    uint16_t x, y;
+    uint8_t action;
+    uint8_t slot;
+} PktFluidRequest;
+
+typedef struct {
+    uint16_t x, y;
+    uint8_t blockType;
+    uint8_t kind;
+    uint8_t level;
+    uint8_t source;
+} PktFluidCell;
+
+typedef struct {
+    uint16_t snapshotId;
+    uint16_t batchIndex;
+    uint16_t batchCount;
+    uint8_t count;
+} PktFluidSnapshotHeader;
+
+
 
 // PKT_JOIN
 typedef struct {

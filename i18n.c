@@ -185,6 +185,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ACH_BREEDER] = "Breeder - Raise a baby animal",
     [STR_ACH_ENCHANTER] = "Enchanter - Enchant an item",
     [STR_ACH_DEMOLITION] = "Demolition - Detonate TNT",
+    [STR_COLLECTION_TITLE] = "Collection",
+    [STR_COLLECTION_CHALLENGES] = "Electronic Challenges",
+    [STR_COLLECTION_UNLOCKED] = "Unlocked",
+    [STR_COLLECTION_LOCKED] = "Locked",
+    [STR_COLLECTION_CLOSE] = "I / ESC: Close",
 
     // Status Messages
     [STR_MSG_GAME_SAVED] = "Game Saved",
@@ -747,6 +752,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ACH_BREEDER] = "繁育者 - 培育幼崽动物",
     [STR_ACH_ENCHANTER] = "附魔师 - 附魔一件物品",
     [STR_ACH_DEMOLITION] = "爆破手 - 引爆 TNT",
+    [STR_COLLECTION_TITLE] = "藏品",
+    [STR_COLLECTION_CHALLENGES] = "电子竞赛挑战",
+    [STR_COLLECTION_UNLOCKED] = "已解锁",
+    [STR_COLLECTION_LOCKED] = "未解锁",
+    [STR_COLLECTION_CLOSE] = "I / ESC：关闭",
 
     [STR_MSG_GAME_SAVED] = "游戏已保存",     // 游戏已保存
     [STR_MSG_HEALED_XP] = "用XP治疗了!",         // 用XP治疗了!
@@ -1303,6 +1313,11 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ACH_BREEDER] = "繁殖家 - 赤ちゃん動物を育てる",
     [STR_ACH_ENCHANTER] = "エンチャンター - アイテムにエンチャント",
     [STR_ACH_DEMOLITION] = "爆破屋 - TNTを爆発させる",
+    [STR_COLLECTION_TITLE] = "コレクション",
+    [STR_COLLECTION_CHALLENGES] = "電子チャレンジ",
+    [STR_COLLECTION_UNLOCKED] = "解除済み",
+    [STR_COLLECTION_LOCKED] = "未解除",
+    [STR_COLLECTION_CLOSE] = "I / ESC：閉じる",
 
     [STR_MSG_GAME_SAVED] = "セーブしました",  // セーブしました
     [STR_MSG_HEALED_XP] = "XPで治癒しました!",  // XPで治療しました!

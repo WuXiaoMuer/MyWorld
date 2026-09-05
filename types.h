@@ -79,6 +79,8 @@ void InitWin32WheelHook(void);
 //----------------------------------------------------------------------------------
 #define SCREEN_WIDTH        1280
 #define SCREEN_HEIGHT       720
+#define SIM_TICK_RATE       20
+#define SIM_TICK_DT         (1.0f / SIM_TICK_RATE)
 
 #define WORLD_WIDTH         2048
 #define WORLD_HEIGHT        256
@@ -136,7 +138,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        15
+#define SAVE_VERSION        16
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"
@@ -663,6 +665,11 @@ typedef enum {
     STR_ACH_BREEDER,
     STR_ACH_ENCHANTER,
     STR_ACH_DEMOLITION,
+    STR_COLLECTION_TITLE,
+    STR_COLLECTION_CHALLENGES,
+    STR_COLLECTION_UNLOCKED,
+    STR_COLLECTION_LOCKED,
+    STR_COLLECTION_CLOSE,
 
     // Status Messages
     STR_MSG_GAME_SAVED,
@@ -1424,6 +1431,8 @@ extern bool inventoryOpen;
 extern bool gamePaused;
 extern bool audioReady;
 extern unsigned int worldSeed;
+extern uint64_t simulationTick;
+extern float simulationAccumulator;
 
 extern char messageText[128];
 extern float messageTimer;
@@ -1444,6 +1453,7 @@ extern Difficulty gameDifficulty;
 extern GameMode gameMode;
 extern int pendingGameMode; // survival/creative selected on the new-game screen
 extern bool creativeOpen;   // creative inventory palette overlay
+extern bool achievementsOpen; // collection/achievement overlay
 extern bool menuPartyMode;  // Konami-code easter egg: confetti rain on the main menu
 extern int menuTitleClicks; // consecutive clicks on the main-menu title
 
@@ -1617,6 +1627,19 @@ void ApplyGravityAt(int bx, int by);
 void InitWater(void);
 int GetWaterLevel(int bx, int by);
 void SetWaterSource(int bx, int by);
+void UpdateFluidTick(float dt);
+void GetFluidState(int bx, int by, uint8_t *blockType, uint8_t *kind, uint8_t *level, bool *source);
+void RestoreFluidState(int bx, int by, uint8_t blockType, uint8_t kind, uint8_t level, bool source);
+void ClearFluidStateAt(int bx, int by);
+typedef struct {
+    uint16_t x, y;
+    uint8_t blockType, kind, level;
+    bool source;
+} FluidChange;
+void QueueFluidSources(void);
+int GetFluidChangeCount(void);
+bool GetFluidChange(int index, FluidChange *change);
+void ClearFluidChanges(void);
 void RemoveWaterAt(int bx, int by);
 
 // Lava flow system (world.c)
@@ -1722,6 +1745,7 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
 void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha);
 void DrawMessage(void);
 void DrawPauseMenu(void);
+void DrawAchievementsUI(void);
 void DrawDeathScreen(float dt);
 float GetDeathFadeTimer(void);
 void SetDeathCause(StringId cause);

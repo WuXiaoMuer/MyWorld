@@ -2322,13 +2322,94 @@ static uint8_t waterLevel[WORLD_WIDTH][WORLD_HEIGHT];
 // Lava Flow System
 //----------------------------------------------------------------------------------
 #define LAVA_MAX_LEVEL      5
+#define WATER_MAX_LEVEL     7
+#define FLUID_QUEUE_CAP     8192
+typedef struct { uint16_t x, y; uint8_t type, level; } FluidNode;
+static FluidNode fluidQueue[FLUID_QUEUE_CAP];
+static int fluidQueueHead = 0, fluidQueueTail = 0, fluidQueueCount = 0;
+static float fluidWaterTimer = 0.0f, fluidLavaTimer = 0.0f;
 static uint8_t lavaLevel[WORLD_WIDTH][WORLD_HEIGHT];
+static bool waterSource[WORLD_WIDTH][WORLD_HEIGHT];
+static bool lavaSource[WORLD_WIDTH][WORLD_HEIGHT];
+#define MAX_FLUID_CHANGES 4096
+static FluidChange fluidChanges[MAX_FLUID_CHANGES];
+static int fluidChangeCount = 0;
+static int16_t fluidChangeIndex[WORLD_WIDTH][WORLD_HEIGHT];
+static void QueueFluid(int x, int y, int type, int level);
 
 void InitLava(void)
 {
     memset(lavaLevel, 0, sizeof(lavaLevel));
+    memset(waterSource, 0, sizeof(waterSource));
+    memset(lavaSource, 0, sizeof(lavaSource));
+    memset(fluidChangeIndex, 0xFF, sizeof(fluidChangeIndex));
+    fluidChangeCount = 0;
 }
 
+static void MarkFluidChange(int x, int y)
+{
+    uint8_t bt, kind, level; bool source;
+    GetFluidState(x, y, &bt, &kind, &level, &source);
+    int existing = fluidChangeIndex[x][y];
+    if (existing >= 0 && existing < fluidChangeCount) {
+        fluidChanges[existing] = (FluidChange){(uint16_t)x, (uint16_t)y, bt, kind, level, source};
+        return;
+    }
+    if (fluidChangeCount >= MAX_FLUID_CHANGES) return;
+    fluidChangeIndex[x][y] = (int16_t)fluidChangeCount;
+    fluidChanges[fluidChangeCount++] = (FluidChange){(uint16_t)x, (uint16_t)y, bt, kind, level, source};
+}
+
+int GetFluidChangeCount(void) { return fluidChangeCount; }
+bool GetFluidChange(int index, FluidChange *change)
+{
+    if (!change || index < 0 || index >= fluidChangeCount) return false;
+    *change = fluidChanges[index];
+    return true;
+}
+void ClearFluidChanges(void)
+{
+    for (int i = 0; i < fluidChangeCount; i++) {
+        fluidChangeIndex[fluidChanges[i].x][fluidChanges[i].y] = -1;
+    }
+    fluidChangeCount = 0;
+}
+void QueueFluidSources(void)
+{
+    for (int x = 0; x < WORLD_WIDTH; x++) for (int y = 0; y < WORLD_HEIGHT; y++) {
+        if (waterSource[x][y] && world[x][y] == BLOCK_WATER) QueueFluid(x, y, BLOCK_WATER, waterLevel[x][y]);
+        if (lavaSource[x][y] && world[x][y] == BLOCK_LAVA) QueueFluid(x, y, BLOCK_LAVA, lavaLevel[x][y]);
+    }
+}
+void GetFluidState(int bx, int by, uint8_t *blockType, uint8_t *kind, uint8_t *level, bool *source)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    uint8_t block = world[bx][by];
+    if (blockType) *blockType = block;
+    if (kind) *kind = block == BLOCK_LAVA ? BLOCK_LAVA : (block == BLOCK_WATER ? BLOCK_WATER : 0);
+    if (level) *level = block == BLOCK_LAVA ? lavaLevel[bx][by] : (block == BLOCK_WATER ? waterLevel[bx][by] : 0);
+    if (source) *source = block == BLOCK_LAVA ? lavaSource[bx][by] : (block == BLOCK_WATER ? waterSource[bx][by] : false);
+}
+
+void ClearFluidStateAt(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    waterLevel[bx][by] = lavaLevel[bx][by] = 0;
+    waterSource[bx][by] = lavaSource[bx][by] = false;
+}
+
+void RestoreFluidState(int bx, int by, uint8_t blockType, uint8_t kind, uint8_t level, bool source)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    world[bx][by] = blockType;
+    waterLevel[bx][by] = lavaLevel[bx][by] = 0;
+    waterSource[bx][by] = lavaSource[bx][by] = false;
+    if (kind == BLOCK_WATER && blockType == BLOCK_WATER) {
+        waterLevel[bx][by] = level; waterSource[bx][by] = source;
+    } else if (kind == BLOCK_LAVA && blockType == BLOCK_LAVA) {
+        lavaLevel[bx][by] = level; lavaSource[bx][by] = source;
+    }
+}
 int GetLavaLevel(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
@@ -2336,59 +2417,75 @@ int GetLavaLevel(int bx, int by)
     return lavaLevel[bx][by];
 }
 
-static void PropagateLavaBFS(int startX, int startY, int level)
+static void QueueFluid(int x, int y, int type, int level)
 {
-    if (level <= 0) return;
-    static int qx[WORLD_WIDTH * 2];
-    static int qy[WORLD_WIDTH * 2];
-    static int ql[WORLD_WIDTH * 2];
-    int head = 0, tail = 0;
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT || level <= 0) return;
+    if (fluidQueueCount >= FLUID_QUEUE_CAP) return;
+    FluidNode *n = &fluidQueue[fluidQueueTail];
+    n->x = (uint16_t)x; n->y = (uint16_t)y; n->type = (uint8_t)type; n->level = (uint8_t)level;
+    fluidQueueTail = (fluidQueueTail + 1) % FLUID_QUEUE_CAP;
+    fluidQueueCount++;
+}
 
-    lavaLevel[startX][startY] = level;
-    qx[tail] = startX; qy[tail] = startY; ql[tail] = level; tail++;
-
-    while (head != tail) {
-        int cx = qx[head], cy = qy[head], cl = ql[head];
-        head = (head + 1) % (WORLD_WIDTH * 2);
-        if (cl <= 1) continue;
-
-        // Flow down
-        if (cy + 1 < WORLD_HEIGHT) {
-            if (world[cx][cy + 1] == BLOCK_AIR) {
-                world[cx][cy + 1] = BLOCK_LAVA;
-                lavaLevel[cx][cy + 1] = LAVA_MAX_LEVEL;
-                int next = tail % (WORLD_WIDTH * 2);
-                qx[next] = cx; qy[next] = cy + 1; ql[next] = LAVA_MAX_LEVEL;
-                tail++;
-            } else if (world[cx][cy + 1] == BLOCK_WATER) {
-                // Lava + water = obsidian
-                world[cx][cy + 1] = BLOCK_OBSIDIAN;
-                waterLevel[cx][cy + 1] = 0;
-                InvalidateChunkAt(cx, cy + 1);
-            }
+static void ProcessFluidNode(FluidNode node)
+{
+    int x = node.x, y = node.y, level = node.level;
+    uint8_t fluid = node.type == BLOCK_LAVA ? BLOCK_LAVA : BLOCK_WATER;
+    if (world[x][y] != fluid || level <= 1) return;
+    int down = y + 1;
+    if (down < WORLD_HEIGHT) {
+        if (world[x][down] == BLOCK_AIR) {
+            InvalidateChunkAt(x, down);
+            MarkFluidChange(x, down);
+            QueueFluid(x, down, fluid, level);
+        } else if (world[x][down] == (fluid == BLOCK_LAVA ? BLOCK_WATER : BLOCK_LAVA)) {
+            world[x][down] = fluid == BLOCK_LAVA ? BLOCK_OBSIDIAN : BLOCK_COBBLESTONE;
+            waterLevel[x][down] = 0; lavaLevel[x][down] = 0;
+            waterSource[x][down] = false; lavaSource[x][down] = false;
+            MarkFluidChange(x, down);
+            InvalidateChunkAt(x, down);
         }
-
-        // Flow sideways
-        int nextL = cl - 1;
-        if (nextL > 0) {
-            static const int dx[] = {1, -1};
-            for (int d = 0; d < 2; d++) {
-                int nx = cx + dx[d];
-                if (nx < 0 || nx >= WORLD_WIDTH) continue;
-                if (world[nx][cy] == BLOCK_AIR && (cy + 1 >= WORLD_HEIGHT || world[nx][cy + 1] != BLOCK_AIR)) {
-                    world[nx][cy] = BLOCK_LAVA;
-                    lavaLevel[nx][cy] = (uint8_t)nextL;
-                    int next = tail % (WORLD_WIDTH * 2);
-                    qx[next] = nx; qy[next] = cy; ql[next] = nextL;
-                    tail++;
-                } else if (world[nx][cy] == BLOCK_WATER) {
-                    // Flowing lava + water = cobblestone
-                    world[nx][cy] = BLOCK_COBBLESTONE;
-                    waterLevel[nx][cy] = 0;
-                    InvalidateChunkAt(nx, cy);
-                }
-            }
+    }
+    int next = level - 1;
+    if (next <= 0) return;
+    static const int dirs[2] = { -1, 1 };
+    for (int i = 0; i < 2; i++) {
+        int nx = x + dirs[i];
+        if (nx < 0 || nx >= WORLD_WIDTH) continue;
+        if (world[nx][y] == BLOCK_AIR && (y + 1 >= WORLD_HEIGHT || world[nx][y + 1] != BLOCK_AIR)) {
+            InvalidateChunkAt(nx, y);
+            MarkFluidChange(nx, y);
+            QueueFluid(nx, y, fluid, next);
+        } else if (world[nx][y] == (fluid == BLOCK_LAVA ? BLOCK_WATER : BLOCK_LAVA)) {
+            world[nx][y] = fluid == BLOCK_LAVA ? BLOCK_COBBLESTONE : BLOCK_OBSIDIAN;
+            waterLevel[nx][y] = 0; lavaLevel[nx][y] = 0;
+            waterSource[nx][y] = false; lavaSource[nx][y] = false;
+            MarkFluidChange(nx, y);
+            InvalidateChunkAt(nx, y);
         }
+    }
+}
+
+void UpdateFluidTick(float dt)
+{
+    fluidWaterTimer += dt;
+    fluidLavaTimer += dt;
+    bool waterReady = fluidWaterTimer >= 0.18f;
+    bool lavaReady = fluidLavaTimer >= 0.55f;
+    if (!waterReady && !lavaReady) return;
+    if (waterReady) fluidWaterTimer = 0.0f;
+    if (lavaReady) fluidLavaTimer = 0.0f;
+    int budget = 96;
+    int scanned = fluidQueueCount;
+    while (fluidQueueCount > 0 && budget-- > 0 && scanned-- > 0) {
+        FluidNode node = fluidQueue[fluidQueueHead];
+        fluidQueueHead = (fluidQueueHead + 1) % FLUID_QUEUE_CAP;
+        fluidQueueCount--;
+        if ((node.type == BLOCK_LAVA && !lavaReady) || (node.type == BLOCK_WATER && !waterReady)) {
+            QueueFluid(node.x, node.y, node.type, node.level);
+            continue;
+        }
+        ProcessFluidNode(node);
     }
 }
 
@@ -2411,7 +2508,9 @@ void SetLavaSource(int bx, int by)
     }
     world[bx][by] = BLOCK_LAVA;
     lavaLevel[bx][by] = LAVA_MAX_LEVEL;
-    PropagateLavaBFS(bx, by, LAVA_MAX_LEVEL);
+    lavaSource[bx][by] = true;
+    QueueFluid(bx, by, BLOCK_LAVA, LAVA_MAX_LEVEL);
+    MarkFluidChange(bx, by);
 }
 
 void RemoveLavaAt(int bx, int by)
@@ -2420,7 +2519,30 @@ void RemoveLavaAt(int bx, int by)
     if (world[bx][by] != BLOCK_LAVA) return;
     world[bx][by] = BLOCK_AIR;
     lavaLevel[bx][by] = 0;
+    lavaSource[bx][by] = false;
+    MarkFluidChange(bx, by);
     InvalidateChunkAt(bx, by);
+    int radius = LAVA_MAX_LEVEL + 1;
+    int minX = bx - radius, maxX = bx + radius;
+    int minY = by - radius, maxY = by + radius;
+    if (minX < 0) minX = 0; if (maxX >= WORLD_WIDTH) maxX = WORLD_WIDTH - 1;
+    if (minY < 0) minY = 0; if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
+    for (int x = minX; x <= maxX; x++) for (int y = minY; y <= maxY; y++) {
+        if (world[x][y] == BLOCK_LAVA) {
+            bool dynamic = lavaSource[x][y] || lavaLevel[x][y] > 0;
+            lavaLevel[x][y] = 0;
+            if (dynamic && !lavaSource[x][y]) {
+                world[x][y] = BLOCK_AIR;
+                MarkFluidChange(x, y);
+            }
+        }
+    }
+    for (int x = minX; x <= maxX; x++) for (int y = minY; y <= maxY; y++) {
+        if (lavaSource[x][y] && world[x][y] == BLOCK_LAVA) {
+            lavaLevel[x][y] = LAVA_MAX_LEVEL;
+            QueueFluid(x, y, BLOCK_LAVA, LAVA_MAX_LEVEL);
+        }
+    }
 }
 
 //----------------------------------------------------------------------------------
@@ -2461,6 +2583,7 @@ void ApplyGravityAt(int bx, int by)
 void InitWater(void)
 {
     memset(waterLevel, 0, sizeof(waterLevel));
+    memset(waterSource, 0, sizeof(waterSource));
 }
 
 int GetWaterLevel(int bx, int by)
@@ -2520,7 +2643,9 @@ void SetWaterSource(int bx, int by)
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
     world[bx][by] = BLOCK_WATER;
     waterLevel[bx][by] = WATER_MAX_LEVEL;
-    PropagateWaterBFS(bx, by, WATER_MAX_LEVEL);
+    waterSource[bx][by] = true;
+    QueueFluid(bx, by, BLOCK_WATER, WATER_MAX_LEVEL);
+    MarkFluidChange(bx, by);
 }
 
 void RemoveWaterAt(int bx, int by)
@@ -2531,6 +2656,8 @@ void RemoveWaterAt(int bx, int by)
     // Clear this water block
     world[bx][by] = BLOCK_AIR;
     waterLevel[bx][by] = 0;
+    waterSource[bx][by] = false;
+    MarkFluidChange(bx, by);
     InvalidateChunkAt(bx, by);
 
     // Recalculate water in affected area (radius = WATER_MAX_LEVEL)
@@ -2542,21 +2669,40 @@ void RemoveWaterAt(int bx, int by)
     if (minY < 0) minY = 0;
     if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
 
-    // Clear water levels in area
-    for (int x = minX; x <= maxX; x++)
-        for (int y = minY; y <= maxY; y++)
-            if (world[x][y] == BLOCK_WATER) waterLevel[x][y] = 0;
-
-    // Re-propagate from remaining sources in area
-    for (int x = minX; x <= maxX; x++)
-        for (int y = minY; y <= maxY; y++)
-            if (world[x][y] == BLOCK_WATER && waterLevel[x][y] == 0) {
-                // Check if this is a source (water above it)
-                if (y > 0 && world[x][y - 1] == BLOCK_WATER) {
-                    waterLevel[x][y] = WATER_MAX_LEVEL;
-                    PropagateWaterBFS(x, y, WATER_MAX_LEVEL);
+    for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+            if (world[x][y] == BLOCK_WATER) {
+                bool dynamic = waterSource[x][y] || waterLevel[x][y] > 0;
+                waterLevel[x][y] = 0;
+                if (dynamic && !waterSource[x][y]) {
+                    world[x][y] = BLOCK_AIR;
+                    MarkFluidChange(x, y);
                 }
             }
+            if (world[x][y] == BLOCK_LAVA) {
+                bool dynamic = lavaSource[x][y] || lavaLevel[x][y] > 0;
+                lavaLevel[x][y] = 0;
+                if (dynamic && !lavaSource[x][y]) {
+                    world[x][y] = BLOCK_AIR;
+                    MarkFluidChange(x, y);
+                }
+            }
+        }
+    }
+
+    // Re-propagate only from explicit remaining sources; descendants are queued.
+    for (int x = minX; x <= maxX; x++) {
+        for (int y = minY; y <= maxY; y++) {
+            if (waterSource[x][y] && world[x][y] == BLOCK_WATER) {
+                waterLevel[x][y] = WATER_MAX_LEVEL;
+                QueueFluid(x, y, BLOCK_WATER, WATER_MAX_LEVEL);
+            }
+            if (lavaSource[x][y] && world[x][y] == BLOCK_LAVA) {
+                lavaLevel[x][y] = LAVA_MAX_LEVEL;
+                QueueFluid(x, y, BLOCK_LAVA, LAVA_MAX_LEVEL);
+            }
+        }
+    }
 }
 
 //----------------------------------------------------------------------------------
@@ -2927,6 +3073,7 @@ void ExplodeAt(float worldX, float worldY, int radius)
             if (bt == BLOCK_AIR || bt == BLOCK_BEDROCK) continue;
             if (bt == BLOCK_TNT) { PrimeTnt(bx, by); continue; } // chain reaction
             SpawnBlockParticles(bx, by, bt);
+            ClearFluidStateAt(bx, by);
             world[bx][by] = BLOCK_AIR;
             NetSyncBlockChange(bx, by, BLOCK_AIR);
             InvalidateChunkAt(bx, by);

@@ -12,6 +12,8 @@ static const char* GetEnchantName(EnchantmentType type);
 
 // Forward declarations (drawn helpers used before their definition in this file)
 static void DrawRoundedRect(int x, int y, int w, int h, float radius, Color color);
+static void DrawCompetitionIcon(int x, int y, int size, unsigned char alpha, bool unlocked);
+static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned char alpha, bool unlocked);
 
 //----------------------------------------------------------------------------------
 // Smooth hover animation system
@@ -3219,6 +3221,72 @@ void DrawPauseMenu(void)
 //----------------------------------------------------------------------------------
 float GetDeathFadeTimer(void) { return deathFadeTimer; }
 
+static void DrawCompetitionIcon(int x, int y, int size, unsigned char alpha, bool unlocked)
+{
+    Color gold = {255, 205, 90, alpha};
+    Color teal = {56, 217, 169, alpha};
+    DrawUiSlot(x, y, size, false, unlocked, alpha / 255.0f);
+    int cx = x + size / 2, top = y + size / 5;
+    DrawRectangle(cx - size / 5, top, size * 2 / 5, size / 3, (Color){34, 42, 56, alpha});
+    DrawRectangleLines(cx - size / 5, top, size * 2 / 5, size / 3, gold);
+    DrawRectangle(x + size / 8, top + 3, size / 8, size / 5, teal);
+    DrawRectangle(x + size * 3 / 4, top + 3, size / 8, size / 5, teal);
+    DrawRectangle(cx - size / 16, top + size / 3, size / 8, size / 5, gold);
+    DrawRectangle(cx - size / 4, y + size / 2, size / 2, size / 10, gold);
+    DrawLine(x + size / 8, y + size * 3 / 4, x + size / 3, y + size * 3 / 5, teal);
+    DrawLine(x + size * 7 / 8, y + size * 3 / 4, x + size * 2 / 3, y + size * 3 / 5, teal);
+}
+
+static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned char alpha, bool unlocked)
+{
+    Color frame = unlocked ? (Color){255, 205, 90, alpha} : (Color){74, 88, 112, alpha};
+    Color gem = unlocked ? (Color){74, 210, 235, alpha} : (Color){70, 80, 100, alpha};
+    DrawUiSlot(x, y, size, false, unlocked, alpha / 255.0f);
+    int cx = x + size / 2, cy = y + size / 2;
+    if (variant == 1) {
+        DrawRectangle(x + size / 5, y + size / 4, size * 3 / 5, size / 2, (Color){130, 90, 55, alpha});
+        DrawRectangleLines(x + size / 5, y + size / 4, size * 3 / 5, size / 2, frame);
+        DrawLine(cx, y + size / 4, cx, y + size * 3 / 4, frame);
+    } else {
+        DrawCircle(cx, cy, size / 4, gem);
+        DrawCircleLines(cx, cy, size / 4, frame);
+        DrawTriangle((Vector2){(float)cx, (float)(y + size / 8)}, (Vector2){(float)(x + size * 7 / 8), (float)cy}, (Vector2){(float)cx, (float)(y + size * 7 / 8)}, frame);
+    }
+    DrawRectangle(cx - size / 2, cy - 1, size / 4, 2, frame);
+    DrawRectangle(cx + size / 4, cy - 1, size / 4, 2, frame);
+}
+
+void DrawAchievementsUI(void)
+{
+    if (!achievementsOpen) return;
+    int panelW = 760, panelH = 570;
+    int panelX = (SCREEN_WIDTH - panelW) / 2, panelY = 75;
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){4, 8, 16, 185});
+    DrawRoundedRect(panelX + 4, panelY + 6, panelW, panelH, 0.04f, (Color){0, 0, 0, 100});
+    DrawRoundedRect(panelX, panelY, panelW, panelH, 0.04f, (Color){20, 28, 42, 250});
+    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){88, 112, 145, 255});
+    DrawRectangle(panelX + 30, panelY + 2, panelW - 60, 2, (Color){56, 217, 169, 190});
+    DrawCompetitionIcon(panelX + 24, panelY + 22, 56, 255, true);
+    DrawGameText(S(STR_COLLECTION_TITLE), panelX + 96, panelY + 28, 30, (Color){235, 240, 250, 255});
+    DrawGameText(S(STR_COLLECTION_CHALLENGES), panelX + 98, panelY + 64, 14, (Color){140, 205, 210, 220});
+    static const StringId achNames[ACH_COUNT] = {
+        STR_ACH_FIRST_STEPS, STR_ACH_DEEP_DIG, STR_ACH_MONSTER_HUNTER, STR_ACH_ARCHITECT,
+        STR_ACH_REDSTONE_ENGINEER, STR_ACH_COLLECTOR, STR_ACH_ANGLER, STR_ACH_BREEDER,
+        STR_ACH_ENCHANTER, STR_ACH_DEMOLITION
+    };
+    for (int i = 0; i < ACH_COUNT; i++) {
+        int col = i % 2, row = i / 2;
+        int x = panelX + 28 + col * 366, y = panelY + 112 + row * 72;
+        bool unlocked = achievements[i];
+        DrawRoundedRect(x, y, 340, 60, 0.08f, unlocked ? (Color){35, 58, 60, 245} : (Color){27, 34, 48, 245});
+        DrawRectangleLines(x, y, 340, 60, unlocked ? (Color){255, 205, 90, 220} : (Color){58, 71, 92, 220});
+        DrawCollectibleIcon(x + 8, y + 8, 44, i % 3, 255, unlocked);
+        DrawGameText(S(achNames[i]), x + 62, y + 11, 13, (Color){225, 230, 240, unlocked ? 255 : 180});
+        DrawGameText(S(unlocked ? STR_COLLECTION_UNLOCKED : STR_COLLECTION_LOCKED), x + 62, y + 36, 11, unlocked ? (Color){255, 205, 90, 230} : (Color){120, 130, 150, 190});
+    }
+    DrawGameText(S(STR_COLLECTION_CLOSE), panelX + 250, panelY + panelH - 30, 14, (Color){150, 165, 185, 220});
+}
+
 void DrawDeathScreen(float dt)
 {
     if (!player.playerDead) {
@@ -3623,7 +3691,7 @@ void DrawMainMenu(void)
         int sx = (i * 131 + 47) % SCREEN_WIDTH;
         int sy = (i * 83 + 19) % (SCREEN_HEIGHT * 3 / 4);
         float twinkle = sinf(time * (1.5f + (i % 5) * 0.8f) + i * 1.7f) * 0.5f + 0.5f;
-        unsigned char a = (unsigned char)(twinkle * (i % 3 == 0 ? 200 : 120));
+        unsigned char a = (unsigned char)(twinkle * (i % 3 == 0 ? 70 : 35));
         float sz = (i % 3 == 0) ? 2.0f : 1.0f;
         DrawRectangle(sx, sy, (int)sz, (int)sz, (Color){180 + (i%3)*24, 190 + (i%3)*22, 220, a});
     }
@@ -3654,7 +3722,7 @@ void DrawMainMenu(void)
     for (int i = 0; i < 5; i++) {
         cloudX[i] += dt * (2.5f + i * 1.2f);
         if (cloudX[i] > SCREEN_WIDTH + 100) cloudX[i] = -cloudW[i] - 50;
-        unsigned char ca = (unsigned char)(18 + i * 4);
+        unsigned char ca = (unsigned char)(8 + i * 2);
         DrawRectangle((int)cloudX[i], (int)cloudY[i], (int)cloudW[i], 6,
                       (Color){ca + 10, ca + 12, ca + 18, 50});
         DrawRectangle((int)cloudX[i] + 10, (int)cloudY[i] - 4, (int)(cloudW[i] * 0.5f), 5,
@@ -3717,16 +3785,12 @@ void DrawMainMenu(void)
             DrawRectangle(x + 40, oy - 8, 3, 3, (Color){120, 214, 214, 255}); // diamond speck
         }
         // Soft dark veil behind bottom hints for readability
-        DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 12, 18, 120});
+        DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 12, 18, 210});
     }
 
     // Focused menu card: keeps the title and actions readable over the animated sky.
-    int menuCardX = (SCREEN_WIDTH - 560) / 2;
-    int menuCardY = 34;
-    DrawRoundedRect(menuCardX + 4, menuCardY + 6, 560, 650, 0.04f, (Color){0, 0, 0, 70});
-    DrawRoundedRect(menuCardX, menuCardY, 560, 650, 0.04f, (Color){14, 20, 32, 178});
-    DrawRectangleLines(menuCardX, menuCardY, 560, 650, (Color){110, 133, 164, 150});
-    DrawRectangle(menuCardX + 36, menuCardY + 2, 488, 2, (Color){84, 214, 160, 110});
+    // The menu keeps the sky open; the controls themselves provide the focus.
+
 
     // ================================================================
     // Title — block-themed with decorative icons and sparkles

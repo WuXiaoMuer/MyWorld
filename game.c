@@ -72,10 +72,85 @@ void ApplyWindowMode(int mode)
 }
 
 char currentSavePath[256] = { 0 };
+uint64_t simulationTick = 0;
+float simulationAccumulator = 0.0f;
+static uint16_t fluidSnapshotNext[MAX_NET_PLAYERS] = { 0 };
+static uint16_t fluidSnapshotId[MAX_NET_PLAYERS] = { 0 };
+static bool fluidSnapshotActive[MAX_NET_PLAYERS] = { false };
+
+static int SendFluidSnapshotBatch(int clientId, uint16_t batchIndex)
+{
+    FluidChange *cells = NULL;
+    int total = 0, cap = 0;
+    for (int x = 0; x < WORLD_WIDTH; x++) for (int y = 0; y < WORLD_HEIGHT; y++) {
+        uint8_t bt, kind, level; bool source;
+        GetFluidState(x, y, &bt, &kind, &level, &source);
+        if (!kind || (!level && !source)) continue;
+        if (total >= cap) {
+            cap = cap ? cap * 2 : 256;
+            FluidChange *next = (FluidChange *)realloc(cells, (size_t)cap * sizeof(FluidChange));
+            if (!next) { free(cells); return 0; }
+            cells = next;
+        }
+        cells[total++] = (FluidChange){ (uint16_t)x, (uint16_t)y, bt, kind, level, source };
+    }
+    int cellBytes = (int)sizeof(PktFluidCell);
+    int maxCells = (NET_PACKET_MAX - 1 - (int)sizeof(PktFluidSnapshotHeader)) / cellBytes;
+    if (maxCells < 1) { free(cells); return 0; }
+    int batches = total > 0 ? (total + maxCells - 1) / maxCells : 1;
+    for (int batch = 0; batch < batches; batch++) {
+        if (batch != batchIndex) continue;
+        uint8_t buf[NET_PACKET_MAX];
+        PktFluidSnapshotHeader header = { fluidSnapshotId[clientId], (uint16_t)batch, (uint16_t)batches, 0 };
+        int start = batch * maxCells;
+        int count = total - start;
+        if (count > maxCells) count = maxCells;
+        header.count = (uint8_t)count;
+        buf[0] = PKT_FLUID_SNAPSHOT;
+        memcpy(buf + 1, &header, sizeof(header));
+        int pos = 1 + (int)sizeof(header);
+        for (int i = 0; i < count; i++) {
+            FluidChange *c = &cells[start + i];
+            PktFluidCell cell = { c->x, c->y, c->blockType, c->kind, c->level, c->source ? 1 : 0 };
+            memcpy(buf + pos, &cell, sizeof(cell));
+            pos += sizeof(cell);
+        }
+        NetSendTo(clientId, buf, pos, false);
+    }
+    free(cells);
+    return batches;
+}
+
+static void FlushFluidChanges(void)
+{
+    if (GetFluidChangeCount() <= 0) return;
+    if (NetIsHost()) {
+        int index = 0;
+        while (index < GetFluidChangeCount()) {
+            uint8_t buf[NET_PACKET_MAX];
+            buf[0] = PKT_FLUID_DELTA;
+            uint8_t count = 0;
+            int pos = 2;
+            while (index < GetFluidChangeCount() && count < 174 && pos + (int)sizeof(PktFluidCell) <= NET_PACKET_MAX) {
+                FluidChange change;
+                if (!GetFluidChange(index++, &change)) continue;
+                PktFluidCell cell = { change.x, change.y, change.blockType, change.kind, change.level, change.source ? 1 : 0 };
+                memcpy(buf + pos, &cell, sizeof(cell));
+                pos += sizeof(cell); count++;
+            }
+            buf[1] = count;
+            for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                if (players[r].netControlled) NetSendTo(r, buf, pos, false);
+            }
+        }
+    }
+    ClearFluidChanges();
+}
 
 GameMode gameMode = GAME_SURVIVAL;
 int pendingGameMode = 0;
 bool creativeOpen = false;
+bool achievementsOpen = false;
 bool menuPartyMode = false;
 int menuTitleClicks = 0;
 
@@ -191,7 +266,7 @@ void NetSyncBlockChange(int x, int y, uint8_t blockType)
 static void NetSendWorldToClient(int clientId)
 {
     if (modifiedBlockCount == 0) return;
-    const int batchSize = 250;
+    const int batchSize = (NET_PACKET_MAX - (int)sizeof(PacketHeader) - 1) / (int)sizeof(PktBlockChange);
     uint8_t buf[NET_PACKET_MAX];
     int offset = 0;
 
@@ -2303,6 +2378,9 @@ void UpdateGame(float dt)
                 }
                 // Send modified blocks to new client
                 NetSendWorldToClient(fromId);
+                fluidSnapshotId[fromId]++;
+                fluidSnapshotNext[fromId] = 0;
+                fluidSnapshotActive[fromId] = false;
                 ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
             }
         }
@@ -2412,6 +2490,11 @@ void UpdateGame(float dt)
                     joinConnecting = false;
                     joinIpLen = 8;
                     memcpy(joinIpBuf, "127.0.0.1", 9);
+                    // Request fluid snapshot after baseline generation.
+                    PktFluidRequest fr = { 0, 0, FLUID_REQUEST_BEGIN_SNAPSHOT, 0 };
+                    uint8_t fbuf[NET_PACKET_MAX]; fbuf[0] = PKT_FLUID_REQUEST;
+                    memcpy(fbuf + 1, &fr, sizeof(fr));
+                    NetSendToServer(fbuf, 1 + sizeof(fr), true);
                     // Start playing
                     StartTransition(STATE_PLAYING);
                     return;
@@ -2567,6 +2650,14 @@ void UpdateGame(float dt)
         PlaySoundUIClick();
     }
 
+    // I: collection and achievement panel
+    if (!chatOpen && !player.playerDead && Win32IsKeyPressed(KEY_I)) {
+        achievementsOpen = !achievementsOpen;
+        gamePaused = achievementsOpen;
+        if (achievementsOpen) { inventoryOpen = false; creativeOpen = false; }
+        PlaySoundUIClick();
+    }
+
     // ESC: close enchanting first, then furnace, then chest, then inventory, then large map, then toggle pause
     if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_ESCAPE)) {
         if (localEnchantSession.open) {
@@ -2592,6 +2683,9 @@ void UpdateGame(float dt)
         } else if (tradeOpen) {
             tradeOpen = false;
             inventoryOpen = false;
+            gamePaused = false;
+        } else if (achievementsOpen) {
+            achievementsOpen = false;
             gamePaused = false;
         } else if (creativeOpen) {
             creativeOpen = false;
@@ -2643,7 +2737,8 @@ void UpdateGame(float dt)
     }
 
     // Don't update gameplay when paused, inventory open, or creative palette open
-    if (!gamePaused && !inventoryOpen && !creativeOpen) {
+    if (!gamePaused && !inventoryOpen && !creativeOpen && !achievementsOpen) {
+        if (!NetIsClient()) UpdateFluidTick(dt);
         if (NetIsHost()) {
             // Host mode: poll client inputs, run authoritative logic, broadcast state
             NetPoll();
@@ -2712,8 +2807,43 @@ void UpdateGame(float dt)
                     }
                     // Send modified blocks to new client
                     NetSendWorldToClient(fromId);
+                fluidSnapshotId[fromId]++;
+                fluidSnapshotNext[fromId] = 0;
+                fluidSnapshotActive[fromId] = false;
                     ShowMessage(S(STR_NET_PLAYER_JOINED), (Color){100, 255, 100, 255});
-                } else if (type == PKT_INPUT && size >= 1 + (int)sizeof(PktInput) && fromId > 0 && fromId < MAX_NET_PLAYERS) {
+                } else if (type == PKT_FLUID_REQUEST && size >= 1 + (int)sizeof(PktFluidRequest) && fromId > 0 && fromId < MAX_NET_PLAYERS) {
+                    const PktFluidRequest *fr = (const PktFluidRequest *)((const uint8_t *)data + 1);
+                    if (fr->action == FLUID_REQUEST_BEGIN_SNAPSHOT) {
+                        fluidSnapshotId[fromId]++;
+                        fluidSnapshotNext[fromId] = 0;
+                        fluidSnapshotActive[fromId] = true;
+                        SendFluidSnapshotBatch(fromId, 0);
+                        continue;
+                    }
+                    if (fr->action == FLUID_REQUEST_ACK_SNAPSHOT) {
+                        if (fluidSnapshotActive[fromId] && fr->x == fluidSnapshotId[fromId] && fr->y == fluidSnapshotNext[fromId]) {
+                            fluidSnapshotNext[fromId]++;
+                            int total = SendFluidSnapshotBatch(fromId, fluidSnapshotNext[fromId]);
+                            if (fluidSnapshotNext[fromId] >= total) fluidSnapshotActive[fromId] = false;
+                        }
+                        continue;
+                    }
+                    Player *fluidPlayer = &players[fromId];
+                    if (!fluidPlayer->netControlled || fr->slot >= INVENTORY_SLOTS) continue;
+                    fluidPlayer->selectedSlot = fr->slot;
+                    int bx = fr->x, by = fr->y;
+                    bool accepted = false;
+                    if (fr->action == 0) accepted = TryPlaceBlockRemote(fluidPlayer, bx, by);
+                    else if (fr->action == 1) accepted = TryUseItemRemote(fluidPlayer, bx, by, bx * BLOCK_SIZE + 8.0f, by * BLOCK_SIZE + 8.0f);
+                    if (accepted) {
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_INVENTORY_SYNC;
+                        PktInventorySync ipkt;
+                        PackInventorySync(&ipkt, fromId);
+                        memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                        NetSendTo(fromId, sbuf, 1 + sizeof(ipkt), true);
+                    }
+
                     const PktInput *input = (const PktInput *)((const uint8_t *)data + 1);
                     // Apply remote player input
                     Player *rp = &players[fromId];
@@ -2775,7 +2905,20 @@ void UpdateGame(float dt)
                     if (input->place) {
                         int bx = (int)(input->cursorX / BLOCK_SIZE);
                         int by = (int)(input->cursorY / BLOCK_SIZE);
-                        TryPlaceBlockRemote(rp, bx, by);
+                        uint8_t held = (input->selectedSlot < INVENTORY_SLOTS) ? rp->inventory[input->selectedSlot] : BLOCK_AIR;
+                        if (held == ITEM_BUCKET || held == ITEM_WATER_BUCKET || held == ITEM_LAVA_BUCKET) {
+                            bool accepted = (held == ITEM_BUCKET)
+                                ? TryUseItemRemote(rp, bx, by, input->cursorX, input->cursorY)
+                                : TryPlaceBlockRemote(rp, bx, by);
+                            if (accepted) {
+                                uint8_t sbuf[NET_PACKET_MAX]; sbuf[0] = PKT_INVENTORY_SYNC;
+                                PktInventorySync ipkt; PackInventorySync(&ipkt, fromId);
+                                memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
+                                NetSendTo(fromId, sbuf, 1 + sizeof(ipkt), true);
+                            }
+                        } else {
+                            TryPlaceBlockRemote(rp, bx, by);
+                        }
                     }
                     // Handle item use from remote player
                     if (input->use) {
@@ -3356,7 +3499,35 @@ void UpdateGame(float dt)
                 const void *data = NetGetReceived(i, &size, &fromId);
                 if (!data) continue;
                 uint8_t type = ((const uint8_t *)data)[0];
-                if (type == PKT_PLAYER_STATE && size >= 1 + (int)sizeof(PktPlayerState)) {
+                if (type == PKT_FLUID_DELTA && size >= 2) {
+                    const uint8_t *raw = (const uint8_t *)data;
+                    int count = raw[1];
+                    int pos = 2;
+                    for (int fi = 0; fi < count && pos + (int)sizeof(PktFluidCell) <= size; fi++) {
+                        PktFluidCell cell;
+                        memcpy(&cell, raw + pos, sizeof(cell));
+                        RestoreFluidState(cell.x, cell.y, cell.blockType, cell.kind, cell.level, cell.source != 0);
+                        InvalidateChunkAt(cell.x, cell.y);
+                        pos += sizeof(cell);
+                    }
+                } else if (type == PKT_FLUID_SNAPSHOT && size >= 1 + (int)sizeof(PktFluidSnapshotHeader)) {
+                    const uint8_t *raw = (const uint8_t *)data;
+                    PktFluidSnapshotHeader header;
+                    memcpy(&header, raw + 1, sizeof(header));
+                    int count = header.count;
+                    int pos = 1 + (int)sizeof(header);
+                    for (int fi = 0; fi < count && pos + (int)sizeof(PktFluidCell) <= size; fi++) {
+                        PktFluidCell cell;
+                        memcpy(&cell, raw + pos, sizeof(cell));
+                        RestoreFluidState(cell.x, cell.y, cell.blockType, cell.kind, cell.level, cell.source != 0);
+                        InvalidateChunkAt(cell.x, cell.y);
+                        pos += sizeof(cell);
+                    }
+                    PktFluidRequest ack = { header.snapshotId, header.batchIndex, FLUID_REQUEST_ACK_SNAPSHOT, 0 };
+                    uint8_t ackBuf[NET_PACKET_MAX]; ackBuf[0] = PKT_FLUID_REQUEST;
+                    memcpy(ackBuf + 1, &ack, sizeof(ack));
+                    NetSendToServer(ackBuf, 1 + sizeof(ack), true);
+                } else if (type == PKT_PLAYER_STATE && size >= 1 + (int)sizeof(PktPlayerState)) {
                     const PktPlayerState *ps = (const PktPlayerState *)((const uint8_t *)data + 1);
                     for (int j = 0; j < ps->count; j++) {
                         const PktPlayerInfo *pi = &ps->players[j];
@@ -3625,6 +3796,7 @@ void UpdateGame(float dt)
             UpdateAmbientSounds();
             if (player.damageFlashTimer > 0.0f) player.damageFlashTimer -= dt;
         }
+        FlushFluidChanges();
     }
     // Status effects (drowning, hunger) apply even with inventory open
     if (!gamePaused) {
@@ -3684,7 +3856,6 @@ void DrawGame(void)
     ClearBackground(GetSkyColor());
 
     if (gameState == STATE_MENU) {
-        DrawBackground();
         DrawMainMenu();
         if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
         DrawTransition();
@@ -3879,8 +4050,9 @@ void DrawGame(void)
         DrawCreativeScreen();
         DrawTradeUI();
         DrawEnchantingTableUI();
-        DrawPauseMenu();
+        if (!achievementsOpen) DrawPauseMenu();
     }
+    DrawAchievementsUI();
     DrawDeathScreen(GetFrameTime());
 
     // Sleep transition overlay (fade to black while sleeping)
@@ -3988,6 +4160,12 @@ void UpdateDrawFrame(void)
 {
     float dt = GetFrameTime();
     if (dt > 0.05f) dt = 0.05f;
+    simulationAccumulator += dt;
+    if (simulationAccumulator > 0.25f) simulationAccumulator = 0.25f;
+    while (simulationAccumulator >= SIM_TICK_DT) {
+        simulationAccumulator -= SIM_TICK_DT;
+        simulationTick++;
+    }
     UpdateBGM();
     UpdateTransition(dt);
     UpdateGame(dt);

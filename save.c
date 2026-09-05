@@ -11,7 +11,7 @@ __declspec(dllimport) int __stdcall MoveFileExA(const char*, const char*, unsign
 #define SAVE_TRAILER_MAGIC 0x4D59574C  // "MYWL" in little-endian
 
 //----------------------------------------------------------------------------------
-// Save File Format v14:
+// Save File Format v16:
 //   Header:      "MWSV" + uint32 version + uint32 seed + uint32 worldW + uint32 worldH
 //   DayNight:    float timeOfDay + float daySpeed + float lightLevel
 //   Player:      float posX,Y + float velX,Y + bool onGround + int selectedSlot
@@ -26,7 +26,9 @@ __declspec(dllimport) int __stdcall MoveFileExA(const char*, const char*, unsign
 //   Mobs:        count + per-mob data (v10+)
 //   Cauldrons:   count + per-cauldron x,y,fillLevel (v11+)
 //   Crops:       uint32 count + per-crop (uint16 x, uint16 y, uint8 growth) (v12+)
-// NOTE: Cauldrons/Crops are written AFTER World+Modified; LoadWorld reads them last too.
+//   Fluids:      uint32 count + (uint16 x,y, uint8 block, kind, level, source) (v16+)
+//   Trailer:     uint32 SAVE_TRAILER_MAGIC
+// NOTE: Cauldrons/Crops/Fluids are written AFTER World+Modified; LoadWorld reads them before the trailer.
 //----------------------------------------------------------------------------------
 
 bool SaveExists(const char *path)
@@ -280,6 +282,30 @@ bool SaveWorld(const char *path)
                 ok = ok && fwrite(&cy, sizeof(uint16_t), 1, f) == 1;
                 ok = ok && fwrite(&g, sizeof(uint8_t), 1, f) == 1;
             }
+        }
+    }
+
+    // v16+: sparse dynamic fluid state.
+    if (version >= 16) {
+        uint32_t fluidN = 0;
+        for (int x = 0; x < WORLD_WIDTH; x++) for (int y = 0; y < WORLD_HEIGHT; y++) {
+            uint8_t bt, kind, level; bool source;
+            GetFluidState(x, y, &bt, &kind, &level, &source);
+            if (kind && (level || source)) fluidN++;
+        }
+        ok = ok && fwrite(&fluidN, sizeof(fluidN), 1, f) == 1;
+        for (int x = 0; x < WORLD_WIDTH && ok; x++) for (int y = 0; y < WORLD_HEIGHT && ok; y++) {
+            uint8_t bt, kind, level; bool source;
+            GetFluidState(x, y, &bt, &kind, &level, &source);
+            if (!kind || (!level && !source)) continue;
+            uint16_t sx = (uint16_t)x, sy = (uint16_t)y;
+            uint8_t src = source ? 1 : 0;
+            ok = ok && fwrite(&sx, sizeof(sx), 1, f) == 1;
+            ok = ok && fwrite(&sy, sizeof(sy), 1, f) == 1;
+            ok = ok && fwrite(&bt, sizeof(bt), 1, f) == 1;
+            ok = ok && fwrite(&kind, sizeof(kind), 1, f) == 1;
+            ok = ok && fwrite(&level, sizeof(level), 1, f) == 1;
+            ok = ok && fwrite(&src, sizeof(src), 1, f) == 1;
         }
     }
 
@@ -656,10 +682,46 @@ bool LoadWorld(const char *path)
         }
     }
 
-    // Verify integrity trailer
+    // Legacy fluid migration: preserve old visible fluids as static full cells.
+    // Historical formats had no source/level metadata, so do not guess dynamic sources.
+    if (version < 16) {
+        for (int x = 0; x < WORLD_WIDTH; x++) for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_WATER) RestoreFluidState(x, y, BLOCK_WATER, BLOCK_WATER, 7, false);
+            else if (world[x][y] == BLOCK_LAVA) RestoreFluidState(x, y, BLOCK_LAVA, BLOCK_LAVA, 5, false);
+        }
+    }
+
+    // v16+: restore sparse dynamic fluid metadata directly (never propagate per record).
+    if (version >= 16) {
+        uint32_t fluidN = 0;
+        if (fread(&fluidN, sizeof(fluidN), 1, f) != 1 || fluidN > WORLD_WIDTH * WORLD_HEIGHT) {
+            fclose(f); return false;
+        }
+        for (uint32_t i = 0; i < fluidN; i++) {
+            uint16_t x, y; uint8_t bt, kind, level, src;
+            if (fread(&x, sizeof(x), 1, f) != 1 || fread(&y, sizeof(y), 1, f) != 1 ||
+                fread(&bt, sizeof(bt), 1, f) != 1 || fread(&kind, sizeof(kind), 1, f) != 1 ||
+                fread(&level, sizeof(level), 1, f) != 1 || fread(&src, sizeof(src), 1, f) != 1) {
+                fclose(f); return false;
+            }
+            if (x >= WORLD_WIDTH || y >= WORLD_HEIGHT ||
+                (kind != BLOCK_WATER && kind != BLOCK_LAVA) ||
+                (kind == BLOCK_WATER && level > 7) || (kind == BLOCK_LAVA && level > 5) ||
+                (bt != BLOCK_WATER && bt != BLOCK_LAVA)) {
+                fclose(f); return false;
+            }
+            RestoreFluidState((int)x, (int)y, bt, kind, level, src != 0);
+        }
+        QueueFluidSources();
+    }
+
     {
         uint32_t trailer = 0;
-        if (fread(&trailer, sizeof(uint32_t), 1, f) != 1 || trailer != SAVE_TRAILER_MAGIC) {
+        if (fread(&trailer, sizeof(uint32_t), 1, f) != 1) {
+            // The trailer was introduced after early v14 saves. EOF is valid
+            // for pre-v16 historical files whose preceding sections passed.
+            if (version >= 16 || !feof(f)) { fclose(f); return false; }
+        } else if (trailer != SAVE_TRAILER_MAGIC) {
             fclose(f);
             return false;
         }

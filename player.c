@@ -900,6 +900,7 @@ void PlayerBlockInteraction(void)
                         }
                     }
                 }
+                ClearFluidStateAt(blockX, blockY);
                 world[blockX][blockY] = BLOCK_AIR;
                 NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                 if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
@@ -1011,7 +1012,18 @@ void PlayerBlockInteraction(void)
     // Place block or eat food (right click, instant)
     if (isSleeping) return;
     if (Win32IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-        // Interact with bed (set spawn point or sleep)
+        // Network clients send bucket actions to the host; they do not predict
+        // fluid state or inventory changes locally.
+        if (NetIsClient() && (selectedTool == ITEM_BUCKET || selectedTool == ITEM_WATER_BUCKET || selectedTool == ITEM_LAVA_BUCKET)) {
+            PktFluidRequest fr = { (uint16_t)blockX, (uint16_t)blockY,
+                                   selectedTool == ITEM_BUCKET ? 1 : 0,
+                                   (uint8_t)player.selectedSlot };
+            uint8_t nbuf[NET_PACKET_MAX]; nbuf[0] = PKT_FLUID_REQUEST;
+            memcpy(nbuf + 1, &fr, sizeof(fr));
+            NetSendToServer(nbuf, 1 + sizeof(fr), true);
+            return;
+        }
+
         if (blockX >= 0 && blockX < WORLD_WIDTH && blockY >= 0 && blockY < WORLD_HEIGHT) {
             if (world[blockX][blockY] == BLOCK_BED) {
                 // Check for nearby hostile mobs
@@ -1649,7 +1661,8 @@ void PlayerBlockInteraction(void)
                     UpdateRedstoneAt(blockX, blockY);
                     // Gravity: sand/gravel falls when placed
                     if (IsGravityBlock(selectedTool)) {
-                        world[blockX][blockY] = BLOCK_AIR;
+                        ClearFluidStateAt(blockX, blockY);
+                world[blockX][blockY] = BLOCK_AIR;
                         NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                         int landY = blockY;
                         // Search downward for landing spot
