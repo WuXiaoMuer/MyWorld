@@ -1192,7 +1192,8 @@ static void TrySpawnMobs(float dt)
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
-                if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS ||
+                     world[bx][y] == BLOCK_MYCELIUM) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     int biome = MobGetBiomeAtX(bx);
                     int roll = rand() % 100;
                     MobType spawnType;
@@ -1245,6 +1246,30 @@ static void TrySpawnMobs(float dt)
                             else if (roll < 85) spawnType = MOB_PIG;
                             else if (roll < 95) spawnType = MOB_CHICKEN;
                             else spawnType = MOB_VILLAGER;
+                            break;
+                        case 7: // savanna - herds graze among acacia
+                            if (roll < 45) spawnType = MOB_COW;
+                            else if (roll < 75) spawnType = MOB_SHEEP;
+                            else if (roll < 90) spawnType = MOB_PIG;
+                            else if (roll < 97) spawnType = MOB_PIG;
+                            else spawnType = MOB_CHICKEN;
+                            break;
+                        case 8: // mesa - sparse, dry
+                            if (roll < 70) doSpawn = false;
+                            else if (roll < 90) spawnType = MOB_CHICKEN;
+                            else spawnType = MOB_PIG;
+                            break;
+                        case 9: // flower field - peaceful grazers
+                            if (roll < 35) spawnType = MOB_SHEEP;
+                            else if (roll < 60) spawnType = MOB_COW;
+                            else if (roll < 80) spawnType = MOB_CHICKEN;
+                            else if (roll < 92) spawnType = MOB_PIG;
+                            else spawnType = MOB_PIG;
+                            break;
+                        case 10: // mushroom island - mooshroom-free, but horses roam
+                            if (roll < 50) doSpawn = false;
+                            else if (roll < 80) spawnType = MOB_COW;
+                            else spawnType = MOB_PIG;
                             break;
                         default: // fallback to plains
                             if (roll < 35) spawnType = MOB_PIG;

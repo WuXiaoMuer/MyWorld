@@ -441,6 +441,11 @@ typedef enum {
     ITEM_BOOK,
     ITEM_SUGAR,
     BLOCK_TNT,          // explosive block; ignite by right-click or redstone
+    // Phase 2: new biome blocks
+    BLOCK_RED_SAND,
+    BLOCK_MYCELIUM,
+    BLOCK_MUSHROOM_BLOCK,   // giant mushroom cap (red with white spots)
+    BLOCK_MUSHROOM_STEM,    // giant mushroom stalk
     BLOCK_COUNT
 } BlockType;
 
@@ -1043,6 +1048,11 @@ typedef enum {
     STR_ITEM_BOOK,
     STR_ITEM_SUGAR,
     STR_BLOCK_TNT,
+    // Phase 2: new biome blocks
+    STR_BLOCK_RED_SAND,
+    STR_BLOCK_MYCELIUM,
+    STR_BLOCK_MUSHROOM_BLOCK,
+    STR_BLOCK_MUSHROOM_STEM,
     STR_RECIPE_TNT,
     STR_RECIPE_PAPER,
     STR_RECIPE_BOOK,

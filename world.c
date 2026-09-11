@@ -186,6 +186,11 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Book",                   {180,120,60,255},  {150,100,50,255},  false, false, false},
     {"Sugar",                  {240,235,230,255}, {200,195,190,255},  false, false, false},
     {"TNT",                    {200,50,40,255},   {235,90,70,255},   true,  false, true},
+    // Phase 2: new biome blocks
+    {"Red Sand",               {200,110,60,255},  {175,90,45,255},   true,  false, true},
+    {"Mycelium",               {150,130,160,255}, {120,100,135,255}, true,  false, true},
+    {"Mushroom Block",         {200,60,60,255},   {235,225,215,255}, true,  false, true},
+    {"Mushroom Stem",          {225,220,205,255}, {200,195,180,255}, true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -1938,6 +1943,51 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case BLOCK_RED_SAND:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                if (hash2D(worldX * 16 + x, worldY * 16 + y, 71) % 5 == 0) c = detail;
+                if (y < 2) c = detail;   // slightly darker top rim
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MYCELIUM:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(worldX * 16 + x, worldY * 16 + y, 72);
+                if (h % 6 == 0) c = detail;
+                // Purple speckles resembling mycelium spores
+                if (h % 17 == 0) c = (Color){190, 165, 210, 255};
+                if (y == 0) c = (Color){175, 155, 195, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MUSHROOM_BLOCK:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                // White spots on the red cap
+                if (hash2D(worldX * 16 + x, worldY * 16 + y, 73) % 9 == 0) c = detail;
+                if ((x % 8 == 3 && y % 8 == 4) || (x % 8 == 5 && y % 8 == 2)) c = detail;
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_MUSHROOM_STEM:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                // Vertical fibrous texture
+                if (hash2D(worldX * 16 + x, worldY * 16 + y, 74) % 7 == 0) c = detail;
+                if (x % 5 == 0) c = detail;
+                ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     // Animal drop items (small icons)
     case ITEM_RAW_BEEF:
     case ITEM_COOKED_BEEF:
@@ -3171,18 +3221,23 @@ void SetCropGrowth(int bx, int by, int stage)
 //----------------------------------------------------------------------------------
 // Authoritative biome lookup. Single source of truth for the biome noise mapping;
 // every world-generation pass and mob spawning call this instead of duplicating it.
-// 0=plains, 1=desert, 2=forest, 3=tundra, 4=swamp, 5=jungle, 6=taiga
+// 0=plains, 1=desert, 2=forest, 3=tundra, 4=swamp, 5=jungle, 6=taiga,
+// 7=savanna, 8=mesa, 9=flower field, 10=mushroom island
 // (Add new biomes here only — all consumers pick them up automatically.)
 int GetBiomeAtX(int worldX, unsigned int seed)
 {
-    float biomeNoise = fbm(worldX * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-    if (biomeNoise > 0.55f) return 1;       // desert
-    else if (biomeNoise > 0.35f) return 6;   // taiga
-    else if (biomeNoise > 0.15f) return 0;   // plains
-    else if (biomeNoise > -0.05f) return 4;  // swamp
-    else if (biomeNoise > -0.25f) return 2;  // forest
-    else if (biomeNoise > -0.45f) return 5;  // jungle
-    else return 3;                            // tundra
+    float n = fbm(worldX * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
+    if (n > 0.58f) return 1;        // desert
+    else if (n > 0.46f) return 8;   // mesa (hot, dry, next to desert)
+    else if (n > 0.36f) return 7;   // savanna
+    else if (n > 0.24f) return 6;   // taiga
+    else if (n > 0.12f) return 0;   // plains
+    else if (n > 0.00f) return 9;   // flower field
+    else if (n > -0.12f) return 4;  // swamp
+    else if (n > -0.26f) return 2;  // forest
+    else if (n > -0.40f) return 5;  // jungle
+    else if (n > -0.55f) return 10; // mushroom island (rare, far end)
+    else return 3;                  // tundra
 }
 
 void GenerateWorld(unsigned int seed)
@@ -3242,6 +3297,10 @@ void GenerateWorld(unsigned int seed)
             case 4: hillAmp = 8.0f; break;   // swamp: very flat
             case 5: hillAmp = 32.0f; break;  // jungle: very hilly
             case 6: hillAmp = 20.0f; break;  // taiga: moderate
+            case 7: hillAmp = 18.0f; break;  // savanna: gentle rolling
+            case 8: hillAmp = 24.0f; break;  // mesa: terraced rises
+            case 9: hillAmp = 10.0f; break;  // flower field: flat
+            case 10: hillAmp = 16.0f; break; // mushroom island: gentle
             default: hillAmp = 22.0f; break; // plains
         }
         surfaceY += (int)(hills * hillAmp * continental);
@@ -3271,13 +3330,16 @@ void GenerateWorld(unsigned int seed)
             } else if (y == surfaceY) {
                 if (isStonePeak) world[x][y] = BLOCK_STONE;        // mountain peak
                 else if (biome == 1) world[x][y] = BLOCK_SAND;     // desert
+                else if (biome == 8) world[x][y] = BLOCK_RED_SAND; // mesa
                 else if (biome == 3) world[x][y] = BLOCK_SNOWY_GRASS; // tundra
                 else if (biome == 4) world[x][y] = BLOCK_MUD;      // swamp
                 else if (biome == 6) world[x][y] = BLOCK_SNOWY_GRASS; // taiga
-                else world[x][y] = BLOCK_GRASS;                     // plains/forest/jungle
+                else if (biome == 10) world[x][y] = BLOCK_MYCELIUM; // mushroom island
+                else world[x][y] = BLOCK_GRASS;                     // plains/forest/jungle/savanna/flower
             } else if (y < surfaceY + 4) {
                 if (isStonePeak) world[x][y] = BLOCK_STONE;        // mountain subsurface
                 else if (biome == 1) world[x][y] = BLOCK_SAND;     // desert sand layers
+                else if (biome == 8) world[x][y] = BLOCK_RED_SAND; // mesa layers
                 else if (biome == 4) world[x][y] = BLOCK_MUD;      // swamp mud layers
                 else world[x][y] = BLOCK_DIRT;
             } else if (y < WORLD_HEIGHT - 1) {
@@ -3377,8 +3439,9 @@ void GenerateWorld(unsigned int seed)
     for (int x = 0; x < WORLD_WIDTH; x++) {
         int biome = GetBiomeAtX(x, seed);
         bool isDesert = (biome == 1);
+        bool isMesa = (biome == 8);
         bool isTundra = (biome == 3);
-        if (isDesert || isTundra) continue; // desert has sand, tundra has ice/snow
+        if (isDesert || isMesa || isTundra) continue; // sand/red-sand/ice already placed
         for (int y = SEA_LEVEL - 3; y <= SEA_LEVEL + 2; y++) {
             if (y < 0 || y >= WORLD_HEIGHT) continue;
             if (world[x][y] == BLOCK_GRASS || world[x][y] == BLOCK_DIRT) {
@@ -3632,6 +3695,10 @@ void GenerateWorld(unsigned int seed)
             case 4: treeChance = 10; break;   // swamp: moderate
             case 5: treeChance = 4; break;    // jungle: very dense
             case 6: treeChance = 8; break;    // taiga: moderate-dense
+            case 7: treeChance = 26; break;   // savanna: sparse acacia
+            case 8: treeChance = 999; break;  // mesa: no trees
+            case 9: treeChance = 16; break;   // flower field: few trees
+            case 10: treeChance = 999; break; // mushroom island: giant mushrooms instead
             default: treeChance = 12; break;  // plains
         }
         if (hash2D(x, 0, seed + 999) % treeChance != 0) continue;
@@ -3665,6 +3732,9 @@ void GenerateWorld(unsigned int seed)
                 break;
             case 6: // taiga: medium narrow trees
                 trunkH = 5 + (hash2D(x, 1, seed + 888) % 3);
+                break;
+            case 7: // savanna: short acacia with flat wide canopy
+                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
                 break;
             default: // plains/forest
                 trunkH = (biome == 2) ? (5 + (hash2D(x, 1, seed + 888) % 4)) : (4 + (hash2D(x, 1, seed + 888) % 3));
@@ -3761,6 +3831,22 @@ void GenerateWorld(unsigned int seed)
                     }
                 }
             }
+        } else if (biome == 7) {
+            // Savanna: acacia — flat wide canopy atop a short trunk
+            for (int dx = -3; dx <= 3; dx++) {
+                int bx = x + dx;
+                int by = canopyTop;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (world[bx][by] == BLOCK_AIR) world[bx][by] = leafBlock;
+                }
+            }
+            for (int dx = -2; dx <= 2; dx++) {
+                int bx = x + dx;
+                int by = canopyTop - 1;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (world[bx][by] == BLOCK_AIR && dx != 0) world[bx][by] = leafBlock;
+                }
+            }
         } else {
             // Default canopy (plains/forest)
             for (int dy = -2; dy <= 0; dy++) {
@@ -3785,6 +3871,40 @@ void GenerateWorld(unsigned int seed)
     }
 
     // ============================================================
+    // Pass 11b: Giant mushrooms on the mushroom island
+    // ============================================================
+    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
+        if (GetBiomeAtX(x, seed) != 10) continue;
+        if (hash2D(x, 0, seed + 1210) % 14 != 0) continue;
+
+        // Find mycelium surface
+        int surfaceY = -1;
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_MYCELIUM) { surfaceY = y; break; }
+        }
+        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
+
+        int stemH = 3 + (hash2D(x, 1, seed + 1211) % 3);
+        int capR = 2 + (hash2D(x, 2, seed + 1212) % 2);
+        int capTop = surfaceY - stemH;
+
+        // Stem
+        for (int i = 1; i <= stemH && surfaceY - i >= 0; i++)
+            world[x][surfaceY - i] = BLOCK_MUSHROOM_STEM;
+
+        // Rounded cap
+        for (int dy = -capR; dy <= 0; dy++) {
+            int half = capR - (dy == -capR ? 1 : 0);
+            for (int dx = -half; dx <= half; dx++) {
+                int bx = x + dx, by = capTop + dy;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT &&
+                    world[bx][by] == BLOCK_AIR)
+                    world[bx][by] = BLOCK_MUSHROOM_BLOCK;
+            }
+        }
+    }
+
+    // ============================================================
     // Pass 12: Flowers, tall grass, decorations (biome-aware)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
@@ -3793,7 +3913,8 @@ void GenerateWorld(unsigned int seed)
         for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
             uint8_t surface = world[x][y];
             if (surface != BLOCK_GRASS && surface != BLOCK_SAND &&
-                surface != BLOCK_SNOWY_GRASS && surface != BLOCK_MUD) continue;
+                surface != BLOCK_SNOWY_GRASS && surface != BLOCK_MUD &&
+                surface != BLOCK_RED_SAND && surface != BLOCK_MYCELIUM) continue;
             if (world[x][y - 1] != BLOCK_AIR) continue;
 
             unsigned int h = hash2D(x, y, seed + 6000);
@@ -3825,6 +3946,24 @@ void GenerateWorld(unsigned int seed)
                     if (h % 10 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
                     else if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
                     break;
+                case 7: // Savanna: dry tall grass, occasional flowers
+                    if (h % 6 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    else if (h % 30 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    break;
+                case 8: // Mesa: nearly barren, rare cactus
+                    if (h % 60 == 0 && world[x - 1][y] == BLOCK_RED_SAND &&
+                        world[x + 1][y] == BLOCK_RED_SAND && y > SEA_LEVEL + 2)
+                        world[x][y - 1] = BLOCK_CACTUS;
+                    else if (h % 40 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
+                case 9: // Flower field: dense flowers
+                    if (h % 3 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    else if (h % 7 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
+                case 10: // Mushroom island: sparse grass; giant mushrooms placed in a later pass
+                    if (surface == BLOCK_MYCELIUM && h % 9 == 0)
+                        world[x][y - 1] = BLOCK_TALL_GRASS;
+                    break;
                 default: // Plains
                     if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
                     else if (h % 8 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
@@ -3839,7 +3978,7 @@ void GenerateWorld(unsigned int seed)
     for (int x = 2; x < WORLD_WIDTH - 2; x++) {
         int biome = GetBiomeAtX(x, seed);
 
-        if (biome == 3) continue; // No sugar cane in tundra
+        if (biome == 3 || biome == 8 || biome == 10) continue; // no cane in tundra/mesa/mushroom
 
         for (int y = 1; y < SEA_LEVEL + 6 && y < WORLD_HEIGHT - 1; y++) {
             if (world[x][y] != BLOCK_AIR) continue;
