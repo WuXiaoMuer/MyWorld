@@ -2110,6 +2110,31 @@ void DrawCreativeScreen(void)
                 Rectangle src = { (float)(item * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
                 Rectangle dst = { (float)(x + 4), (float)(y + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
                 DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
+
+                bool isTool = IsTool((BlockType)item);
+                // Quantity badge: tools are single, everything else stacks to 64
+                // (matches what clicking the slot grants).
+                if (!isTool) {
+                    const char *countStr = "64";
+                    int ctw = MeasureGameTextWidth(countStr, 12);
+                    int badgeX = x + slotSize - ctw - 5;
+                    int badgeY = y + slotSize - 16;
+                    DrawRectangle(badgeX - 2, badgeY - 1, ctw + 4, 14, (Color){0, 0, 0, 140});
+                    DrawGameText(countStr, badgeX, badgeY, 12, (Color){240, 240, 255, 230});
+                }
+
+                if (isTool) {
+                    int maxDur = GetToolMaxDurability((BlockType)item);
+                    if (maxDur > 0) {
+                        int barW = slotSize - 8;
+                        int barH = 3;
+                        int barX = x + 4;
+                        int barY = y + slotSize - 6;
+                        DrawRectangle(barX, barY, barW, barH, (Color){0, 0, 0, 120});
+                        DrawRectangle(barX, barY, barW, barH, (Color){80, 200, 100, 220});
+                        DrawRectangle(barX, barY, barW, 1, (Color){255, 255, 255, 40});
+                    }
+                }
             }
 
             // Click: pick into selected hotbar slot (infinite stack)
