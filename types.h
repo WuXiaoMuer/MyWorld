@@ -1214,6 +1214,7 @@ typedef struct {
     bool wasInWater;         // for water splash detection
     float footstepTimer;     // for footstep sound intervals
     float fallPeakVel;       // peak downward velocity during current fall
+    float fallDistance;      // accumulated fall distance (pixels) for fall damage
     float coyoteTimer;
     float jumpBufferTimer;
     float cameraShakeIntensity;

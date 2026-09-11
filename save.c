@@ -597,6 +597,7 @@ bool LoadWorld(const char *path)
     player.sprinting = false;
     player.playerDead = false;
     player.fallPeakVel = 0.0f;
+    player.fallDistance = 0.0f;
     player.knockbackTimer = 0.0f;
     player.cameraShakeIntensity = 0.0f;
     player.cameraShakeTimer = 0.0f;

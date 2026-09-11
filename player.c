@@ -83,6 +83,7 @@ void InitPlayer(void)
     player.damageFlashTimer = 0.0f;
     player.playerDead = false;
     player.fallPeakVel = 0.0f;
+    player.fallDistance = 0.0f;
     player.coyoteTimer = 0.0f;
     player.jumpBufferTimer = 0.0f;
     player.cameraShakeIntensity = 0.0f;
@@ -688,9 +689,14 @@ void PlayerPhysics(float dt)
         if (blocked) break;
     }
 
-    // Track peak fall velocity
-    if (player.velocity.y > 0) {
-        if (player.velocity.y > player.fallPeakVel) player.fallPeakVel = player.velocity.y;
+    // Accumulate fall distance while descending (see fall damage on landing).
+    // Reset on the ground, while rising, in water or in creative flight so only
+    // a genuine uninterrupted fall counts.
+    if (!inWater && !player.flying && !player.onGround && player.velocity.y > 0) {
+        float dy = newY - player.position.y;
+        if (dy > 0) player.fallDistance += dy;
+    } else if (player.onGround || player.velocity.y <= 0 || inWater || player.flying) {
+        player.fallDistance = 0.0f;
     }
 
     bool wasOnGround = player.onGround;
@@ -707,9 +713,10 @@ void PlayerPhysics(float dt)
                                      player.velocity.y / 400.0f);
                 }
             }
-            // Fall damage (creative: invincible)
-            if (player.fallPeakVel > 300.0f && gameMode != GAME_CREATIVE) {
-                int damage = (int)((player.fallPeakVel - 300.0f) / 100.0f);
+            // Fall damage: MC-style, 1 damage per block fallen beyond 3 blocks.
+            float fallBlocks = player.fallDistance / BLOCK_SIZE;
+            if (fallBlocks > 3.0f && gameMode != GAME_CREATIVE) {
+                int damage = (int)(fallBlocks - 3.0f);
                 if (damage > 0) {
                     float reduction = GetArmorDamageReduction();
                     damage = (int)(damage * (1.0f - reduction));
@@ -729,14 +736,18 @@ void PlayerPhysics(float dt)
                     ShowMessage(S(STR_MSG_FALL_DAMAGE), (Color){240, 100, 100, 255});
                 }
             }
+            player.fallDistance = 0.0f;
             player.fallPeakVel = 0.0f;
         } else if (player.velocity.y < 0) {
             newY = (int)(top / BLOCK_SIZE) * BLOCK_SIZE + BLOCK_SIZE;
         }
         player.velocity.y = 0;
     }
-    // Reset peak vel when not falling (e.g., in water, on ground)
-    if (player.onGround || player.velocity.y <= 0) player.fallPeakVel = 0.0f;
+    // Reset fall tracking when not falling (e.g., in water, on ground)
+    if (player.onGround || player.velocity.y <= 0 || inWater || player.flying) {
+        player.fallDistance = 0.0f;
+        player.fallPeakVel = 0.0f;
+    }
     player.position.y = newY;
 
     if (player.position.x < 0) player.position.x = 0;
@@ -2107,6 +2118,7 @@ void RespawnPlayer(void)
     player.wasInWater = false;
     player.footstepTimer = 0.0f;
     player.fallPeakVel = 0.0f;
+    player.fallDistance = 0.0f;
     player.coyoteTimer = 0.0f;
     player.jumpBufferTimer = 0.0f;
     player.cameraShakeIntensity = 0.0f;
