@@ -287,7 +287,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 
     // Title
     const char *title = showAdvanced ? S(STR_CRAFTING_TABLE) : S(STR_CRAFTING);
-    DrawGameText(title, panelX, panelY, 16, (Color){170, 170, 170, 255});
+    DrawGameText(title, panelX, panelY, 16, (Color){62, 62, 62, 255});
     panelY += 22;
 
     // Search box
@@ -472,11 +472,11 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             for (int s = 0; s < INVENTORY_SLOTS; s++) {
                 if (player.inventory[s] == r->input) have += player.inventoryCount[s];
             }
-            Color countColor = have >= r->inputCount ? (Color){200, 200, 200, 255} : (Color){232, 87, 92, 255};
+            Color countColor = have >= r->inputCount ? (Color){45, 125, 45, 255} : (Color){232, 87, 92, 255};
             DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
         }
 
-        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){170, 170, 170, 200});
+        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){95, 95, 95, 220});
 
         // Output icon
         if (r->output < BLOCK_COUNT && blockAtlas.id > 0) {
@@ -484,10 +484,10 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             Rectangle dstOut = { (float)(x + iconSize + 50), (float)(slotY + 3), (float)iconSize, (float)iconSize };
             DrawTexturePro(blockAtlas, srcOut, dstOut, (Vector2){0, 0}, 0, WHITE);
         }
-        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){255, 255, 255, 255});
+        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){62, 62, 62, 255});
 
         // Recipe name
-        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){170, 170, 170, 220});
+        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){95, 95, 95, 225});
 
         // Max craftable count
         if (canCraft && r->inputCount > 0) {
@@ -502,8 +502,8 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
                 int bw = MeasureGameTextWidth(buf, 9) + 6;
                 int bx = panelX + panelW - bw - 8;
                 DrawRectangle(bx, textY - 1, bw, 14, (Color){36, 36, 36, 200});
-                DrawRectangleLines(bx, textY - 1, bw, 14, (Color){200, 200, 200, 190});
-                DrawGameText(buf, bx + 3, textY, 9, (Color){200, 200, 200, 220});
+                DrawRectangleLines(bx, textY - 1, bw, 14, (Color){85, 85, 85, 200});
+                DrawGameText(buf, bx + 3, textY, 9, (Color){70, 70, 70, 230});
             }
         }
     }
@@ -520,23 +520,23 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         int thumbH = (int)(trackH * viewRatio);
         if (thumbH < 12) thumbH = 12;
         int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
-        DrawRectangle(trackX, thumbY, 4, thumbH, (Color){200, 200, 200, 220});
+        DrawRectangle(trackX, thumbY, 4, thumbH, (Color){100, 100, 100, 230});
     }
 
     // Fade arrows
     int listH = visibleCount * (slotH + pad);
     if (craftScrollOffset > 0) {
         DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){55, 55, 55, 180});
-        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){170, 170, 170, 150});
+        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){95, 95, 95, 180});
     }
     if (endIdx < filteredCount) {
         DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){55, 55, 55, 180});
-        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){170, 170, 170, 150});
+        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){95, 95, 95, 180});
     }
 
     if (filteredCount == 0) {
         const char *msg = craftSearchLen > 0 ? S(STR_NO_MATCHES) : S(STR_NO_RECIPES);
-        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){170, 170, 170, 180});
+        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){95, 95, 95, 200});
     }
 }
 
@@ -556,12 +556,12 @@ void DrawFurnaceUI(void)
 
     // Background with shadow
     CraftRoundedRect(panelX + 3, panelY + 3, panelW, panelH, 0.06f, (Color){0, 0, 0, 60});
-    CraftRoundedRect(panelX, panelY, panelW, panelH, 0.06f, (Color){55, 55, 55, 240});
-    DrawRectangle(panelX, panelY, panelW, 30, (Color){36, 45, 60, 240});
+    CraftRoundedRect(panelX, panelY, panelW, panelH, 0.06f, (Color){198, 198, 198, 255});
+    DrawRectangle(panelX, panelY, panelW, 30, (Color){180, 180, 180, 255});
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){90, 90, 90, 255});
 
     // Title
-    DrawGameText(S(STR_FURNACE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_FURNACE), 16) / 2, panelY + 8, 16, (Color){255, 255, 255, 255});
+    DrawGameText(S(STR_FURNACE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_FURNACE), 16) / 2, panelY + 8, 16, (Color){62, 62, 62, 255});
 
     int slotSize = 40;
     int slotY = panelY + 44;
@@ -575,7 +575,7 @@ void DrawFurnaceUI(void)
     if (fuelHover) DrawRectangle(fuelX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(fuelX, slotY, slotSize, slotSize, fuelBg);
     DrawRectangleLines(fuelX, slotY, slotSize, slotSize, fuelBorder);
-    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 10, (Color){180, 175, 190, 200});
+    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 10, (Color){95, 95, 95, 210});
 
     // Input slot (center)
     int inputX = panelX + panelW / 2 - slotSize / 2;
@@ -586,7 +586,7 @@ void DrawFurnaceUI(void)
     if (inputHover) DrawRectangle(inputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(inputX, slotY, slotSize, slotSize, inputBg);
     DrawRectangleLines(inputX, slotY, slotSize, slotSize, inputBorder);
-    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 10, (Color){180, 175, 190, 200});
+    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 10, (Color){95, 95, 95, 210});
 
     // Output slot (right)
     int outputX = panelX + panelW - 30 - slotSize;
@@ -597,7 +597,7 @@ void DrawFurnaceUI(void)
     if (outputHover) DrawRectangle(outputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(outputX, slotY, slotSize, slotSize, outputBg);
     DrawRectangleLines(outputX, slotY, slotSize, slotSize, outputBorder);
-    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 10, (Color){180, 175, 190, 200});
+    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 10, (Color){95, 95, 95, 210});
 
     // Draw items in slots
     if (furnaceFuel != BLOCK_AIR && blockAtlas.id > 0) {
@@ -605,6 +605,7 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(fuelX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceFuelCount > 1)
+            DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 17, slotY + slotSize - 13, 10, (Color){0, 0, 0, 150});
             DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
     if (furnaceInput != BLOCK_AIR && blockAtlas.id > 0) {
@@ -612,6 +613,7 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(inputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceInputCount > 1)
+            DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 17, slotY + slotSize - 13, 10, (Color){0, 0, 0, 150});
             DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
     if (furnaceOutput != BLOCK_AIR && blockAtlas.id > 0) {
@@ -619,6 +621,7 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(outputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceOutputCount > 1)
+            DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 17, slotY + slotSize - 13, 10, (Color){0, 0, 0, 150});
             DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
 
@@ -641,7 +644,7 @@ void DrawFurnaceUI(void)
 
     // Fuel flame indicator
     int flameY = slotY + slotSize + 10;
-    DrawGameText(TextFormat("%s:", S(STR_FUEL)), fuelX, flameY, 10, (Color){180, 175, 190, 200});
+    DrawGameText(TextFormat("%s:", S(STR_FUEL)), fuelX, flameY, 10, (Color){95, 95, 95, 210});
     if (furnaceFuelBurn > 0.0f) {
         int flameW = 60;
         int flameH = 8;
@@ -657,7 +660,7 @@ void DrawFurnaceUI(void)
         int ri = FindSmeltRecipe((BlockType)furnaceInput);
         if (ri >= 0) {
             DrawGameText(Sf(STR_MSG_SMELTING, S(smeltRecipes[ri].nameId)),
-                     panelX + 10, panelY + panelH - 40, 10, (Color){150, 145, 160, 200});
+                     panelX + 10, panelY + panelH - 40, 10, (Color){95, 95, 95, 210});
         } else {
             DrawGameText(S(STR_MSG_CANNOT_SMELT),
                      panelX + 10, panelY + panelH - 40, 10, (Color){200, 100, 100, 200});
@@ -666,7 +669,7 @@ void DrawFurnaceUI(void)
 
     // Close hint
     DrawGameText(S(STR_PRESS_E_ESC_CLOSE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_PRESS_E_ESC_CLOSE), 10) / 2,
-             panelY + panelH - 18, 10, (Color){120, 115, 130, 180});
+             panelY + panelH - 18, 10, (Color){95, 95, 95, 200});
 
     // --- Click handling for furnace slots ---
 
