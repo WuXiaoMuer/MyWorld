@@ -1613,6 +1613,7 @@ float fbm(float x, float y, int octaves, float persistence, unsigned int seed);
 void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int worldY);
 void GenerateBlockAtlas(void);
 void GenerateWorld(unsigned int seed);
+int GetBiomeAtX(int worldX, unsigned int seed);
 Chunk* GetChunk(int chunkX);
 void UnloadChunk(int chunkX);
 void GenerateChunkTexture(Chunk *chunk);

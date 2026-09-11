@@ -3169,6 +3169,22 @@ void SetCropGrowth(int bx, int by, int stage)
 //----------------------------------------------------------------------------------
 // World Generation
 //----------------------------------------------------------------------------------
+// Authoritative biome lookup. Single source of truth for the biome noise mapping;
+// every world-generation pass and mob spawning call this instead of duplicating it.
+// 0=plains, 1=desert, 2=forest, 3=tundra, 4=swamp, 5=jungle, 6=taiga
+// (Add new biomes here only — all consumers pick them up automatically.)
+int GetBiomeAtX(int worldX, unsigned int seed)
+{
+    float biomeNoise = fbm(worldX * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
+    if (biomeNoise > 0.55f) return 1;       // desert
+    else if (biomeNoise > 0.35f) return 6;   // taiga
+    else if (biomeNoise > 0.15f) return 0;   // plains
+    else if (biomeNoise > -0.05f) return 4;  // swamp
+    else if (biomeNoise > -0.25f) return 2;  // forest
+    else if (biomeNoise > -0.45f) return 5;  // jungle
+    else return 3;                            // tundra
+}
+
 void GenerateWorld(unsigned int seed)
 {
     memset(world, 0, sizeof(world));
@@ -3210,16 +3226,7 @@ void GenerateWorld(unsigned int seed)
         }
 
         // --- Biome ---
-        // 0=plains, 1=desert, 2=forest, 3=tundra, 4=swamp, 5=jungle, 6=taiga
-        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        int biome = 0;
-        if (biomeNoise > 0.55f) biome = 1;       // desert
-        else if (biomeNoise > 0.35f) biome = 6;   // taiga
-        else if (biomeNoise > 0.15f) biome = 0;   // plains
-        else if (biomeNoise > -0.05f) biome = 4;  // swamp
-        else if (biomeNoise > -0.25f) biome = 2;  // forest
-        else if (biomeNoise > -0.45f) biome = 5;  // jungle
-        else biome = 3;                            // tundra
+        int biome = GetBiomeAtX(x, seed);
 
         // --- Calculate surface Y ---
         // Terrain is lower Y = higher on screen
@@ -3368,9 +3375,9 @@ void GenerateWorld(unsigned int seed)
     // Pass 5: Sand near sea level (for non-desert biomes)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
-        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        bool isDesert = biomeNoise > 0.55f;
-        bool isTundra = biomeNoise < -0.45f;
+        int biome = GetBiomeAtX(x, seed);
+        bool isDesert = (biome == 1);
+        bool isTundra = (biome == 3);
         if (isDesert || isTundra) continue; // desert has sand, tundra has ice/snow
         for (int y = SEA_LEVEL - 3; y <= SEA_LEVEL + 2; y++) {
             if (y < 0 || y >= WORLD_HEIGHT) continue;
@@ -3595,8 +3602,7 @@ void GenerateWorld(unsigned int seed)
     // Pass 10b: Freeze water surface in tundra biome
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
-        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        bool isTundra = biomeNoise < -0.45f;
+        bool isTundra = (GetBiomeAtX(x, seed) == 3);
         if (!isTundra) continue;
         for (int y = SEA_LEVEL; y < WORLD_HEIGHT; y++) {
             if (world[x][y] == BLOCK_WATER) {
@@ -3615,15 +3621,7 @@ void GenerateWorld(unsigned int seed)
     // Pass 11: Trees (biome-aware density and type)
     // ============================================================
     for (int x = 5; x < WORLD_WIDTH - 5; x++) {
-        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        int biome = 0;
-        if (biomeNoise > 0.55f) biome = 1;       // desert
-        else if (biomeNoise > 0.35f) biome = 6;   // taiga
-        else if (biomeNoise > 0.15f) biome = 0;   // plains
-        else if (biomeNoise > -0.05f) biome = 4;  // swamp
-        else if (biomeNoise > -0.25f) biome = 2;  // forest
-        else if (biomeNoise > -0.45f) biome = 5;  // jungle
-        else biome = 3;                            // tundra
+        int biome = GetBiomeAtX(x, seed);
 
         // Biome-specific tree density
         int treeChance;
@@ -3790,15 +3788,7 @@ void GenerateWorld(unsigned int seed)
     // Pass 12: Flowers, tall grass, decorations (biome-aware)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
-        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        int biome = 0;
-        if (biomeNoise > 0.55f) biome = 1;       // desert
-        else if (biomeNoise > 0.35f) biome = 6;   // taiga
-        else if (biomeNoise > 0.15f) biome = 0;   // plains
-        else if (biomeNoise > -0.05f) biome = 4;  // swamp
-        else if (biomeNoise > -0.25f) biome = 2;  // forest
-        else if (biomeNoise > -0.45f) biome = 5;  // jungle
-        else biome = 3;                            // tundra
+        int biome = GetBiomeAtX(x, seed);
 
         for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
             uint8_t surface = world[x][y];
@@ -3847,15 +3837,7 @@ void GenerateWorld(unsigned int seed)
     // Pass 12b: Sugar cane near water (warm biomes)
     // ============================================================
     for (int x = 2; x < WORLD_WIDTH - 2; x++) {
-        float biomeNoise = fbm(x * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        int biome = 0;
-        if (biomeNoise > 0.55f) biome = 1;       // desert
-        else if (biomeNoise > 0.35f) biome = 6;   // taiga
-        else if (biomeNoise > 0.15f) biome = 0;   // plains
-        else if (biomeNoise > -0.05f) biome = 4;  // swamp
-        else if (biomeNoise > -0.25f) biome = 2;  // forest
-        else if (biomeNoise > -0.45f) biome = 5;  // jungle
-        else biome = 3;                            // tundra
+        int biome = GetBiomeAtX(x, seed);
 
         if (biome == 3) continue; // No sugar cane in tundra
 
@@ -3889,15 +3871,7 @@ void GenerateWorld(unsigned int seed)
         int vx = (int)(hash2D(v, 0, seed + 20000) % (WORLD_WIDTH - 60)) + 30;
 
         // Check biome at village center
-        float biomeNoise = fbm(vx * 0.008f, 0.0f, 2, 0.5f, seed + 8000);
-        int biome = 0;
-        if (biomeNoise > 0.55f) biome = 1;
-        else if (biomeNoise > 0.35f) biome = 6;
-        else if (biomeNoise > 0.15f) biome = 0;
-        else if (biomeNoise > -0.05f) biome = 4;
-        else if (biomeNoise > -0.25f) biome = 2;
-        else if (biomeNoise > -0.45f) biome = 5;
-        else biome = 3;
+        int biome = GetBiomeAtX(vx, seed);
 
         // Only place villages in plains or forest
         if (biome != 0 && biome != 2 && biome != 6) continue;

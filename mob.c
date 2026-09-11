@@ -752,17 +752,10 @@ static void UpdateSpiderAI(Mob *mob, float dt)
     }
 }
 
-// Get biome at a world X position (must match GenerateWorld logic)
-static int GetBiomeAtX(int worldX)
+// Biome lookup is shared with world generation (world.c GetBiomeAtX).
+static int MobGetBiomeAtX(int worldX)
 {
-    float biomeNoise = fbm(worldX * 0.008f, 0.0f, 2, 0.5f, worldSeed + 8000);
-    if (biomeNoise > 0.55f) return 1;       // desert
-    else if (biomeNoise > 0.35f) return 6;   // taiga
-    else if (biomeNoise > 0.15f) return 0;   // plains
-    else if (biomeNoise > -0.05f) return 4;  // swamp
-    else if (biomeNoise > -0.25f) return 2;  // forest
-    else if (biomeNoise > -0.45f) return 5;  // jungle
-    else return 3;                            // tundra
+    return GetBiomeAtX(worldX, worldSeed);
 }
 
 static void UpdateSlimeAI(Mob *mob, float dt)
@@ -1155,7 +1148,7 @@ static void TrySpawnMobs(float dt)
 
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
-            int biome = GetBiomeAtX(bx);
+            int biome = MobGetBiomeAtX(bx);
             if (biome == 4 || biome == 5) { // swamp or jungle
                 for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
                     if (IsBlockSolid(bx, y) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
@@ -1200,7 +1193,7 @@ static void TrySpawnMobs(float dt)
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
                 if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
-                    int biome = GetBiomeAtX(bx);
+                    int biome = MobGetBiomeAtX(bx);
                     int roll = rand() % 100;
                     MobType spawnType;
                     bool doSpawn = true;
