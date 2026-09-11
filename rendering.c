@@ -426,7 +426,7 @@ void DrawInventoryScreen(void)
         memcpy(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch));
     }
 
-    int slotSize = 40;
+    int slotSize = 32;
 
     // --- Minecraft-style combined furnace + inventory screen ---
     if (furnaceOpen) {
@@ -1217,16 +1217,16 @@ void DrawInventoryScreen(void)
     }
 
     // --- Normal inventory screen (when furnace is NOT open) ---
-    int padding = 3;
+    int padding = 2;
     int gridW = INVENTORY_COLS * slotSize + (INVENTORY_COLS - 1) * padding;
     int gridH = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
 
     // Player preview dimensions
-    int previewW = 80;
-    int previewPad = 8;
+    int previewW = 72;
+    int previewPad = 6;
 
     // Armor slots: vertical column to the left of inventory
-    int armorSlotSize = 40;
+    int armorSlotSize = 32;
     int armorPad = 3;
     int armorColW = armorSlotSize + armorPad;
 
@@ -1234,7 +1234,11 @@ void DrawInventoryScreen(void)
     int craftSlotH = 38;
     int craftPad = 2;
     int craftPanelW = 280;
-    int visibleRecipes = 6;
+    int gridH_local = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
+    int invBlockH = 24 + gridH_local;
+    int visibleRecipes = (invBlockH - 32) / (craftSlotH + craftPad);
+    if (visibleRecipes < 3) visibleRecipes = 3;
+    if (visibleRecipes > 8) visibleRecipes = 8;
     int craftVisibleH = visibleRecipes * (craftSlotH + craftPad);
     int craftPanelH = craftVisibleH + 32; // title + padding
 

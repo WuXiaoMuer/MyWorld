@@ -291,14 +291,15 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     panelY += 22;
 
     // Search box
-    int searchBoxW = panelW - 10;
-    int searchBoxH = 18;
+    int searchBoxW = panelW - 12;
+    int searchBoxH = 20;
     Rectangle searchBox = { (float)panelX, (float)panelY, (float)searchBoxW, (float)searchBoxH };
     bool searchFocused = CheckCollisionPointRec(mouse, searchBox);
-
-    CraftRoundedRect(panelX, panelY, searchBoxW, searchBoxH, 0.06f, (Color){36, 36, 36, 220});
+    DrawRectangle(panelX, panelY, searchBoxW, searchBoxH, (Color){70, 70, 70, 255});
+    DrawRectangle(panelX, panelY, searchBoxW, 1, (Color){40, 40, 40, 255});
+    DrawRectangle(panelX, panelY, 1, searchBoxH, (Color){40, 40, 40, 255});
     DrawRectangleLines(panelX, panelY, searchBoxW, searchBoxH,
-                       searchFocused ? (Color){200, 200, 200, 220} : (Color){90, 90, 90, 180});
+                       searchFocused ? (Color){255, 255, 255, 255} : (Color){110, 110, 110, 255});
 
     // Handle text input for search
     if (searchFocused || craftSearchLen > 0) {
