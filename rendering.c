@@ -2096,17 +2096,8 @@ void DrawCreativeScreen(void)
                 DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
 
                 bool isTool = IsTool((BlockType)item);
-                // Quantity badge: tools are single, everything else stacks to 64
-                // (matches what clicking the slot grants).
-                if (!isTool) {
-                    const char *countStr = "64";
-                    int ctw = MeasureGameTextWidth(countStr, 12);
-                    int badgeX = x + slotSize - ctw - 5;
-                    int badgeY = y + slotSize - 16;
-                    DrawRectangle(badgeX - 2, badgeY - 1, ctw + 4, 14, (Color){0, 0, 0, 140});
-                    DrawGameText(countStr, badgeX, badgeY, 12, (Color){240, 240, 255, 230});
-                }
-
+                // MC creative shows no stack counts — just the icon. Keep a
+                // durability bar for tools so damaged gear reads correctly.
                 if (isTool) {
                     int maxDur = GetToolMaxDurability((BlockType)item);
                     if (maxDur > 0) {
