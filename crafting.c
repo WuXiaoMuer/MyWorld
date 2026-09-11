@@ -411,20 +411,20 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         Color rowBorder;
         if (canCraft) {
             bgColor = (Color){
-                (unsigned char)(34 + (int)(10 * hA)),
-                (unsigned char)(50 + (int)(16 * hA)),
-                (unsigned char)(44 + (int)(12 * hA)),
-                (unsigned char)(200 + (int)(20 * hA))
+                (unsigned char)(150 + (int)(20 * hA)),
+                (unsigned char)(150 + (int)(20 * hA)),
+                (unsigned char)(150 + (int)(20 * hA)),
+                (unsigned char)(230 + (int)(25 * hA))
             };
-            rowBorder = hover ? (Color){200, 200, 200, 220} : (Color){90, 90, 90, 150};
+            rowBorder = hover ? (Color){255, 255, 255, 230} : (Color){110, 110, 110, 200};
         } else {
             bgColor = (Color){
-                (unsigned char)(31 + (int)(6 * hA)),
-                (unsigned char)(35 + (int)(6 * hA)),
-                (unsigned char)(40 + (int)(8 * hA)),
-                (unsigned char)(190 + (int)(20 * hA))
+                (unsigned char)(128 + (int)(10 * hA)),
+                (unsigned char)(128 + (int)(10 * hA)),
+                (unsigned char)(128 + (int)(10 * hA)),
+                (unsigned char)(215 + (int)(20 * hA))
             };
-            rowBorder = hover ? (Color){232, 87, 92, 180} : (Color){42, 49, 63, 150};
+            rowBorder = hover ? (Color){232, 87, 92, 200} : (Color){110, 110, 110, 170};
         }
         if (hover) {
             if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && canCraft) {

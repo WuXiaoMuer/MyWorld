@@ -170,24 +170,26 @@ void DrawUiPanel(int x, int y, int w, int h, unsigned char alpha)
     DrawRectangle(x + 2, y + 2, w - 4, 1, (Color){0, 0, 0, (unsigned char)(alpha * 0.18f)});
 }
 
-// Minecraft-style slot: #8B8B8B recessed square — dark #373737 inner top/left,
-// white inner bottom/right — exactly the vanilla inventory slot look. Hover
-// lightens; selected draws the white item-frame outline.
+// Minecraft-style slot: dark #8B8B8B recessed square. Vanilla draws a 1px
+// #373737 line along the top/left and a 1px #FFFFFF line along the bottom/right
+// of the *inner* area, which reads as a sunken well.
 void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha)
 {
     int a = (int)(255 * alpha);
     Color fill = hover ? UI_SLOT_HOVER : UI_SLOT;
     fill.a = (unsigned char)a;
+    Color dark = {UI_SLOT_DK.r, UI_SLOT_DK.g, UI_SLOT_DK.b, (unsigned char)a};
+    Color lite = {255, 255, 255, (unsigned char)a};
 
     DrawRectangle(x, y, size, size, fill);
-    // Inner recessed bevel (dark top-left, light bottom-right)
-    DrawRectangle(x, y, size, 2, (Color){UI_SLOT_DK.r, UI_SLOT_DK.g, UI_SLOT_DK.b, (unsigned char)a});
-    DrawRectangle(x, y, 2, size, (Color){UI_SLOT_DK.r, UI_SLOT_DK.g, UI_SLOT_DK.b, (unsigned char)a});
-    DrawRectangle(x, y + size - 2, size, 2, (Color){255, 255, 255, (unsigned char)(a * 0.85f)});
-    DrawRectangle(x + size - 2, y, 2, size, (Color){255, 255, 255, (unsigned char)(a * 0.85f)});
+    // Sunken inner bevel: dark on top/left, white on bottom/right
+    DrawRectangle(x, y, size, 1, dark);
+    DrawRectangle(x, y, 1, size, dark);
+    DrawRectangle(x, y + size - 1, size, 1, lite);
+    DrawRectangle(x + size - 1, y, 1, size, lite);
 
     if (selected) {
-        // MC selected-slot: thick white frame extending 1px outside
+        // MC selected-slot: white frame drawn just outside the slot
         DrawRectangleLinesEx((Rectangle){(float)x - 1, (float)y - 1, (float)size + 2, (float)size + 2},
                              2, (Color){255, 255, 255, (unsigned char)(235 * alpha)});
     }
@@ -1204,11 +1206,11 @@ void DrawInventoryScreen(void)
     int armorPad = 3;
     int armorColW = armorSlotSize + armorPad;
 
-    // Crafting panel dimensions
+    // Crafting panel dimensions (kept short so the panel hugs the inventory)
     int craftSlotH = 38;
     int craftPad = 2;
     int craftPanelW = 280;
-    int visibleRecipes = 10;
+    int visibleRecipes = 6;
     int craftVisibleH = visibleRecipes * (craftSlotH + craftPad);
     int craftPanelH = craftVisibleH + 32; // title + padding
 
@@ -1356,7 +1358,6 @@ void DrawInventoryScreen(void)
 
     // Armor slots (vertical, to the left of inventory)
     {
-        const char *armorLabels[] = {"H", "C", "L", "B"};
         int armorX = containerX + panelPad + previewW + previewPad;
         int armorY = invY;
         for (int i = 0; i < 4; i++) {
@@ -1385,8 +1386,24 @@ void DrawInventoryScreen(void)
                     DrawRectangle(barX, barY, (int)(barW * pct), 3, barColor);
                 }
             } else {
-                // Label for empty slot
-                DrawGameText(armorLabels[i], armorX + armorSlotSize / 2 - 4, ay + armorSlotSize / 2 - 6,14, (Color){62, 62, 62, 150});
+                // Empty armor slot: faint MC-style silhouette icon
+                Color ghost = (Color){90, 90, 90, 90};
+                int icx = armorX + armorSlotSize / 2;
+                int icy = ay + armorSlotSize / 2;
+                if (i == 0) {          // helmet
+                    DrawRectangle(icx - 8, icy - 7, 16, 8, ghost);
+                    DrawRectangle(icx - 6, icy + 1, 12, 3, ghost);
+                } else if (i == 1) {   // chestplate
+                    DrawRectangle(icx - 8, icy - 7, 16, 14, ghost);
+                    DrawRectangle(icx - 11, icy - 6, 3, 9, ghost);
+                    DrawRectangle(icx + 8, icy - 6, 3, 9, ghost);
+                } else if (i == 2) {   // leggings
+                    DrawRectangle(icx - 7, icy - 6, 6, 13, ghost);
+                    DrawRectangle(icx + 1, icy - 6, 6, 13, ghost);
+                } else {               // boots
+                    DrawRectangle(icx - 7, icy - 2, 6, 8, ghost);
+                    DrawRectangle(icx + 1, icy - 2, 6, 8, ghost);
+                }
             }
 
             // Click handling for armor slots
@@ -1580,10 +1597,6 @@ void DrawInventoryScreen(void)
                         DrawRectangle(barX, barY, (int)(barW * pct), barH, barColor);
                     }
                 }
-            }
-
-            if (row == 0) {
-                DrawGameText(TextFormat("%d", col + 1), x + 2, y + 1,10, (Color){62, 62, 62, 120});
             }
 
             if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -3852,16 +3865,6 @@ void DrawMainMenu(void)
     }
     bool btnEnabled[] = { true, hasAnySave, true, true, true, true };
 
-    // Per-button accent colors (subtle colored bar + tint for a colorful menu)
-    static const Color btnAccent[] = {
-        {84, 214, 160, 255},   // New Game  — emerald
-        {84, 160, 235, 255},   // Load Game — sky blue
-        {255, 185, 90, 255},   // Host Game — amber
-        {74, 214, 190, 255},   // Join Game — teal
-        {190, 130, 235, 255},  // Settings  — lavender
-        {235, 100, 100, 255},  // Quit      — rose
-    };
-
     for (int i = 0; i < btnCount; i++) {
         // Staggered entrance
         float btnDelay = btnDelay0 + i * 0.08f;
@@ -3881,13 +3884,6 @@ void DrawMainMenu(void)
 
         DrawUiButton(drawX, by, btnW, btnH, btnLabels[i], 19,
                      hover && btnEnabled[i], sel, btnEnabled[i], btnAlpha);
-
-        // Colorful accent bar on the left edge
-        if (btnEnabled[i]) {
-            Color ac = btnAccent[i];
-            unsigned char ab = (unsigned char)(180 * btnAlpha);
-            DrawRectangle(drawX + 5, by + 8, 4, btnH - 16, (Color){ac.r, ac.g, ac.b, ab});
-        }
     }
 
     // ================================================================

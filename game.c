@@ -4079,6 +4079,54 @@ draw_finish:
         Rectangle dest = logicalViewport;
         DrawTexturePro(logicalCanvas.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
     }
+
+    // TEMP: screenshot capture (env MYWORLD_SHOT=<name>; ?<frames> suffix sets delay)
+    {
+        static const char *shotName = NULL;
+        static int shotFrame = -1, shotDelay = 60, frameCount = 0;
+        if (shotFrame < 0) {
+            const char *env = getenv("MYWORLD_SHOT");
+            shotName = env;
+            if (env) {
+                const char *q = strchr(env, '?');
+                if (q) { shotDelay = atoi(q + 1); }
+            }
+            // TEMP: MYWORLD_WORLD=<slot> auto-starts a game for capture
+            const char *ws = getenv("MYWORLD_WORLD");
+            if (ws) {
+                StartGameFromSlot(atoi(ws), false);
+            }
+            shotFrame = 0;
+        }
+        // TEMP: force a screen open for capture (MYWORLD_OPEN=inv|creative|pause)
+        {
+            const char *open = getenv("MYWORLD_OPEN");
+            if (open && gameState == STATE_PLAYING) {
+                if (!strcmp(open, "inv")) inventoryOpen = true;
+                else if (!strcmp(open, "creative")) creativeOpen = true;
+                else if (!strcmp(open, "pause")) gamePaused = true;
+            }
+        }
+        if (shotName && frameCount < 100000) {
+            frameCount++;
+            if (frameCount == shotDelay) {
+                char path[256];
+                const char *q = strchr(shotName, '?');
+                int n = q ? (int)(q - shotName) : (int)strlen(shotName);
+                snprintf(path, sizeof(path), "shots/%.*s.png", n, shotName);
+                // Capture the logical canvas directly (the screen framebuffer is
+                // unreliable when the window is not foreground).
+                if (logicalCanvasReady) {
+                    Image img = LoadImageFromTexture(logicalCanvas.texture);
+                    ImageFlipVertical(&img);
+                    ExportImage(img, path);
+                    UnloadImage(img);
+                } else {
+                    TakeScreenshot(path);
+                }
+            }
+        }
+    }
     EndDrawing();
 }
 
