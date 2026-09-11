@@ -43,9 +43,11 @@ static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned ch
 #define UI_SLOT       (Color){139, 139, 139, 255}   // slot body (#8B8B8B)
 #define UI_SLOT_DK    (Color){ 55,  55,  55, 255}   // slot inner shadow (#373737)
 #define UI_SLOT_HOVER (Color){160, 160, 160, 255}
-#define UI_BTN        (Color){110, 110, 110, 255}   // stone button face
-#define UI_BTN_HOVER  (Color){135, 135, 145, 255}   // hovered face (slight cool tint)
-#define UI_BTN_OFF    (Color){ 70,  70,  70, 255}   // disabled face
+#define UI_BTN        (Color){108, 108, 108, 255}   // stone button face (#6C6C6C)
+#define UI_BTN_TOP    (Color){160, 160, 160, 255}   // raised top/left highlight
+#define UI_BTN_BOT    (Color){ 70,  70,  70, 255}   // raised bottom/right shadow
+#define UI_BTN_HOVER  (Color){126, 126, 136, 255}   // hovered face (slight cool tint)
+#define UI_BTN_OFF    (Color){ 64,  64,  64, 255}   // disabled face
 #define UI_TEXT_ON_LT (Color){ 62,  62,  62, 255}   // dark text on light panels (#3E)
 #define UI_TEXT       (Color){255, 255, 255, 255}   // white text (buttons/tooltips)
 #define UI_TEXT_DIM   (Color){160, 160, 160, 255}
@@ -152,16 +154,21 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
     fill.a = (unsigned char)(fill.a * alpha);
     textCol.a = (unsigned char)(textCol.a * alpha);
 
-    // Black outer outline, then the stone face with a beveled top.
+    // MC stone button: black outline, then a 3px raised bevel (light top-left,
+    // dark bottom-right) around a flat gray face.
     DrawRectangle(ix - 1, iy - 1, iw + 2, ih + 2, (Color){0, 0, 0, (unsigned char)(255 * alpha)});
-    DrawBevelBox(ix, iy, iw, ih, fill, true);
-    // Brighten the top face a touch more (MC's stone highlight)
-    DrawRectangle(ix + 2, iy + 2, iw - 4, 2, (Color){255, 255, 255, (unsigned char)(35 * alpha)});
+    DrawRectangle(ix, iy, iw, ih, fill);
+    Color top = {UI_BTN_TOP.r, UI_BTN_TOP.g, UI_BTN_TOP.b, (unsigned char)(255 * alpha)};
+    Color bot = {UI_BTN_BOT.r, UI_BTN_BOT.g, UI_BTN_BOT.b, (unsigned char)(255 * alpha)};
+    DrawRectangle(ix, iy, iw, 3, top);
+    DrawRectangle(ix, iy, 3, ih, top);
+    DrawRectangle(ix, iy + ih - 3, iw, 3, bot);
+    DrawRectangle(ix + iw - 3, iy, 3, ih, bot);
 
-    // Hover/selected: white inset frame
+    // Hover/selected: white inset frame (MC highlight)
     if (enabled && (hover || selected)) {
         DrawRectangleLines(ix + 1, iy + 1, iw - 2, ih - 2,
-                           (Color){255, 255, 255, (unsigned char)(200 * alpha)});
+                           (Color){255, 255, 255, (unsigned char)(220 * alpha)});
     }
 
     // Label with hard shadow
@@ -3692,7 +3699,6 @@ void DrawMainMenu(void)
     // Menu entrance animation state
     static float menuEnterTime = 0.0f;
     static float dustX[80], dustY[80], dustSpeed[80], dustSize[80];
-    static float fireflyX[20], fireflyY[20], fireflyPhase[20];
     static float cloudX[6], cloudW[6], cloudY[6];
     static bool menuInited = false;
     extern bool g_resetMenuAnim;
@@ -3707,11 +3713,6 @@ void DrawMainMenu(void)
             dustY[i] = (float)(rand() % SCREEN_HEIGHT);
             dustSpeed[i] = 5.0f + (float)(rand() % 15);
             dustSize[i] = 1.0f + (float)(rand() % 3);
-        }
-        for (int i = 0; i < 15; i++) {
-            fireflyX[i] = (float)(100 + rand() % (SCREEN_WIDTH - 200));
-            fireflyY[i] = (float)(250 + rand() % 300);
-            fireflyPhase[i] = (float)(rand() % 100) * 0.1f;
         }
         for (int i = 0; i < 5; i++) {
             cloudX[i] = (float)(rand() % (SCREEN_WIDTH + 200) - 100);
@@ -3748,12 +3749,6 @@ void DrawMainMenu(void)
             if (tuft == 0) continue;
             DrawRectangle(x, terrY - 3, 2, 3, (Color){108, 182, 82, 255});
         }
-        // A few ore speckles in the stone
-        for (int x = 20; x < SCREEN_WIDTH; x += 97) {
-            int oy = terrY + 34 + ((x / 97) % 3) * 6;
-            DrawRectangle(x, oy, 3, 3, (Color){222, 198, 90, 255}); // gold speck
-            DrawRectangle(x + 40, oy - 8, 3, 3, (Color){120, 214, 214, 255}); // diamond speck
-        }
         // Soft dark veil behind bottom hints for readability
         DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 12, 18, 210});
     }
@@ -3785,38 +3780,6 @@ void DrawMainMenu(void)
 
     // Background glow aura (removed for clean modern look)
 
-    // Sparkle particles around title
-    {
-        static float sparkleX[16], sparkleY[16], sparklePhase[16], sparkleSpeed[16];
-        static bool sparkleInit = false;
-        if (!sparkleInit) {
-            for (int s = 0; s < 12; s++) {
-                sparkleX[s] = (float)(-60 + rand() % (titleW + 120));
-                sparkleY[s] = (float)(-30 + rand() % 70);
-                sparklePhase[s] = (float)(rand() % 100) * 0.1f;
-                sparkleSpeed[s] = 0.5f + (float)(rand() % 10) * 0.15f;
-            }
-            sparkleInit = true;
-        }
-        if (elapsed > 0.8f) {
-            for (int s = 0; s < 12; s++) {
-                float sAlpha = sinf(time * sparkleSpeed[s] + sparklePhase[s]) * 0.5f + 0.5f;
-                sAlpha = sAlpha * sAlpha;
-                float fadeIn = (elapsed - 0.8f - s * 0.05f);
-                if (fadeIn < 0.0f) continue;
-                if (fadeIn > 1.0f) fadeIn = 1.0f;
-                unsigned char sa = (unsigned char)(sAlpha * 160 * fadeIn);
-                int sx = titleX + (int)sparkleX[s];
-                int sy = titleY + (int)sparkleY[s];
-                // Small cross sparkle
-                int sz = 2 + (s % 3);
-                DrawRectangle(sx - 1, sy - sz, 3, sz * 2 + 1, (Color){255, 240, 180, sa});
-                DrawRectangle(sx - sz, sy - 1, sz * 2 + 1, 3, (Color){255, 240, 180, sa});
-                DrawRectangle(sx, sy, 1, 1, (Color){255, 255, 255, (unsigned char)(sa * 1.5f)});
-            }
-        }
-    }
-
     // Bounce-in animation
     for (int ci = 0; ci < titleLen; ci++) {
         float letterStart = ci * 0.055f;
@@ -3838,11 +3801,15 @@ void DrawMainMenu(void)
         DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 215, 165, ca});
     }
 
-    // Final title — flat MC gold with a hard drop shadow
+    // Final title — MC gold with a full dark outline + hard drop shadow
     if (elapsed > titleTotalDur) {
-        DrawGameText(title, titleX + 3, titleY + 4, titleSize, (Color){0, 0, 0, 180});
-        DrawGameText(title, titleX + 1, titleY + 2, titleSize, (Color){60, 48, 20, 200});
-        DrawGameText(title, titleX, titleY, titleSize, (Color){252, 220, 120, 255});
+        Color outline = (Color){52, 36, 12, 255};
+        DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){0, 0, 0, 170});
+        DrawGameText(title, titleX - 2, titleY, titleSize, outline);
+        DrawGameText(title, titleX + 2, titleY, titleSize, outline);
+        DrawGameText(title, titleX, titleY - 2, titleSize, outline);
+        DrawGameText(title, titleX, titleY + 2, titleSize, outline);
+        DrawGameText(title, titleX, titleY, titleSize, (Color){252, 226, 130, 255});
     }
 
     // ================================================================
@@ -3957,12 +3924,16 @@ void DrawMainMenu(void)
     float hintFade = (elapsed - btnDelay0 - btnCount * 0.08f - 0.25f) / 0.4f;
     if (hintFade > 0.0f) {
         if (hintFade > 1.0f) hintFade = 1.0f;
-        unsigned char h1a = (unsigned char)(hintFade * 110);
+        unsigned char a = (unsigned char)(hintFade * 235);
         const char *hint1 = S(STR_HINT_NAVIGATE);
         int hint1W = MeasureGameTextWidth(hint1, 12);
-        DrawGameText(hint1, (SCREEN_WIDTH - hint1W) / 2, SCREEN_HEIGHT - 48, 12, (Color){120, 125, 140, h1a});
+        int h1x = (SCREEN_WIDTH - hint1W) / 2;
+        DrawGameText(hint1, h1x + 1, SCREEN_HEIGHT - 53, 12, (Color){0, 0, 0, a});
+        DrawGameText(hint1, h1x, SCREEN_HEIGHT - 54, 12, (Color){235, 235, 235, a});
         const char *hint2 = S(STR_HINT_CONTROLS);
-        DrawGameText(hint2, (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 12)) / 2, SCREEN_HEIGHT - 30, 12, (Color){100, 105, 120, (unsigned char)(hintFade * 90)});
+        int h2x = (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 12)) / 2;
+        DrawGameText(hint2, h2x + 1, SCREEN_HEIGHT - 37, 12, (Color){0, 0, 0, a});
+        DrawGameText(hint2, h2x, SCREEN_HEIGHT - 38, 12, (Color){225, 225, 225, a});
     }
 
     // Version text intentionally omitted from the playable UI; keep the footer quiet.
