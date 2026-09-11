@@ -287,7 +287,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 
     // Title
     const char *title = showAdvanced ? S(STR_CRAFTING_TABLE) : S(STR_CRAFTING);
-    DrawGameText(title, panelX, panelY, 16, (Color){154, 168, 184, 255});
+    DrawGameText(title, panelX, panelY, 16, (Color){170, 170, 170, 255});
     panelY += 22;
 
     // Search box
@@ -296,9 +296,9 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     Rectangle searchBox = { (float)panelX, (float)panelY, (float)searchBoxW, (float)searchBoxH };
     bool searchFocused = CheckCollisionPointRec(mouse, searchBox);
 
-    CraftRoundedRect(panelX, panelY, searchBoxW, searchBoxH, 0.06f, (Color){24, 29, 38, 220});
+    CraftRoundedRect(panelX, panelY, searchBoxW, searchBoxH, 0.06f, (Color){36, 36, 36, 220});
     DrawRectangleLines(panelX, panelY, searchBoxW, searchBoxH,
-                       searchFocused ? (Color){56, 217, 169, 220} : (Color){58, 71, 92, 180});
+                       searchFocused ? (Color){200, 200, 200, 220} : (Color){90, 90, 90, 180});
 
     // Handle text input for search
     if (searchFocused || craftSearchLen > 0) {
@@ -319,10 +319,10 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     }
 
     if (craftSearchLen > 0) {
-        DrawGameText(craftSearchBuf, panelX + 4, panelY + 3, 11, (Color){232, 237, 245, 255});
+        DrawGameText(craftSearchBuf, panelX + 4, panelY + 3, 11, (Color){255, 255, 255, 255});
         if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
             int cursorX = panelX + 4 + MeasureGameTextWidth(craftSearchBuf, 11);
-            DrawRectangle(cursorX, panelY + 3, 1, 11, (Color){232, 237, 245, 200});
+            DrawRectangle(cursorX, panelY + 3, 1, 11, (Color){255, 255, 255, 200});
         }
         int clearX = panelX + searchBoxW - 14;
         DrawGameText("x", clearX, panelY + 3, 11, (Color){232, 87, 92, 200});
@@ -333,9 +333,9 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             craftScrollOffset = 0;
         }
     } else {
-        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){154, 168, 184, 150});
+        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){170, 170, 170, 150});
         if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
-            DrawRectangle(panelX + 4, panelY + 3, 1, 11, (Color){154, 168, 184, 150});
+            DrawRectangle(panelX + 4, panelY + 3, 1, 11, (Color){170, 170, 170, 150});
         }
     }
     panelY += searchBoxH + 4;
@@ -416,7 +416,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
                 (unsigned char)(44 + (int)(12 * hA)),
                 (unsigned char)(200 + (int)(20 * hA))
             };
-            rowBorder = hover ? (Color){56, 217, 169, 220} : (Color){58, 71, 92, 150};
+            rowBorder = hover ? (Color){200, 200, 200, 220} : (Color){90, 90, 90, 150};
         } else {
             bgColor = (Color){
                 (unsigned char)(31 + (int)(6 * hA)),
@@ -472,11 +472,11 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             for (int s = 0; s < INVENTORY_SLOTS; s++) {
                 if (player.inventory[s] == r->input) have += player.inventoryCount[s];
             }
-            Color countColor = have >= r->inputCount ? (Color){56, 217, 169, 255} : (Color){232, 87, 92, 255};
+            Color countColor = have >= r->inputCount ? (Color){200, 200, 200, 255} : (Color){232, 87, 92, 255};
             DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
         }
 
-        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){154, 168, 184, 200});
+        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){170, 170, 170, 200});
 
         // Output icon
         if (r->output < BLOCK_COUNT && blockAtlas.id > 0) {
@@ -484,10 +484,10 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             Rectangle dstOut = { (float)(x + iconSize + 50), (float)(slotY + 3), (float)iconSize, (float)iconSize };
             DrawTexturePro(blockAtlas, srcOut, dstOut, (Vector2){0, 0}, 0, WHITE);
         }
-        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){232, 237, 245, 255});
+        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){255, 255, 255, 255});
 
         // Recipe name
-        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){154, 168, 184, 220});
+        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){170, 170, 170, 220});
 
         // Max craftable count
         if (canCraft && r->inputCount > 0) {
@@ -501,9 +501,9 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
                 snprintf(buf, sizeof(buf), "x%d", maxCraft);
                 int bw = MeasureGameTextWidth(buf, 9) + 6;
                 int bx = panelX + panelW - bw - 8;
-                DrawRectangle(bx, textY - 1, bw, 14, (Color){24, 29, 38, 200});
-                DrawRectangleLines(bx, textY - 1, bw, 14, (Color){56, 217, 169, 180});
-                DrawGameText(buf, bx + 3, textY, 9, (Color){56, 217, 169, 220});
+                DrawRectangle(bx, textY - 1, bw, 14, (Color){36, 36, 36, 200});
+                DrawRectangleLines(bx, textY - 1, bw, 14, (Color){200, 200, 200, 190});
+                DrawGameText(buf, bx + 3, textY, 9, (Color){200, 200, 200, 220});
             }
         }
     }
@@ -513,30 +513,30 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         int trackX = panelX + panelW - 5;
         int trackY = panelY;
         int trackH = visibleCount * (slotH + pad);
-        DrawRectangle(trackX, trackY, 4, trackH, (Color){24, 29, 38, 200});
+        DrawRectangle(trackX, trackY, 4, trackH, (Color){36, 36, 36, 200});
 
         float viewRatio = (float)visibleCount / filteredCount;
         float scrollRatio = (filteredCount > visibleCount) ? (float)craftScrollOffset / (filteredCount - visibleCount) : 0;
         int thumbH = (int)(trackH * viewRatio);
         if (thumbH < 12) thumbH = 12;
         int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
-        DrawRectangle(trackX, thumbY, 4, thumbH, (Color){56, 217, 169, 220});
+        DrawRectangle(trackX, thumbY, 4, thumbH, (Color){200, 200, 200, 220});
     }
 
     // Fade arrows
     int listH = visibleCount * (slotH + pad);
     if (craftScrollOffset > 0) {
-        DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){31, 39, 52, 180});
-        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){154, 168, 184, 150});
+        DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){55, 55, 55, 180});
+        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){170, 170, 170, 150});
     }
     if (endIdx < filteredCount) {
-        DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){31, 39, 52, 180});
-        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){154, 168, 184, 150});
+        DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){55, 55, 55, 180});
+        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){170, 170, 170, 150});
     }
 
     if (filteredCount == 0) {
         const char *msg = craftSearchLen > 0 ? S(STR_NO_MATCHES) : S(STR_NO_RECIPES);
-        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){154, 168, 184, 180});
+        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){170, 170, 170, 180});
     }
 }
 
@@ -556,12 +556,12 @@ void DrawFurnaceUI(void)
 
     // Background with shadow
     CraftRoundedRect(panelX + 3, panelY + 3, panelW, panelH, 0.06f, (Color){0, 0, 0, 60});
-    CraftRoundedRect(panelX, panelY, panelW, panelH, 0.06f, (Color){31, 39, 52, 240});
+    CraftRoundedRect(panelX, panelY, panelW, panelH, 0.06f, (Color){55, 55, 55, 240});
     DrawRectangle(panelX, panelY, panelW, 30, (Color){36, 45, 60, 240});
-    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){58, 71, 92, 255});
+    DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){90, 90, 90, 255});
 
     // Title
-    DrawGameText(S(STR_FURNACE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_FURNACE), 16) / 2, panelY + 8, 16, (Color){232, 237, 245, 255});
+    DrawGameText(S(STR_FURNACE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_FURNACE), 16) / 2, panelY + 8, 16, (Color){255, 255, 255, 255});
 
     int slotSize = 40;
     int slotY = panelY + 44;
