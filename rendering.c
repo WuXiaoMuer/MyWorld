@@ -11,7 +11,7 @@
 static const char* GetEnchantName(EnchantmentType type);
 
 // Forward declarations (drawn helpers used before their definition in this file)
-static void DrawRoundedRect(int x, int y, int w, int h, float radius, Color color);
+static void DrawUiBox(int x, int y, int w, int h, float radius, Color color);
 static void DrawCompetitionIcon(int x, int y, int size, unsigned char alpha, bool unlocked);
 static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned char alpha, bool unlocked);
 
@@ -207,32 +207,13 @@ void ReturnHeldItem(void)
 //----------------------------------------------------------------------------------
 
 // Draw a rounded rectangle (simulated with overlapping rectangles + circles)
-static void DrawRoundedRect(int x, int y, int w, int h, float radius, Color color)
+// Flat UI box (MC style — no rounded corners). Corner radius is intentionally
+// ignored; the panel helpers handle beveled edges where needed.
+static void DrawUiBox(int x, int y, int w, int h, float radius, Color color)
 {
-    if (radius <= 0.0f) {
-        DrawRectangle(x, y, w, h, color);
-        return;
-    }
-    radius = radius * 0.5f; // radius as fraction (0..1)
-    int rx = (int)(w * radius);
-    int ry = (int)(h * radius);
-    if (rx > w / 2) rx = w / 2;
-    if (ry > h / 2) ry = h / 2;
-
-    // Center
-    DrawRectangle(x + rx, y, w - rx * 2, h, color);
-    DrawRectangle(x, y + ry, w, h - ry * 2, color);
-    // Corners
-    if (rx > 0 && ry > 0) {
-        // Top-left
-        DrawCircle((int)(x + rx + 0.5f), (int)(y + ry + 0.5f), rx, color);
-        // Top-right
-        DrawCircle((int)(x + w - rx - 0.5f), (int)(y + ry + 0.5f), rx, color);
-        // Bottom-left
-        DrawCircle((int)(x + rx + 0.5f), (int)(y + h - ry - 0.5f), rx, color);
-        // Bottom-right
-        DrawCircle((int)(x + w - rx - 0.5f), (int)(y + h - ry - 0.5f), rx, color);
-    }
+    (void)radius;
+    if (w <= 0 || h <= 0) return;
+    DrawRectangle(x, y, w, h, color);
 }
 
 // Polished UI button: rounded rect + glow + hover + click detection
@@ -246,26 +227,26 @@ static bool DrawButton(int x, int y, int w, int h, const char *label, Color acce
     if (animAlpha < 0.01f) return false;
 
     if (!enabled) {
-        DrawRoundedRect(x, y, w, h, 0.1f, (Color){16, 14, 22, (unsigned char)(100 * animAlpha)});
+        DrawUiBox(x, y, w, h, 0.1f, (Color){16, 14, 22, (unsigned char)(100 * animAlpha)});
         int tw = MeasureGameTextWidth(label, 15);
         DrawGameText(label, x + (w - tw) / 2, y + (h - 15) / 2, 15, (Color){60, 58, 72, (unsigned char)(110 * animAlpha)});
         return false;
     }
 
     // Shadow
-    DrawRoundedRect(x + 3, y + 3, w, h, 0.1f, (Color){0, 0, 0, (unsigned char)(45 * animAlpha)});
+    DrawUiBox(x + 3, y + 3, w, h, 0.1f, (Color){0, 0, 0, (unsigned char)(45 * animAlpha)});
     // Bg — dark card tinted by accent
     Color bg = {
         (unsigned char)((10 + accent.r * 0.18f) * animAlpha),
         (unsigned char)((8 + accent.g * 0.18f) * animAlpha),
         (unsigned char)((14 + accent.b * 0.18f) * animAlpha), 245
     };
-    DrawRoundedRect(x, y, w, h, 0.1f, bg);
+    DrawUiBox(x, y, w, h, 0.1f, bg);
 
     // Hover glow layers
     if (hA > 0.01f) {
         for (int gl = 3; gl > 0; gl--) {
-            DrawRoundedRect(x - gl, y - gl, w + gl * 2, h + gl * 2, 0.1f,
+            DrawUiBox(x - gl, y - gl, w + gl * 2, h + gl * 2, 0.1f,
                 (Color){accent.r, accent.g, accent.b, (unsigned char)(18 * hA / gl * animAlpha)});
         }
     }
@@ -496,7 +477,7 @@ void DrawInventoryScreen(void)
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, furnaceOA});
 
         // Container
-        DrawRoundedRect(contX, contY, contW, contH, 0.06f, (Color){31, 39, 52, 240});
+        DrawUiBox(contX, contY, contW, contH, 0.06f, (Color){31, 39, 52, 240});
         DrawRectangleLines(contX, contY, contW, contH, (Color){58, 71, 92, 255});
 
         // --- Furnace section ---
@@ -609,7 +590,7 @@ void DrawInventoryScreen(void)
             int prevX = contX + panelPad;
             int prevY = invY;
             int prevH = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
-            DrawRoundedRect(prevX, prevY, previewW, prevH, 0.06f, (Color){24, 29, 38, 220});
+            DrawUiBox(prevX, prevY, previewW, prevH, 0.06f, (Color){24, 29, 38, 220});
             DrawRectangleLines(prevX, prevY, previewW, prevH, (Color){58, 71, 92, 180});
             int sc = 2;
             int charW = 12 * sc, charH = 28 * sc;
@@ -956,7 +937,7 @@ void DrawInventoryScreen(void)
         unsigned char chestOA = (unsigned char)(100 * panelAnim);
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, chestOA});
         // Container
-        DrawRoundedRect(contX, contY, contW, contH, 0.06f, (Color){31, 39, 52, 240});
+        DrawUiBox(contX, contY, contW, contH, 0.06f, (Color){31, 39, 52, 240});
         DrawRectangleLines(contX, contY, contW, contH, (Color){58, 71, 92, 255});
 
         // Chest title
@@ -1286,7 +1267,7 @@ void DrawInventoryScreen(void)
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, invOA});
 
     // Container background with subtle gradient feel
-    DrawRoundedRect(containerX, containerY, totalW, totalH, 0.06f, (Color){31, 39, 52, 240});
+    DrawUiBox(containerX, containerY, totalW, totalH, 0.06f, (Color){31, 39, 52, 240});
     DrawRectangleLines(containerX, containerY, totalW, totalH, (Color){58, 71, 92, 255});
 
     // Inventory title
@@ -1303,7 +1284,7 @@ void DrawInventoryScreen(void)
         int prevH = gridH;
 
         // Preview background with subtle pattern
-        DrawRoundedRect(prevX, prevY, previewW, prevH, 0.06f, (Color){24, 29, 38, 220});
+        DrawUiBox(prevX, prevY, previewW, prevH, 0.06f, (Color){24, 29, 38, 220});
         DrawRectangleLines(prevX, prevY, previewW, prevH, (Color){58, 71, 92, 180});
         // Inner shadow (top darker, bottom lighter)
         DrawRectangle(prevX + 1, prevY + 1, previewW - 2, 3, (Color){20, 18, 28, 100});
@@ -2018,7 +1999,7 @@ void DrawCreativeScreen(void)
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, ovA});
 
     // Panel frame
-    DrawRoundedRect(panelX, panelY, panelW, panelH, 0.06f, (Color){31, 39, 52, 240});
+    DrawUiBox(panelX, panelY, panelW, panelH, 0.06f, (Color){31, 39, 52, 240});
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){58, 71, 92, 255});
 
     // Title
@@ -2066,7 +2047,7 @@ void DrawCreativeScreen(void)
             creativeSearchFocused = false;
         }
     }
-    DrawRoundedRect((int)searchBox.x, (int)searchBox.y, (int)searchBox.width, (int)searchBox.height, 0.06f, (Color){24, 29, 38, 220});
+    DrawUiBox((int)searchBox.x, (int)searchBox.y, (int)searchBox.width, (int)searchBox.height, 0.06f, (Color){24, 29, 38, 220});
     DrawGameText(S(STR_CREATIVE_SEARCH), gridX + 4, panelY + titleH + 6, 13, (Color){154, 168, 184, 200});
     if (creativeSearch[0]) {
         DrawGameText(creativeSearch, gridX + 66, panelY + titleH + 6, 13, (Color){232, 237, 245, 255});
@@ -3123,7 +3104,7 @@ void DrawPauseMenu(void)
     boxY += (int)((1.0f - pauseAnim) * 40.0f);
 
     // Container — modern dark flat panel
-    DrawRoundedRect(boxX, boxY, boxW, boxH, 0.05f, (Color){31, 39, 52, 245});
+    DrawUiBox(boxX, boxY, boxW, boxH, 0.05f, (Color){31, 39, 52, 245});
     DrawRectangleLines(boxX, boxY, boxW, boxH, (Color){58, 71, 92, 255});
     // Subtle inner top highlight
     DrawRectangle(boxX + 8, boxY, boxW - 16, 1, (Color){255, 255, 255, 18});
@@ -3251,7 +3232,7 @@ void DrawPauseMenu(void)
             // Already open — show a status line instead of a button.
             char st[128];
             snprintf(st, sizeof(st), S(STR_LAN_STATUS), lanIp, NET_PORT, NetGetPlayerCount(), NET_MAX_PLAYERS);
-            DrawRoundedRect(lanX, lanY, lanW, lanH, 0.06f, (Color){31, 39, 52, (unsigned char)(200 * pauseAnim)});
+            DrawUiBox(lanX, lanY, lanW, lanH, 0.06f, (Color){31, 39, 52, (unsigned char)(200 * pauseAnim)});
             DrawRectangleLinesEx((Rectangle){(float)lanX, (float)lanY, (float)lanW, (float)lanH}, 1, (Color){56, 217, 169, (unsigned char)(150 * pauseAnim)});
             int tw = MeasureGameTextWidth(st, 13);
             DrawGameText(st, lanX + (lanW - tw) / 2, lanY + 9, 13, (Color){154, 200, 184, (unsigned char)(230 * pauseAnim)});
@@ -3355,8 +3336,8 @@ void DrawAchievementsUI(void)
     int panelW = 760, panelH = 570;
     int panelX = (SCREEN_WIDTH - panelW) / 2, panelY = 75;
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){4, 8, 16, 185});
-    DrawRoundedRect(panelX + 4, panelY + 6, panelW, panelH, 0.04f, (Color){0, 0, 0, 100});
-    DrawRoundedRect(panelX, panelY, panelW, panelH, 0.04f, (Color){20, 28, 42, 250});
+    DrawUiBox(panelX + 4, panelY + 6, panelW, panelH, 0.04f, (Color){0, 0, 0, 100});
+    DrawUiBox(panelX, panelY, panelW, panelH, 0.04f, (Color){20, 28, 42, 250});
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){88, 112, 145, 255});
     DrawRectangle(panelX + 30, panelY + 2, panelW - 60, 2, (Color){56, 217, 169, 190});
     DrawCompetitionIcon(panelX + 24, panelY + 22, 56, 255, true);
@@ -3371,7 +3352,7 @@ void DrawAchievementsUI(void)
         int col = i % 2, row = i / 2;
         int x = panelX + 28 + col * 366, y = panelY + 112 + row * 72;
         bool unlocked = achievements[i];
-        DrawRoundedRect(x, y, 340, 60, 0.08f, unlocked ? (Color){35, 58, 60, 245} : (Color){27, 34, 48, 245});
+        DrawUiBox(x, y, 340, 60, 0.08f, unlocked ? (Color){35, 58, 60, 245} : (Color){27, 34, 48, 245});
         DrawRectangleLines(x, y, 340, 60, unlocked ? (Color){255, 205, 90, 220} : (Color){58, 71, 92, 220});
         DrawCollectibleIcon(x + 8, y + 8, 44, i % 3, 255, unlocked);
         DrawGameText(S(achNames[i]), x + 62, y + 11, 13, (Color){225, 230, 240, unlocked ? 255 : 180});
@@ -4133,7 +4114,7 @@ void DrawSlotSelectScreen(void)
     }
 
     // Shared screen card keeps slot content legible over the animated background.
-    DrawRoundedRect(270, 24, 740, 668, 0.035f, (Color){8, 14, 26, 185});
+    DrawUiBox(270, 24, 740, 668, 0.035f, (Color){8, 14, 26, 185});
     DrawRectangleLines(270, 24, 740, 668, (Color){88, 112, 145, 180});
     DrawRectangle(320, 26, 640, 2, (Color){74, 157, 235, 120});
 
@@ -4163,7 +4144,7 @@ void DrawSlotSelectScreen(void)
         bool seedFocused = CheckCollisionPointRec(mouse, seedBox);
 
         DrawGameText(S(STR_SEED), seedBoxX - 42, seedBoxY + 4,14, (Color){154, 168, 184, 220});
-        DrawRoundedRect(seedBoxX, seedBoxY, seedBoxW, seedBoxH, 0.15f, (Color){24, 29, 38, 230});
+        DrawUiBox(seedBoxX, seedBoxY, seedBoxW, seedBoxH, 0.15f, (Color){24, 29, 38, 230});
         DrawRectangleLinesEx(seedBox, 2,
                              seedFocused ? (Color){56, 217, 169, 255} : (Color){58, 71, 92, 220});
 
@@ -4235,7 +4216,7 @@ void DrawSlotSelectScreen(void)
             fill.b = (unsigned char)(52 + (int)(14 * hA));
         }
 
-        DrawRoundedRect(slotX, sy, slotW, slotH, 0.04f, fill);
+        DrawUiBox(slotX, sy, slotW, slotH, 0.04f, fill);
         DrawRectangleLines(slotX, sy, slotW, slotH, border);
         // Top highlight
         DrawRectangle(slotX + 10, sy, slotW - 20, 1, (Color){255, 255, 255, 16});
@@ -4322,7 +4303,7 @@ void DrawConfirmDialog(void)
     bool isDelete = (confirmDialogMode == 1);
 
     // Dialog box — modern dark flat panel
-    DrawRoundedRect(dlgX, dlgY, dlgW, dlgH, 0.05f, (Color){31, 39, 52, 250});
+    DrawUiBox(dlgX, dlgY, dlgW, dlgH, 0.05f, (Color){31, 39, 52, 250});
     DrawRectangleLines(dlgX, dlgY, dlgW, dlgH, (Color){58, 71, 92, 255});
     // Top accent (danger/amber by mode)
     Color accentBar = isDelete ? (Color){232, 87, 92, 220} : (Color){240, 190, 90, 220};
@@ -4404,9 +4385,9 @@ void DrawSettingsScreen(void)
     int panelY = 60;
 
     // Panel shadow
-    DrawRoundedRect(panelX + 3, panelY + 4, panelW, panelH, 0.03f, (Color){0, 0, 0, 45});
+    DrawUiBox(panelX + 3, panelY + 4, panelW, panelH, 0.03f, (Color){0, 0, 0, 45});
     // Modern panel: rounded corners, dark fill, subtle border
-    DrawRoundedRect(panelX, panelY, panelW, panelH, 0.03f, (Color){31, 39, 52, 248});
+    DrawUiBox(panelX, panelY, panelW, panelH, 0.03f, (Color){31, 39, 52, 248});
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){58, 71, 92, 255});
     DrawRectangle(panelX + 12, panelY, panelW - 24, 1, (Color){255, 255, 255, 16});
 

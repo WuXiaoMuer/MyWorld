@@ -4,22 +4,12 @@
 #include <stdio.h>
 #include <string.h>
 
-// Local rounded-rect helper (same technique as rendering.c DrawRoundedRect)
+// Local flat box helper (MC style — no rounded corners; radius ignored).
 static void CraftRoundedRect(int x, int y, int w, int h, float radius, Color color)
 {
-    radius = radius * 0.5f;
-    int rx = (int)(w * radius);
-    int ry = (int)(h * radius);
-    if (rx > w / 2) rx = w / 2;
-    if (ry > h / 2) ry = h / 2;
-    DrawRectangle(x + rx, y, w - rx * 2, h, color);
-    DrawRectangle(x, y + ry, w, h - ry * 2, color);
-    if (rx > 0 && ry > 0) {
-        DrawCircle((int)(x + rx + 0.5f), (int)(y + ry + 0.5f), rx, color);
-        DrawCircle((int)(x + w - rx - 0.5f), (int)(y + ry + 0.5f), rx, color);
-        DrawCircle((int)(x + rx + 0.5f), (int)(y + h - ry - 0.5f), rx, color);
-        DrawCircle((int)(x + w - rx - 0.5f), (int)(y + h - ry - 0.5f), rx, color);
-    }
+    (void)radius;
+    if (w <= 0 || h <= 0) return;
+    DrawRectangle(x, y, w, h, color);
 }
 
 void InitCraftingRecipes(void)
