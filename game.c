@@ -1523,7 +1523,8 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
         for (int i = 0; i < MAX_MOBS; i++) {
             if (!mobs[i].active || mobs[i].isBaby) continue;
             if (mobs[i].type != MOB_PIG && mobs[i].type != MOB_COW &&
-                mobs[i].type != MOB_SHEEP && mobs[i].type != MOB_CHICKEN) continue;
+                mobs[i].type != MOB_SHEEP && mobs[i].type != MOB_CHICKEN &&
+                mobs[i].type != MOB_HORSE) continue;
             if (mobs[i].loveTimer > 0) continue;
             int mw = GetMobWidth(mobs[i].type);
             int mh = GetMobHeight(mobs[i].type);

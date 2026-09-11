@@ -559,6 +559,9 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_MOB_COW] = " was kicked by a cow",
     [STR_DEATH_MOB_SHEEP] = " was rammed by a sheep",
     [STR_DEATH_MOB_CHICKEN] = " was pecked to death",
+    [STR_DEATH_MOB_WOLF] = " was mauled by a wolf",
+    [STR_DEATH_MOB_WITCH] = " was slain by a witch",
+    [STR_DEATH_MOB_BAT] = " was startled to death by a bat",
 
     // Mob names
     [STR_MOB_PIG] = "Pig",
@@ -566,6 +569,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MOB_SHEEP] = "Sheep",
     [STR_MOB_CHICKEN] = "Chicken",
     [STR_MOB_VILLAGER] = "Villager",
+    [STR_MOB_HORSE] = "Horse",
+    [STR_MOB_WOLF] = "Wolf",
+    [STR_MOB_WITCH] = "Witch",
+    [STR_MOB_BAT] = "Bat",
 
     // Animal drops
     [STR_ITEM_RAW_BEEF] = "Raw Beef",
@@ -1124,6 +1131,9 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_MOB_COW] = "被牛踢死了",
     [STR_DEATH_MOB_SHEEP] = "被羊撞死了",
     [STR_DEATH_MOB_CHICKEN] = "被鸡啄死了",
+    [STR_DEATH_MOB_WOLF] = "被狼咬死了",
+    [STR_DEATH_MOB_WITCH] = "被女巫杀害了",
+    [STR_DEATH_MOB_BAT] = "被蝙蝠吓死了",
 
     // Mob names
     [STR_MOB_PIG] = "猪",
@@ -1131,6 +1141,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MOB_SHEEP] = "羊",
     [STR_MOB_CHICKEN] = "鸡",
     [STR_MOB_VILLAGER] = "村民",
+    [STR_MOB_HORSE] = "马",
+    [STR_MOB_WOLF] = "狼",
+    [STR_MOB_WITCH] = "女巫",
+    [STR_MOB_BAT] = "蝙蝠",
 
     // Animal drops
     [STR_ITEM_RAW_BEEF] = "生牛肉",
@@ -1689,6 +1703,9 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_DEATH_MOB_COW] = "は牛に蹴られた",
     [STR_DEATH_MOB_SHEEP] = "は羊に突かれた",
     [STR_DEATH_MOB_CHICKEN] = "は鶏に突かれ死んだ",
+    [STR_DEATH_MOB_WOLF] = "は狼に襲われ死んだ",
+    [STR_DEATH_MOB_WITCH] = "は魔女に殺された",
+    [STR_DEATH_MOB_BAT] = "は蝙蝠に驚かされ死んだ",
 
     // Mob names
     [STR_MOB_PIG] = "豚",
@@ -1696,6 +1713,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MOB_SHEEP] = "羊",
     [STR_MOB_CHICKEN] = "鶏",
     [STR_MOB_VILLAGER] = "村人",
+    [STR_MOB_HORSE] = "馬",
+    [STR_MOB_WOLF] = "狼",
+    [STR_MOB_WITCH] = "魔女",
+    [STR_MOB_BAT] = "蝙蝠",
 
     // Animal drops
     [STR_ITEM_RAW_BEEF] = "生の牛肉",

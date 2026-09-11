@@ -590,6 +590,9 @@ typedef enum {
     STR_DEATH_MOB_COW,
     STR_DEATH_MOB_SHEEP,
     STR_DEATH_MOB_CHICKEN,
+    STR_DEATH_MOB_WOLF,
+    STR_DEATH_MOB_WITCH,
+    STR_DEATH_MOB_BAT,
 
     // Mob names
     STR_MOB_PIG,
@@ -597,6 +600,10 @@ typedef enum {
     STR_MOB_SHEEP,
     STR_MOB_CHICKEN,
     STR_MOB_VILLAGER,
+    STR_MOB_HORSE,
+    STR_MOB_WOLF,
+    STR_MOB_WITCH,
+    STR_MOB_BAT,
     STR_DEATH_VOID,
     STR_DEATH_SCORE,
 
@@ -1130,6 +1137,11 @@ typedef enum {
     MOB_SHEEP,
     MOB_CHICKEN,
     MOB_VILLAGER,
+    // Phase 3: new mobs
+    MOB_HORSE,      // passive, rideable-looking grazer
+    MOB_WOLF,       // neutral: wanders, retaliates when hit
+    MOB_WITCH,      // hostile ranged caster
+    MOB_BAT,        // ambient flyer
     MOB_TYPE_COUNT
 } MobType;
 
@@ -1510,6 +1522,7 @@ extern Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 extern Sound sndHurt, sndDeath, sndEat, sndDrink, sndClick, sndCraft, sndXP, sndDrop;
 extern Sound sndFootstep, sndZombie, sndPig, sndSplash, sndVillager;
 extern Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
+extern Sound sndHorse, sndWolf, sndWitch, sndBat;
 extern Sound sndRain, sndCreeperFuse, sndThunder;
 extern Sound sndCaveDrip, sndCaveAmbient, sndWind;
 extern Sound sndPickup, sndBowFire;

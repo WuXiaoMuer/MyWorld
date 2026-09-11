@@ -1034,7 +1034,8 @@ void PlayerBlockInteraction(void)
                     if (!mobs[mi].active || mobs[mi].deathTimer > 0) continue;
                     if (mobs[mi].type == MOB_PIG || mobs[mi].type == MOB_COW ||
                         mobs[mi].type == MOB_SHEEP || mobs[mi].type == MOB_CHICKEN ||
-                        mobs[mi].type == MOB_VILLAGER) continue;
+                        mobs[mi].type == MOB_VILLAGER || mobs[mi].type == MOB_HORSE ||
+                        mobs[mi].type == MOB_BAT) continue;
                     float mcx = mobs[mi].position.x + GetMobWidth(mobs[mi].type) / 2.0f;
                     float mcy = mobs[mi].position.y + GetMobHeight(mobs[mi].type) / 2.0f;
                     float mdx = mcx - bcx, mdy = mcy - bcy;
@@ -1508,7 +1509,8 @@ void PlayerBlockInteraction(void)
             for (int i = 0; i < MAX_MOBS; i++) {
                 if (!mobs[i].active || mobs[i].isBaby) continue;
                 if (mobs[i].type != MOB_PIG && mobs[i].type != MOB_COW &&
-                    mobs[i].type != MOB_SHEEP && mobs[i].type != MOB_CHICKEN) continue;
+                    mobs[i].type != MOB_SHEEP && mobs[i].type != MOB_CHICKEN &&
+                    mobs[i].type != MOB_HORSE) continue;
                 if (mobs[i].loveTimer > 0) continue;
                 int mw = GetMobWidth(mobs[i].type);
                 int mh = GetMobHeight(mobs[i].type);

@@ -383,6 +383,7 @@ Sound sndBreak, sndBreakStone, sndPlace, sndJump, sndLand;
 Sound sndHurt, sndDeath, sndEat, sndDrink, sndClick, sndCraft, sndXP, sndDrop;
 Sound sndFootstep, sndZombie, sndPig, sndSplash, sndVillager;
 Sound sndSkeleton, sndCreeperHiss, sndSpider, sndSlime, sndEnderman;
+Sound sndHorse, sndWolf, sndWitch, sndBat;
 Sound sndRain, sndCreeperFuse, sndThunder;
 Sound sndCaveDrip, sndCaveAmbient, sndWind;
 Sound sndPickup, sndBowFire;

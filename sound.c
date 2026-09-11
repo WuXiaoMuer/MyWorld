@@ -212,9 +212,47 @@ static float villagerGen(float t, float freq, unsigned int *rng) {
     return (s + harmonic + nasal) * env;
 }
 
+// Horse neigh - descending whinny with vibrato
+static float horseGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = expf(-t * 3.0f) * (1.0f - expf(-t * 30.0f));
+    float pitch = 600.0f - t * 700.0f + fast_sine(t * 25.0f) * 40.0f;
+    if (pitch < 150.0f) pitch = 150.0f;
+    float s = fast_sine(t * pitch) * 0.35f;
+    float buzz = fast_sine(t * pitch * 2.0f) * 0.15f;
+    return (s + buzz) * env;
+}
+
+// Wolf howl/bark - low growl with a rising tone
+static float wolfGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = expf(-t * 4.0f) * (1.0f - expf(-t * 40.0f));
+    float pitch = 200.0f + t * 250.0f;
+    float s = fast_sine(t * pitch) * 0.4f;
+    float rasp = fast_sine(t * pitch * 1.5f) * 0.2f;
+    return (s + rasp) * env;
+}
+
+// Witch cackle - wobbly high cackle
+static float witchGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = expf(-t * 5.0f) * (1.0f - expf(-t * 60.0f));
+    float pitch = 500.0f + fast_sine(t * 18.0f) * 120.0f;
+    float s = fast_sine(t * pitch) * 0.3f;
+    float cackle = fast_sine(t * pitch * 1.9f) * 0.2f;
+    return (s + cackle) * env;
+}
+
+// Bat squeak - high brief chirp
+static float batGen(float t, float freq, unsigned int *rng) {
+    (void)freq; (void)rng;
+    float env = expf(-t * 20.0f);
+    float pitch = 1800.0f - t * 800.0f;
+    return fast_sine(t * pitch) * 0.25f * env;
+}
+
 // Water splash - noise burst with filter
-static float splashGen(float t, float freq, unsigned int *rng) {
-    (void)freq;
+static float splashGen(float t, float freq, unsigned int *rng) {    (void)freq;
     float env = expf(-t * 5.0f);
     *rng = *rng * 1103515245 + 12345;
     float noise = (float)(*rng % 1000) / 500.0f - 1.0f;
@@ -610,6 +648,22 @@ void InitSounds(void)
     sndEnderman = LoadSoundFromWave(w);
     UnloadWave(w);
 
+    w = GenerateWave(0.5f, sr, horseGen);
+    sndHorse = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.4f, sr, wolfGen);
+    sndWolf = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.5f, sr, witchGen);
+    sndWitch = LoadSoundFromWave(w);
+    UnloadWave(w);
+
+    w = GenerateWave(0.12f, sr, batGen);
+    sndBat = LoadSoundFromWave(w);
+    UnloadWave(w);
+
     w = GenerateWave(0.4f, sr, splashGen);
     sndSplash = LoadSoundFromWave(w);
     UnloadWave(w);
@@ -688,6 +742,10 @@ void UnloadSounds(void)
     UnloadSound(sndSpider);
     UnloadSound(sndSlime);
     UnloadSound(sndEnderman);
+    UnloadSound(sndHorse);
+    UnloadSound(sndWolf);
+    UnloadSound(sndWitch);
+    UnloadSound(sndBat);
     UnloadSound(sndSplash);
     UnloadSound(sndCreeperFuse);
     UnloadSound(sndRain);
@@ -822,6 +880,10 @@ void PlaySoundMob(MobType type) {
     else if (type == MOB_SLIME) { SetSoundVolume(sndSlime, sfxVolume * 0.6f); PlaySound(sndSlime); }
     else if (type == MOB_ENDERMAN) { SetSoundVolume(sndEnderman, sfxVolume * 0.5f); PlaySound(sndEnderman); }
     else if (type == MOB_VILLAGER) { SetSoundVolume(sndVillager, sfxVolume * 0.6f); PlaySound(sndVillager); }
+    else if (type == MOB_HORSE) { SetSoundVolume(sndHorse, sfxVolume * 0.6f); PlaySound(sndHorse); }
+    else if (type == MOB_WOLF) { SetSoundVolume(sndWolf, sfxVolume * 0.6f); PlaySound(sndWolf); }
+    else if (type == MOB_WITCH) { SetSoundVolume(sndWitch, sfxVolume * 0.6f); PlaySound(sndWitch); }
+    else if (type == MOB_BAT) { SetSoundVolume(sndBat, sfxVolume * 0.4f); PlaySound(sndBat); }
 }
 
 void PlaySoundSplash(void) {
@@ -881,6 +943,10 @@ void PlaySoundMobAt(MobType type, float mobX, float mobY) {
     else if (type == MOB_SLIME) s = sndSlime;
     else if (type == MOB_ENDERMAN) s = sndEnderman;
     else if (type == MOB_VILLAGER) s = sndVillager;
+    else if (type == MOB_HORSE) s = sndHorse;
+    else if (type == MOB_WOLF) s = sndWolf;
+    else if (type == MOB_WITCH) s = sndWitch;
+    else if (type == MOB_BAT) s = sndBat;
     else return;
 
     SetSoundVolume(s, vol);
