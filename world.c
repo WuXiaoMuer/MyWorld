@@ -2373,10 +2373,15 @@ static uint8_t waterLevel[WORLD_WIDTH][WORLD_HEIGHT];
 //----------------------------------------------------------------------------------
 #define LAVA_MAX_LEVEL      5
 #define WATER_MAX_LEVEL     7
-#define FLUID_QUEUE_CAP     8192
+#define FLUID_QUEUE_CAP     4096
 typedef struct { uint16_t x, y; uint8_t type, level; } FluidNode;
-static FluidNode fluidQueue[FLUID_QUEUE_CAP];
-static int fluidQueueHead = 0, fluidQueueTail = 0, fluidQueueCount = 0;
+// Separate queues per fluid: water and lava tick on independent timers, so a
+// shared queue forced one type to be dequeued and re-queued while the other
+// ticked, starving the ready fluid and making spread appear stalled.
+static FluidNode waterQueue[FLUID_QUEUE_CAP];
+static FluidNode lavaQueue[FLUID_QUEUE_CAP];
+static int waterQueueHead = 0, waterQueueTail = 0, waterQueueCount = 0;
+static int lavaQueueHead = 0, lavaQueueTail = 0, lavaQueueCount = 0;
 static float fluidWaterTimer = 0.0f, fluidLavaTimer = 0.0f;
 static uint8_t lavaLevel[WORLD_WIDTH][WORLD_HEIGHT];
 static bool waterSource[WORLD_WIDTH][WORLD_HEIGHT];
@@ -2390,7 +2395,6 @@ static void QueueFluid(int x, int y, int type, int level);
 void InitLava(void)
 {
     memset(lavaLevel, 0, sizeof(lavaLevel));
-    memset(waterSource, 0, sizeof(waterSource));
     memset(lavaSource, 0, sizeof(lavaSource));
     memset(fluidChangeIndex, 0xFF, sizeof(fluidChangeIndex));
     fluidChangeCount = 0;
@@ -2470,11 +2474,15 @@ int GetLavaLevel(int bx, int by)
 static void QueueFluid(int x, int y, int type, int level)
 {
     if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT || level <= 0) return;
-    if (fluidQueueCount >= FLUID_QUEUE_CAP) return;
-    FluidNode *n = &fluidQueue[fluidQueueTail];
+    // Dispatch into the per-fluid queue so each ticks on its own timer.
+    FluidNode *q; int *tail, *count;
+    if (type == BLOCK_LAVA) { q = lavaQueue; tail = &lavaQueueTail; count = &lavaQueueCount; }
+    else { q = waterQueue; tail = &waterQueueTail; count = &waterQueueCount; }
+    if (*count >= FLUID_QUEUE_CAP) return;
+    FluidNode *n = &q[*tail];
     n->x = (uint16_t)x; n->y = (uint16_t)y; n->type = (uint8_t)type; n->level = (uint8_t)level;
-    fluidQueueTail = (fluidQueueTail + 1) % FLUID_QUEUE_CAP;
-    fluidQueueCount++;
+    *tail = (*tail + 1) % FLUID_QUEUE_CAP;
+    (*count)++;
 }
 
 static void ProcessFluidNode(FluidNode node)
@@ -2525,17 +2533,27 @@ void UpdateFluidTick(float dt)
     if (!waterReady && !lavaReady) return;
     if (waterReady) fluidWaterTimer = 0.0f;
     if (lavaReady) fluidLavaTimer = 0.0f;
+
+    // Each fluid drains its own queue on its own timer. An unready fluid is left
+    // completely untouched (nodes stay queued, no re-queue churn) so the ready
+    // fluid gets the full budget instead of competing for it.
     int budget = 96;
-    int scanned = fluidQueueCount;
-    while (fluidQueueCount > 0 && budget-- > 0 && scanned-- > 0) {
-        FluidNode node = fluidQueue[fluidQueueHead];
-        fluidQueueHead = (fluidQueueHead + 1) % FLUID_QUEUE_CAP;
-        fluidQueueCount--;
-        if ((node.type == BLOCK_LAVA && !lavaReady) || (node.type == BLOCK_WATER && !waterReady)) {
-            QueueFluid(node.x, node.y, node.type, node.level);
-            continue;
+    if (waterReady) {
+        while (waterQueueCount > 0 && budget-- > 0) {
+            FluidNode node = waterQueue[waterQueueHead];
+            waterQueueHead = (waterQueueHead + 1) % FLUID_QUEUE_CAP;
+            waterQueueCount--;
+            ProcessFluidNode(node);
         }
-        ProcessFluidNode(node);
+    }
+    if (lavaReady) {
+        budget = 96;
+        while (lavaQueueCount > 0 && budget-- > 0) {
+            FluidNode node = lavaQueue[lavaQueueHead];
+            lavaQueueHead = (lavaQueueHead + 1) % FLUID_QUEUE_CAP;
+            lavaQueueCount--;
+            ProcessFluidNode(node);
+        }
     }
 }
 
@@ -2627,7 +2645,6 @@ void ApplyGravityAt(int bx, int by)
 //----------------------------------------------------------------------------------
 // Water Flow System
 //----------------------------------------------------------------------------------
-#define WATER_MAX_LEVEL     7
 // waterLevel declared above (forward declaration for lava system)
 
 void InitWater(void)
@@ -2641,51 +2658,6 @@ int GetWaterLevel(int bx, int by)
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
     if (world[bx][by] != BLOCK_WATER) return 0;
     return waterLevel[bx][by];
-}
-
-static void PropagateWaterBFS(int startX, int startY, int level)
-{
-    if (level <= 0) return;
-    // BFS queue
-    static int qx[WORLD_WIDTH * 2];
-    static int qy[WORLD_WIDTH * 2];
-    static int ql[WORLD_WIDTH * 2];
-    int head = 0, tail = 0;
-
-    waterLevel[startX][startY] = level;
-    qx[tail] = startX; qy[tail] = startY; ql[tail] = level; tail++;
-
-    while (head != tail) {
-        int cx = qx[head], cy = qy[head], cl = ql[head];
-        head = (head + 1) % (WORLD_WIDTH * 2);
-        if (cl <= 1) continue;
-
-        // Flow down first (full level)
-        if (cy + 1 < WORLD_HEIGHT && world[cx][cy + 1] == BLOCK_AIR) {
-            world[cx][cy + 1] = BLOCK_WATER;
-            waterLevel[cx][cy + 1] = WATER_MAX_LEVEL;
-            int next = tail % (WORLD_WIDTH * 2);
-            qx[next] = cx; qy[next] = cy + 1; ql[next] = WATER_MAX_LEVEL;
-            tail++;
-        }
-
-        // Flow sideways (level - 1)
-        int nextL = cl - 1;
-        if (nextL > 0) {
-            static const int dx[] = {1, -1};
-            for (int d = 0; d < 2; d++) {
-                int nx = cx + dx[d];
-                if (nx < 0 || nx >= WORLD_WIDTH) continue;
-                if (world[nx][cy] == BLOCK_AIR && (cy + 1 >= WORLD_HEIGHT || world[nx][cy + 1] != BLOCK_AIR)) {
-                    world[nx][cy] = BLOCK_WATER;
-                    waterLevel[nx][cy] = (uint8_t)nextL;
-                    int next = tail % (WORLD_WIDTH * 2);
-                    qx[next] = nx; qy[next] = cy; ql[next] = nextL;
-                    tail++;
-                }
-            }
-        }
-    }
 }
 
 void SetWaterSource(int bx, int by)
