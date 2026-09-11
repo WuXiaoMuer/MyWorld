@@ -2468,13 +2468,45 @@ void DrawPlayerSprite(void)
     bool moving = fabsf(player.velocity.x) > 10.0f;
     bool facing = player.facingRight;
     bool sprinting = player.sprinting && moving;
+    bool airborne = !player.onGround && !player.flying;
 
-    // Simple arm swing: forward arm goes UP, back arm goes DOWN (2D side-view)
+    // --- Animation drivers -------------------------------------------------
+    // Walk cycle: forward arm goes UP, back arm goes DOWN (2D side view)
     float armShift = moving ? sinf(walkT) * (sprinting ? 5.0f : 4.0f) : 0;
 
-    // Body bob: removed — torso stays still, only limbs move
+    // Idle breathing: gentle torso rise/fall when standing still on the ground
+    float breath = (!moving && player.onGround) ? sinf((float)GetTime() * 2.0f) * 0.8f : 0.0f;
+
+    // Jump/fall pose: rising stretches the body and lifts the arm; falling
+    // compresses slightly. velN is -1 (rising) .. +1 (falling fast).
+    float velN = 0.0f;
+    if (airborne) {
+        velN = player.velocity.y / 400.0f;
+        if (velN > 1.0f) velN = 1.0f;
+        if (velN < -1.0f) velN = -1.0f;
+    }
+    float airArm = airborne ? (player.velocity.y < 0.0f ? -6.0f : 3.0f) : 0.0f;
+
+    // Landing squash: compress the torso briefly on impact.
+    float landSquash = 0.0f;
+    if (player.landSquashTimer > 0.0f) {
+        float t = player.landSquashTimer / 0.20f; // 1 → 0
+        if (t > 1.0f) t = 1.0f;
+        landSquash = t * 3.0f;
+    }
+
+    // Attack swing: 0 → 1 over the cooldown, peaks mid-swing.
+    float swing = 0.0f;
+    if (player.attackCooldown > 0.0f && player.attackAnim > 0.0f) {
+        float p = 1.0f - (player.attackCooldown / player.attackAnim);
+        if (p < 0.0f) p = 0.0f;
+        if (p > 1.0f) p = 1.0f;
+        swing = sinf(p * 3.141592653f) * 22.0f;
+    }
+
+    // Total vertical offset: crouch + breathing + landing squash
     float sneakShrink = player.sneaking ? 4.0f : 0;
-    float bobY = py - sneakShrink;
+    float bobY = py - sneakShrink + breath + landSquash;
 
     // Held item wobble + rotation
     float itemBob = moving ? cosf(walkT + 1.2f) * 0.3f : 0;
@@ -2527,99 +2559,67 @@ void DrawPlayerSprite(void)
         else bootColor = (Color){80, 220, 230, 255};
     }
 
-    if (facing) {
-        // Facing right — body bobs vertically via bobY
-        DrawRectangle((int)(px + 2), (int)bobY, 8, 8, skin);
-        DrawRectangle((int)(px + 2), (int)bobY, 8, 3, hair);
-        // Helmet overlay
-        if (helmetColor.a > 0) {
-            DrawRectangle((int)(px + 1), (int)(bobY - 1), 10, 5, helmetColor);
-            DrawRectangle((int)(px + 2), (int)(bobY + 4), 8, 2, helmetColor);
-        }
-        DrawRectangle((int)(px + 3), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
-        DrawRectangle((int)(px + 7), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
-        // Body (chest)
-        DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 10, shirt);
-        // Chestplate overlay
-        if (chestColor.a > 0) {
-            DrawRectangle((int)(px), (int)(bobY + 6), 12, 11, chestColor);
-            DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 9, (Color){
-                (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
-            });
-        }
-        // Back arm — goes DOWN when forward (behind body in side view)
-        DrawRectangle((int)(px - 2), (int)(bobY + 8 + armShift), 3, 10, skin);
-        // Front arm — goes UP when forward (held item side)
-        DrawRectangle((int)(px + 11), (int)(bobY + 8 - armShift), 3, 10, skin);
-        // Legs — cross pattern: back leg UP when front arm UP
-        {
-            float legShift = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 4.0f : 3.0f) : 0;
-            DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 4, 10, pants);
-            DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 4, 10, pants);
-            // Leggings
-            if (legColor.a > 0) {
-                DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 5, 10, legColor);
-                DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 5, 10, legColor);
-            }
-            // Boots
-            if (bootColor.a > 0) {
-                DrawRectangle((int)(px + 1), (int)(bobY + 28 + legShift), 5, 3, bootColor);
-                DrawRectangle((int)(px + 7), (int)(bobY + 28 - legShift), 5, 3, bootColor);
-            }
-        }
-    } else {
-        // Facing left (mirrored)
-        DrawRectangle((int)(px + 2), (int)bobY, 8, 8, skin);
-        DrawRectangle((int)(px + 2), (int)bobY, 8, 3, hair);
-        // Helmet overlay
-        if (helmetColor.a > 0) {
-            DrawRectangle((int)(px + 1), (int)(bobY - 1), 10, 5, helmetColor);
-            DrawRectangle((int)(px + 2), (int)(bobY + 4), 8, 2, helmetColor);
-        }
-        DrawRectangle((int)(px + 3), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
-        DrawRectangle((int)(px + 7), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
-        // Body (chest)
-        DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 10, shirt);
-        // Chestplate overlay
-        if (chestColor.a > 0) {
-            DrawRectangle((int)(px), (int)(bobY + 6), 12, 11, chestColor);
-            DrawRectangle((int)(px + 1), (int)(bobY + 7), 10, 9, (Color){
-                (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
-            });
-        }
-        // Front arm (holds item) - left side
-        DrawRectangle((int)(px - 2), (int)(bobY + 8 - armShift), 3, 10, skin);
-        // Back arm - right side, behind body
-        DrawRectangle((int)(px + 11), (int)(bobY + 8 + armShift), 3, 10, skin);
-        // Legs
-        {
-            float legShift = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 4.0f : 3.0f) : 0;
-            DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 4, 10, pants);
-            DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 4, 10, pants);
-            if (legColor.a > 0) {
-                DrawRectangle((int)(px + 1), (int)(bobY + 18 + legShift), 5, 10, legColor);
-                DrawRectangle((int)(px + 7), (int)(bobY + 18 - legShift), 5, 10, legColor);
-            }
-            if (bootColor.a > 0) {
-                DrawRectangle((int)(px + 1), (int)(bobY + 28 + legShift), 5, 3, bootColor);
-                DrawRectangle((int)(px + 7), (int)(bobY + 28 - legShift), 5, 3, bootColor);
-            }
-        }
+    // Single body draw, mirrored horizontally when facing left. `mx` maps a
+    // right-facing local X (relative to px) to the mirrored position.
+    #define MX(off, w) (int)(facing ? (px + (off)) : (px + (12 - (off) - (w))))
+
+    // Head + hair
+    DrawRectangle(MX(2, 8), (int)bobY, 8, 8, skin);
+    DrawRectangle(MX(2, 8), (int)bobY, 8, 3, hair);
+    if (helmetColor.a > 0) {
+        DrawRectangle(MX(1, 10), (int)(bobY - 1), 10, 5, helmetColor);
+        DrawRectangle(MX(2, 8), (int)(bobY + 4), 8, 2, helmetColor);
+    }
+    // Eyes (shift slightly inward when facing)
+    DrawRectangle(MX(3, 2), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
+    DrawRectangle(MX(7, 2), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
+
+    // Torso
+    DrawRectangle(MX(1, 10), (int)(bobY + 7), 10, 10, shirt);
+    if (chestColor.a > 0) {
+        DrawRectangle(MX(0, 12), (int)(bobY + 6), 12, 11, chestColor);
+        DrawRectangle(MX(1, 10), (int)(bobY + 7), 10, 9, (Color){
+            (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
+        });
     }
 
-    // Draw held item — follows front arm
+    // Arms: back arm swings one way, front arm (holds item) the other; the front
+    // arm also lifts when airborne and drives the attack swing.
+    float frontArmDY = -armShift + airArm + swing;
+    DrawRectangle(MX(-2, 3), (int)(bobY + 8 + armShift), 3, 10, skin);
+    DrawRectangle(MX(11, 3), (int)(bobY + 8 + frontArmDY), 3, 10, skin);
+
+    // Legs: cross pattern (opposite the arms). In the air, tuck the legs.
+    {
+        float legShift = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 4.0f : 3.0f) : 0;
+        if (airborne) legShift = 1.5f;
+        DrawRectangle(MX(1, 4), (int)(bobY + 18 + legShift), 4, 10, pants);
+        DrawRectangle(MX(7, 4), (int)(bobY + 18 - legShift), 4, 10, pants);
+        if (legColor.a > 0) {
+            DrawRectangle(MX(1, 5), (int)(bobY + 18 + legShift), 5, 10, legColor);
+            DrawRectangle(MX(7, 5), (int)(bobY + 18 - legShift), 5, 10, legColor);
+        }
+        if (bootColor.a > 0) {
+            DrawRectangle(MX(1, 5), (int)(bobY + 28 + legShift), 5, 3, bootColor);
+            DrawRectangle(MX(7, 5), (int)(bobY + 28 - legShift), 5, 3, bootColor);
+        }
+    }
+    #undef MX
+
+    // Draw held item — follows front arm (matching its walk/air/swing offset)
     int slotItem = player.inventory[player.selectedSlot];
     if (slotItem != BLOCK_AIR && slotItem < BLOCK_COUNT && blockAtlas.id > 0) {
         int itemSize = 13;
+        float frontArmDY = -armShift + airArm + swing;
         float itemX, itemY;
         if (facing) {
             itemX = px + 11 + itemSize * 0.5f;
-            itemY = bobY + 5 - armShift + itemSize * 0.5f;
+            itemY = bobY + 5 + frontArmDY + itemSize * 0.5f;
         } else {
             itemX = px - 7 + itemSize * 0.5f;
-            itemY = bobY + 5 - armShift + itemSize * 0.5f;
+            itemY = bobY + 5 + frontArmDY + itemSize * 0.5f;
         }
-        float rot = (player.attackCooldown > 0.0f) ? sinf(player.attackCooldown * 12.0f) * 25.0f : 0;
+        float rot = itemAngle + swing * 1.6f;
         Rectangle src = { (float)(slotItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { itemX, itemY, (float)itemSize, (float)itemSize };
         Vector2 origin = { itemSize * 0.5f, itemSize * 0.5f };

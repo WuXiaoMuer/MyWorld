@@ -1220,6 +1220,8 @@ typedef struct {
     float cameraShakeIntensity;
     float cameraShakeTimer;
     float attackCooldown;
+    float attackAnim;         // total duration of the current attack swing (for animation)
+    float landSquashTimer;    // >0 = recently landed, drives squash animation
     float bowChargeTimer;     // 0.0 to 1.0 (full charge)
     bool bowCharging;         // true while holding right-click with bow
     bool sneaking;            // shift key held — crouch

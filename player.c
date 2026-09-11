@@ -89,6 +89,8 @@ void InitPlayer(void)
     player.cameraShakeIntensity = 0.0f;
     player.cameraShakeTimer = 0.0f;
     player.attackCooldown = 0.0f;
+    player.attackAnim = 0.0f;
+    player.landSquashTimer = 0.0f;
     player.spawnX = -1;
     player.spawnY = -1;
     player.netControlled = false;
@@ -534,6 +536,9 @@ void PlayerPhysics(float dt)
         while (player.walkTimer > 6.283185307f) player.walkTimer -= 6.283185307f;
     }
 
+    // Landing squash decays over time
+    if (player.landSquashTimer > 0.0f) player.landSquashTimer -= dt;
+
     // Water physics
     bool inWater = IsPlayerUnderwater();
     // Water splash on entry
@@ -706,6 +711,10 @@ void PlayerPhysics(float dt)
             newY = (int)(bottom / BLOCK_SIZE) * BLOCK_SIZE - PLAYER_HEIGHT;
             player.onGround = true;
             if (!wasOnGround && player.velocity.y > 200.0f) {
+                // Landing squash animation (stronger the faster we hit)
+                float t = player.velocity.y / 800.0f;
+                if (t > 1.0f) t = 1.0f;
+                player.landSquashTimer = 0.10f + 0.10f * t;
                 if (!player.netControlled) {
                     PlaySoundLand();
                     SpawnLandingDust(player.position.x + PLAYER_WIDTH / 2.0f,
@@ -842,6 +851,7 @@ void PlayerBlockInteraction(void)
                             mobs[i].velocity.x += kbDir * 150.0f * ENCH_LEVEL(toolEnch);
                         }
                         player.attackCooldown = GetAttackSpeed(selectedTool);
+                        player.attackAnim = player.attackCooldown; // drives the swing animation
                         // Consume durability (Unbreaking check)
                         if (IsTool(selectedTool)) {
                             int slot = player.selectedSlot;
