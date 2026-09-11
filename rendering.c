@@ -104,23 +104,49 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
 void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha)
 {
     unsigned char a = (unsigned char)(255 * alpha);
-    Color fill, border;
+    Color fill, border, inner;
     if (selected) {
         fill   = (Color){36, 62, 70, a};
         border = (Color){56, 217, 169, a};
+        inner  = (Color){90, 235, 200, (unsigned char)(70 * alpha)};
     } else if (hover) {
         fill   = (Color){44, 58, 80, a};
         border = (Color){74, 157, 235, a};
+        inner  = (Color){110, 180, 250, (unsigned char)(50 * alpha)};
     } else {
         fill   = (Color){34, 42, 56, a};
         border = (Color){58, 71, 92, a};
+        inner  = (Color){255, 255, 255, (unsigned char)(14 * alpha)};
     }
     DrawRoundedRect(x, y, size, size, 0.10f, fill);
+    // Outer soft glow for the active states, then the crisp border.
+    if (selected || hover) {
+        DrawRectangleLines(x - 1, y - 1, size + 2, size + 2, (Color){border.r, border.g, border.b, (unsigned char)(90 * alpha)});
+    }
     DrawRectangleLines(x, y, size, size, border);
-    // Inner soft highlight at top
-    DrawRectangle(x + 3, y + 1, size - 6, 1, (Color){255, 255, 255, (unsigned char)(12 * alpha)});
+    // Inner top highlight + bottom shade give the slot subtle depth.
+    DrawRectangle(x + 3, y + 1, size - 6, 1, inner);
+    DrawRectangle(x + 3, y + size - 2, size - 6, 1, (Color){0, 0, 0, (unsigned char)(40 * alpha)});
 }
 
+//----------------------------------------------------------------------------------
+// Tooltip placement — clamped to the screen and flipped at edges.
+// Every tooltip (hotbar, inventory, creative, chest, armor) uses this so the
+// panel never runs off-screen and behaves consistently near the right/bottom.
+//----------------------------------------------------------------------------------
+void GetUiTooltipPos(int mouseX, int mouseY, int w, int h, int *outX, int *outY)
+{
+    const int gap = 14;
+    const int margin = 4;
+    int tx = mouseX + gap;
+    int ty = mouseY - h / 2;               // vertically centered on the cursor
+    if (tx + w + margin > SCREEN_WIDTH) tx = mouseX - w - gap;   // flip left
+    if (ty + h + margin > SCREEN_HEIGHT) ty = SCREEN_HEIGHT - h - margin; // clamp bottom
+    if (ty < margin) ty = margin;                                  // clamp top
+    if (tx < margin) tx = margin;                                  // clamp left
+    *outX = tx;
+    *outY = ty;
+}
 // Held item state for inventory drag-and-drop
 uint8_t heldItem = BLOCK_AIR;
 int heldCount = 0;
@@ -770,9 +796,6 @@ void DrawInventoryScreen(void)
                         BlockType bt = (BlockType)player.inventory[idx];
                         const char *name = GetBlockName(bt);
                         int tw = MeasureGameTextWidth(name, 14);
-                        int tx = (int)mouse.x + 14; int ty = (int)mouse.y - 18;
-                        if (tx + tw + 8 > SCREEN_WIDTH) tx = (int)mouse.x - tw - 14;
-                        if (ty < 4) ty = (int)mouse.y + 14;
                         const char *typeLabel = NULL; Color typeColor = {180,180,190,200};
                         if (IsTool(bt)) { typeLabel = S(STR_TYPE_TOOL); typeColor = (Color){100,160,220,255}; }
                         else if (IsArmor(bt)) { typeLabel = S(STR_TYPE_ARMOR); typeColor = (Color){180,100,220,255}; }
@@ -785,12 +808,15 @@ void DrawInventoryScreen(void)
                         else if (IsTool(bt)) { int md = GetToolMaxDurability(bt); if (md > 0) { int pct = player.toolDurability[idx]*100/md; snprintf(info, sizeof(info), S(STR_TOOLTIP_DURABILITY), pct); } }
                         int infoW = info[0] ? MeasureGameTextWidth(info, 13) : 0; if (infoW > maxW) maxW = infoW;
                         int ttH = 36 + (info[0] ? 16 : 0);
-                        DrawRectangle(tx-3, ty-1, maxW+10, ttH+2, (Color){0,0,0,60});
-                        DrawRectangle(tx-4, ty-2, maxW+10, ttH+2, (Color){31,39,52,240});
-                        DrawRectangleLines(tx-4, ty-2, maxW+10, ttH+2, (Color){58,71,92,220});
-                        DrawGameText(typeLabel, tx, ty, 11, typeColor);
-                        DrawGameText(name, tx, ty+14, 14, (Color){230,225,240,255});
-                        if (info[0]) DrawGameText(info, tx, ty+30, 13, (Color){180,200,180,255});
+                        int boxW = maxW + 10, boxH = ttH + 2;
+                        int tx, ty;
+                        GetUiTooltipPos((int)mouse.x, (int)mouse.y, boxW, boxH, &tx, &ty);
+                        DrawRectangle(tx+1, ty+1, boxW, boxH, (Color){0,0,0,60});
+                        DrawRectangle(tx, ty, boxW, boxH, (Color){31,39,52,240});
+                        DrawRectangleLines(tx, ty, boxW, boxH, (Color){58,71,92,220});
+                        DrawGameText(typeLabel, tx+4, ty+2, 11, typeColor);
+                        DrawGameText(name, tx+4, ty+16, 14, (Color){230,225,240,255});
+                        if (info[0]) DrawGameText(info, tx+4, ty+32, 13, (Color){180,200,180,255});
                     }
                 }
             }
@@ -948,14 +974,14 @@ void DrawInventoryScreen(void)
                         int infoW = info[0] ? MeasureGameTextWidth(info, 13) : 0;
                         if (infoW > maxW) maxW = infoW;
                         int ttH = 36 + (info[0] ? 16 : 0);
-                        int ttx = (int)mouse.x + 14, tty = (int)mouse.y - 18;
-                        if (ttx + maxW + 10 > SCREEN_WIDTH) ttx = (int)mouse.x - maxW - 14;
-                        if (tty < 4) tty = (int)mouse.y + 14;
-                        DrawRectangle(ttx-4, tty-2, maxW+10, ttH+2, (Color){31,39,52,240});
-                        DrawRectangleLines(ttx-4, tty-2, maxW+10, ttH+2, (Color){58,71,92,220});
-                        DrawGameText(typeLabel, ttx, tty, 11, typeColor);
-                        DrawGameText(name, ttx, tty+14, 14, (Color){230,225,240,255});
-                        if (info[0]) DrawGameText(info, ttx, tty+30, 13, (Color){180,200,180,255});
+                        int boxW = maxW + 10, boxH = ttH + 2;
+                        int ttx, tty;
+                        GetUiTooltipPos((int)mouse.x, (int)mouse.y, boxW, boxH, &ttx, &tty);
+                        DrawRectangle(ttx, tty, boxW, boxH, (Color){31,39,52,240});
+                        DrawRectangleLines(ttx, tty, boxW, boxH, (Color){58,71,92,220});
+                        DrawGameText(typeLabel, ttx+4, tty+2, 11, typeColor);
+                        DrawGameText(name, ttx+4, tty+16, 14, (Color){230,225,240,255});
+                        if (info[0]) DrawGameText(info, ttx+4, tty+32, 13, (Color){180,200,180,255});
                     }
                 }
 
@@ -1128,8 +1154,10 @@ void DrawInventoryScreen(void)
             int tw = MeasureGameTextWidth(tooltipText, 14) + 10;
             int th = 20;
             if (ENCH_TYPE(tooltipEnchant) != ENCH_NONE) th = 36;
-            DrawRectangle(tooltipX, tooltipY - 14, tw, th, (Color){31, 39, 52, 230});
-            DrawGameText(tooltipText, tooltipX + 5, tooltipY - 12, 14, WHITE);
+            int tx, ty;
+            GetUiTooltipPos(tooltipX, tooltipY, tw, th, &tx, &ty);
+            DrawRectangle(tx, ty, tw, th, (Color){31, 39, 52, 230});
+            DrawGameText(tooltipText, tx + 5, ty + 2, 14, WHITE);
             if (ENCH_TYPE(tooltipEnchant) != ENCH_NONE) {
                 int enchType = ENCH_TYPE(tooltipEnchant);
                 int enchLvl = ENCH_LEVEL(tooltipEnchant);
@@ -1144,8 +1172,10 @@ void DrawInventoryScreen(void)
                 const char *enchName = S(enchStr);
                 int ew = MeasureGameTextWidth(TextFormat("%s %d", enchName, enchLvl), 12) + 10;
                 if (ew + 10 > tw) tw = ew + 10;
-                DrawRectangle(tooltipX, tooltipY - 14, tw, th, (Color){31, 39, 52, 230});
-                DrawGameText(TextFormat("%s %d", enchName, enchLvl), tooltipX + 5, tooltipY + 4, 12, (Color){180, 120, 255, 255});
+                GetUiTooltipPos(tooltipX, tooltipY, tw, th, &tx, &ty);
+                DrawRectangle(tx, ty, tw, th, (Color){31, 39, 52, 230});
+                DrawRectangleLines(tx, ty, tw, th, (Color){58, 71, 92, 220});
+                DrawGameText(TextFormat("%s %d", enchName, enchLvl), tx + 5, ty + 18, 12, (Color){180, 120, 255, 255});
             }
         }
 
@@ -1462,16 +1492,6 @@ void DrawInventoryScreen(void)
                     BlockType bt = (BlockType)player.armor[i];
                     const char *name = GetBlockName(bt);
                     int tw = MeasureGameTextWidth(name,14);
-                    int tx = (int)mouse.x + 14;
-                    int ty = (int)mouse.y - 18;
-                    if (tx + tw + 8 > SCREEN_WIDTH) tx = (int)mouse.x - tw - 14;
-                    if (ty < 4) ty = (int)mouse.y + 14;
-                    // Tooltip shadow
-                    DrawRectangle(tx - 3, ty - 1, tw + 8, 16, (Color){0, 0, 0, 60});
-                    // Tooltip background
-                    DrawRectangle(tx - 4, ty - 2, tw + 8, 16, (Color){31, 39, 52, 240});
-                    DrawRectangleLines(tx - 4, ty - 2, tw + 8, 16, (Color){58, 71, 92, 220});
-                    DrawGameText(name, tx, ty,14, (Color){230, 225, 240, 255});
 
                     char info[64] = { 0 };
                     int armorVal = GetArmorValue(bt);
@@ -1491,15 +1511,25 @@ void DrawInventoryScreen(void)
                         if (ew > tw) tw = ew;
                     }
 
+                    // Reserve one row for name + one per info/enchant line.
+                    int rows = 1 + 1 + (enchBuf[0] ? 1 : 0);
+                    int boxW = tw + 8, boxH = rows * 16;
+                    int tx, ty;
+                    GetUiTooltipPos((int)mouse.x, (int)mouse.y, boxW, boxH, &tx, &ty);
+
+                    DrawRectangle(tx + 1, ty + 1, boxW, boxH, (Color){0, 0, 0, 60});
+                    DrawRectangle(tx - 4, ty - 2, boxW, boxH, (Color){31, 39, 52, 240});
+                    DrawRectangleLines(tx - 4, ty - 2, boxW, boxH, (Color){58, 71, 92, 220});
+                    DrawGameText(name, tx, ty, 14, (Color){230, 225, 240, 255});
+
                     ty += 16;
-                    DrawRectangle(tx - 4, ty - 2, tw + 8, 15, (Color){24, 29, 38, 230});
-                    DrawRectangleLines(tx - 4, ty - 2, tw + 8, 15, (Color){58, 71, 92, 200});
+                    DrawRectangle(tx - 4, ty - 2, boxW, 15, (Color){24, 29, 38, 230});
                     DrawGameText(info, tx, ty,13, (Color){180, 200, 180, 255});
 
                     if (enchBuf[0]) {
                         ty += 16;
-                        DrawRectangle(tx - 4, ty - 2, tw + 8, 15, (Color){31, 39, 52, 230});
-                        DrawRectangleLines(tx - 4, ty - 2, tw + 8, 15, (Color){74, 157, 235, 200});
+                        DrawRectangle(tx - 4, ty - 2, boxW, 15, (Color){31, 39, 52, 230});
+                        DrawRectangleLines(tx - 4, ty - 2, boxW, 15, (Color){74, 157, 235, 200});
                         DrawGameText(enchBuf, tx, ty, 12, (Color){180, 120, 255, 255});
                     }
                 }
@@ -1797,10 +1827,6 @@ void DrawInventoryScreen(void)
                     BlockType bt = (BlockType)player.inventory[idx];
                     const char *name = GetBlockName(bt);
                     int tw = MeasureGameTextWidth(name,14);
-                    int tx = (int)mouse.x + 14;
-                    int ty = (int)mouse.y - 18;
-                    if (tx + tw + 8 > SCREEN_WIDTH) tx = (int)mouse.x - tw - 14;
-                    if (ty < 4) ty = (int)mouse.y + 14;
 
                     // Item type label
                     const char *typeLabel = NULL;
@@ -1845,24 +1871,27 @@ void DrawInventoryScreen(void)
 
                     // Tooltip background (multi-line)
                     int ttH = 36 + (info[0] ? 16 : 0) + (enchBuf[0] ? 16 : 0);
-                    DrawRectangle(tx - 3, ty - 1, maxW + 10, ttH + 2, (Color){0, 0, 0, 60});
-                    DrawRectangle(tx - 4, ty - 2, maxW + 10, ttH + 2, (Color){31, 39, 52, 240});
-                    DrawRectangleLines(tx - 4, ty - 2, maxW + 10, ttH + 2, (Color){58, 71, 92, 220});
+                    int boxW = maxW + 10, boxH = ttH + 2;
+                    int tx, ty;
+                    GetUiTooltipPos((int)mouse.x, (int)mouse.y, boxW, boxH, &tx, &ty);
+                    DrawRectangle(tx + 1, ty + 1, boxW, boxH, (Color){0, 0, 0, 60});
+                    DrawRectangle(tx, ty, boxW, boxH, (Color){31, 39, 52, 240});
+                    DrawRectangleLines(tx, ty, boxW, boxH, (Color){58, 71, 92, 220});
 
                     // Type label (small, colored)
-                    DrawGameText(typeLabel, tx, ty, 11, typeColor);
+                    DrawGameText(typeLabel, tx + 4, ty + 2, 11, typeColor);
                     // Item name
-                    DrawGameText(name, tx, ty + 14, 14, (Color){230, 225, 240, 255});
+                    DrawGameText(name, tx + 4, ty + 16, 14, (Color){230, 225, 240, 255});
 
                     // Info line
                     if (info[0]) {
-                        DrawGameText(info, tx, ty + 30, 13, (Color){180, 200, 180, 255});
+                        DrawGameText(info, tx + 4, ty + 32, 13, (Color){180, 200, 180, 255});
                     }
 
                     // Enchantment line
                     if (enchBuf[0]) {
-                        int ety = ty + 30 + (info[0] ? 16 : 0);
-                        DrawGameText(enchBuf, tx, ety, 12, (Color){180, 120, 255, 255});
+                        int ety = ty + 32 + (info[0] ? 16 : 0);
+                        DrawGameText(enchBuf, tx + 4, ety, 12, (Color){180, 120, 255, 255});
                     }
                 }
             }
@@ -2128,10 +2157,8 @@ void DrawCreativeScreen(void)
         int item = visIdx[hoveredIdx];
         const char *name = GetBlockName((BlockType)item);
         int tw = MeasureGameTextWidth(name, 14) + 12;
-        int tx = (int)mouse.x + 12;
-        int ty = (int)mouse.y - 20;
-        if (tx + tw > SCREEN_WIDTH) tx = SCREEN_WIDTH - tw - 4;
-        if (ty < 4) ty = 4;
+        int tx, ty;
+        GetUiTooltipPos((int)mouse.x, (int)mouse.y, tw, 18, &tx, &ty);
         DrawRectangle(tx + 2, ty + 2, tw, 18, (Color){0, 0, 0, 50});
         DrawRectangle(tx, ty, tw, 18, (Color){31, 39, 52, 240});
         DrawRectangleLines(tx, ty, tw, 18, (Color){58, 71, 92, 220});
@@ -2686,10 +2713,8 @@ void DrawHotbar(void)
         if (item != BLOCK_AIR && item < BLOCK_COUNT) {
             const char *name = GetBlockName(item);
             int tw = MeasureGameTextWidth(name,14) + 12;
-            int tx = (int)mouse.x + 12;
-            int ty = (int)mouse.y - 20;
-            if (tx + tw > SCREEN_WIDTH) tx = SCREEN_WIDTH - tw - 4;
-            if (ty < 4) ty = 4;
+            int tx, ty;
+            GetUiTooltipPos((int)mouse.x, (int)mouse.y, tw, 18, &tx, &ty);
             // Tooltip shadow
             DrawRectangle(tx + 2, ty + 2, tw, 18, (Color){0, 0, 0, 50});
             // Tooltip background

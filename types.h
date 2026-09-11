@@ -1767,6 +1767,7 @@ void SortInventory(void);
 void DrawUiButton(float x, float y, float w, float h, const char *label,
                   int fontSize, bool hover, bool selected, bool enabled, float alpha);
 void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha);
+void GetUiTooltipPos(int mouseX, int mouseY, int w, int h, int *outX, int *outY);
 void DrawMessage(void);
 void DrawPauseMenu(void);
 void DrawAchievementsUI(void);
