@@ -351,6 +351,8 @@ Mob* SpawnMob(MobType type, float x, float y)
             mobs[i].contactCooldown = 0.0f;
             mobs[i].deathTimer = 0.0f;
             mobs[i].attackTimer = 1.0f + (float)(rand() % 100) / 100.0f;
+            // Wolf uses attackTimer as its provoke countdown; start calm.
+            if (type == MOB_WOLF) mobs[i].attackTimer = 0.0f;
             mobs[i].fuseTimer = 0.0f;
             mobs[i].burnTimer = 0.0f;
             mobs[i].fireTimer = 0.0f;
@@ -532,10 +534,11 @@ static void UpdatePassiveAI(Mob *mob, float dt, MobType type)
 }
 
 // Wolf: neutral. Wanders like a passive mob, but if the player recently hit it
-// (aiState==1 set on damage), it chases and bites for a while.
+// (attackTimer > 0 acts as the provoke countdown), it chases and bites.
 static void UpdateWolfAI(Mob *mob, float dt)
 {
-    if (mob->aiState == 1) { // provoked
+    if (mob->attackTimer > 0) { // provoked
+        mob->attackTimer -= dt;
         float dx = player.position.x - mob->position.x;
         float dist = fabsf(dx);
         mob->facingRight = dx > 0;
@@ -544,12 +547,7 @@ static void UpdateWolfAI(Mob *mob, float dt)
         } else {
             mob->velocity.x = 0;
         }
-        // Stay provoked for a while, then calm down
-        mob->aiTimer -= dt;
-        if (mob->aiTimer <= 0 || dist > 500.0f) {
-            mob->aiState = 0;
-            mob->aiTimer = MOB_AI_INTERVAL;
-        }
+        if (mob->attackTimer < 0 || dist > 500.0f) mob->attackTimer = 0;
         return;
     }
     // Calm wandering
@@ -1055,8 +1053,7 @@ void DamageMob(Mob *mob, int damage)
     mob->despawnTimer = MOB_DESPAWN_TIME; // Reset timer on engagement
     // Wolves retaliate when hurt (neutral mob behaviour)
     if (mob->type == MOB_WOLF && mob->health > 0) {
-        mob->aiState = 1;
-        mob->aiTimer = 6.0f;
+        mob->attackTimer = 6.0f;
     }
     SpawnDamageParticles(mob->position.x + GetMobW(mob) / 2.0f,
                          mob->position.y + GetMobH(mob) / 2.0f,
@@ -2078,7 +2075,7 @@ static void DrawWolfSprite(Mob *mob)
         alpha = (unsigned char)(255 * dp);
     }
     int dir = mob->facingRight ? 1 : -1;
-    bool angry = (mob->aiState == 1);
+    bool angry = (mob->attackTimer > 0);
     // Body (grey)
     DrawRectangle(SRECT(mob, x + 2, y + 4, 14, 8), (Color){170, 170, 180, alpha});
     // Head

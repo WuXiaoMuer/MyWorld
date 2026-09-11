@@ -22,7 +22,7 @@ make clean && make   # gcc/g++, raylib 5.5 static (include/ + lib/libraylib.a)
 | player.c | Physics, inventory, combat, armor, enchantments |
 | rendering.c | All rendering (world, UI, menus) — largest file |
 | crafting.c | Recipes, furnace/smelting UI |
-| mob.c | 7 mob types (Pig/Zombie/Skeleton/Creeper/Spider/Slime/Enderman): spawn, AI, draw |
+| mob.c | 15 mob types (Pig/Zombie/Skeleton/Creeper/Spider/Slime/Enderman/Cow/Sheep/Chicken/Villager/Horse/Wolf/Witch/Bat): spawn, AI, draw |
 | light.c | BFS sunlight + point lights (levels 0-15) |
 | sound.c | Procedural sounds, BGM, ambient |
 | i18n.c | EN/ZH/JA string tables (~200+ strings) |

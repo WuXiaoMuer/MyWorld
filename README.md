@@ -8,7 +8,8 @@ All assets are procedurally generated pixel art — no external textures or spri
 ## Features
 
 - **Procedural World Generation** — 2048×256 block world with terrain, caves, trees, ores,
-  villages, dungeons, and multiple biomes using fractal Brownian motion noise.
+  villages, dungeons, and **11 biomes** (plains, desert, forest, tundra, swamp, jungle,
+  taiga, savanna, mesa, flower field, mushroom island) using fractal Brownian motion noise.
 - **50+ Blocks & Items** — building blocks, ores, tools, armor, food, redstone components,
   crops, and more.
 - **Day/Night Cycle** — dynamic sky color, lighting overlay, and mob spawning.

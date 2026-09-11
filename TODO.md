@@ -32,4 +32,7 @@
 - [x] Resolution option in settings (16:9 presets with fixed logical canvas)
 - [x] Creative mode
 - [x] Key rebinding foundation (centralized movement/sprint/sneak/jump actions)
-- [ ] More biomes/mobs
+- [x] More biomes/mobs
+  - Biomes (11 total): savanna, mesa, flower field, mushroom island added
+  - Mobs (15 total): horse, wolf, witch, bat added
+  - Biome noise mapping refactored into a single `GetBiomeAtX()` (was duplicated 6×)
