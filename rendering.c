@@ -2668,13 +2668,13 @@ void DrawHotbar(void)
                 DrawEnchantGlint(x + 5, drawY + 5, slotSize - 10);
 
             if (player.inventoryCount[i] > 1) {
-                // Count badge with background pill
+                // MC style: white count with a hard black shadow, bottom-right
                 const char *countStr = TextFormat("%d", player.inventoryCount[i]);
                 int ctw = MeasureGameTextWidth(countStr, 12);
-                int badgeX = x + slotSize - ctw - 5;
-                int badgeY = drawY + slotSize - 16;
-                DrawRectangle(badgeX - 2, badgeY - 1, ctw + 4, 14, (Color){0, 0, 0, 140});
-                DrawGameText(countStr, badgeX, badgeY, 12, (Color){240, 240, 255, 230});
+                int badgeX = x + slotSize - ctw - 4;
+                int badgeY = drawY + slotSize - 15;
+                DrawGameText(countStr, badgeX + 1, badgeY + 1, 12, (Color){0, 0, 0, 220});
+                DrawGameText(countStr, badgeX, badgeY, 12, (Color){255, 255, 255, 255});
             }
 
             if (IsTool((BlockType)item)) {
@@ -2699,8 +2699,8 @@ void DrawHotbar(void)
         }
 
         // Slot number — subtle, top-left (white with MC hard shadow)
-        DrawTextMC(TextFormat("%d", i + 1), x + 3, drawY + 2, 10,
-                   selected ? (Color){255, 255, 255, 240} : (Color){220, 220, 220, 170});
+        DrawTextMC(TextFormat("%d", i + 1), x + 3, drawY + 2, 11,
+                   selected ? (Color){255, 255, 255, 255} : (Color){225, 225, 225, 215});
     }
 
     // Smooth sliding selection indicator bar
@@ -2794,21 +2794,36 @@ void DrawPlayerStatus(void)
     // Dedicated status band above the selected-item name (see HUD_* layout).
     int barY = HUD_STATUS_Y;
 
-    int iconSize = 12;
-    int iconPad = 3;
+    int iconSize = 16;
+    int iconPad = 2;
     int barX = startX;
 
-    // ---- Helper: draw a heart at (cx, cy) ----
-    #define DRAW_HEART(cx, cy, col, outline) do { \
-        float hx = (float)(cx), hy = (float)(cy); \
-        DrawCircle((int)(hx - 2.5f), (int)(hy - 1.5f), 2.5f, col); \
-        DrawCircle((int)(hx + 2.5f), (int)(hy - 1.5f), 2.5f, col); \
-        DrawTriangle((Vector2){hx - 5, hy - 0.5f}, (Vector2){hx + 5, hy - 0.5f}, (Vector2){hx, hy + 5}, col); \
-        if (outline.a > 0) { \
-            DrawCircleLines((int)(hx - 2.5f), (int)(hy - 1.5f), 2.5f, outline); \
-            DrawCircleLines((int)(hx + 2.5f), (int)(hy - 1.5f), 2.5f, outline); \
-            DrawTriangleLines((Vector2){hx - 5, hy - 0.5f}, (Vector2){hx + 5, hy - 0.5f}, (Vector2){hx, hy + 5}, outline); \
+    // ---- Helper: draw a chunky MC heart at (cx, cy) using a pixel mask ----
+    // 9x8 mask: two lobes on top, tapering to a point at the bottom.
+    static const char *HEART_MASK[8] = {
+        " XX XX ",
+        "XXXXXXX",
+        "XXXXXXX",
+        "XXXXXXX",
+        " XXXXX ",
+        "  XXX  ",
+        "   X   ",
+        "       "
+    };
+    #define HEART_BLIT(cx, cy, px, col) do { \
+        for (int _r = 0; _r < 8; _r++) { \
+            const char *_row = HEART_MASK[_r]; \
+            for (int _c = 0; _c < 7; _c++) { \
+                if (_row[_c] == 'X') \
+                    DrawRectangle((cx) - 4 * (px) + _c * (px), (cy) - 4 * (px) + _r * (px), (px), (px), col); \
+            } \
         } \
+    } while(0)
+    #define DRAW_HEART(cx, cy, col, outline) do { \
+        int hx = (cx), hy = (cy); \
+        if (outline.a > 0) HEART_BLIT(hx, hy, 3, outline); \
+        HEART_BLIT(hx, hy, 2, col); \
+        DrawRectangle(hx - 4, hy - 3, 2, 2, (Color){255, 255, 255, 95}); \
     } while(0)
 
     float time = (float)GetTime();
@@ -2859,24 +2874,29 @@ void DrawPlayerStatus(void)
         DRAW_HEART(cx, cy, c, outline);
     }
 
-    // Hunger drumsticks
+    // Hunger drumsticks (MC style: beige bone handle, brown meat body)
     int hungerX = barX + (MAX_HEALTH / 2) * (iconSize + iconPad) + 16;
     bool hungerLow = player.hunger <= 6;
     float hungerFlash = hungerLow ? (sinf(time * 4.0f) * 0.3f + 0.7f) : 1.0f;
     for (int i = 0; i < MAX_HUNGER / 2; i++) {
         int dx = hungerX + i * (iconSize + iconPad);
+        int dy = barY;
         bool filled = player.hunger >= (i + 1) * 2;
         bool half = !filled && player.hunger >= i * 2 + 1;
-        Color c = filled ? (Color){200, 140, 50, 255} : (half ? (Color){130, 90, 35, 230} : (Color){50, 32, 14, 160});
+        Color meat = filled ? (Color){190, 120, 45, 255} : (half ? (Color){130, 85, 32, 235} : (Color){55, 38, 20, 190});
+        Color dark = (Color){90, 55, 20, 235};
         if (hungerLow && filled) {
-            c.r = (unsigned char)(c.r * hungerFlash);
-            c.g = (unsigned char)(c.g * hungerFlash);
-            c.b = (unsigned char)(c.b * hungerFlash);
+            meat.r = (unsigned char)(meat.r * hungerFlash);
+            meat.g = (unsigned char)(meat.g * hungerFlash);
+            meat.b = (unsigned char)(meat.b * hungerFlash);
         }
-        // Drumstick shape: bone handle + meat body
-        DrawRectangle(dx + 1, barY, 3, 8, (Color){200, 180, 150, 200}); // bone
-        DrawRectangle(dx + 4, barY + 1, 8, 10, c); // meat
-        DrawRectangleLines(dx + 4, barY + 1, 8, 10, (Color){100, 60, 20, 120});
+        // Bone handle (upper-left) + rounded meat body (lower-right)
+        DrawRectangle(dx + 1, dy + 1, 3, 7, (Color){225, 215, 190, 235});
+        DrawRectangle(dx + 4, dy + 4, 4, 3, dark);
+        DrawRectangle(dx + 3, dy + 5, 10, 8, meat);
+        DrawRectangle(dx + 4, dy + 4, 8, 2, meat);
+        DrawRectangle(dx + 11, dy + 7, 3, 5, dark);
+        DrawRectangle(dx + 5, dy + 7, 3, 3, (Color){230, 190, 140, 150});
     }
 
     // Oxygen bubbles (only show when underwater or not full)
