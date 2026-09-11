@@ -268,24 +268,6 @@ static bool DrawButton(int x, int y, int w, int h, const char *label, Color acce
     return click && enabled;
 }
 
-// Draw text with a left-to-right gradient
-static void DrawGradientText(const char *text, int x, int y, int fontSize, Color colorLeft, Color colorRight)
-{
-    int len = (int)strlen(text);
-    int drawX = x;
-    for (int i = 0; i < len; i++) {
-        char ch[2] = { text[i], 0 };
-        int charW = MeasureGameTextWidth(ch, fontSize);
-        float t = (float)i / (float)len;
-        unsigned char r = (unsigned char)(colorLeft.r + (colorRight.r - colorLeft.r) * t);
-        unsigned char g = (unsigned char)(colorLeft.g + (colorRight.g - colorLeft.g) * t);
-        unsigned char b = (unsigned char)(colorLeft.b + (colorRight.b - colorLeft.b) * t);
-        unsigned char a = (unsigned char)(colorLeft.a + (colorRight.a - colorLeft.a) * t);
-        DrawGameText(ch, drawX, y, fontSize, (Color){r, g, b, a});
-        drawX += charW;
-    }
-}
-
 // Draw a soft glow circle
 static void DrawGlowCircle(int cx, int cy, int radius, Color color, float intensity)
 {
@@ -2626,20 +2608,19 @@ void DrawHotbar(void)
     int xpBarY = HUD_XP_BAR_Y;
     float xpPct = (float)player.xp / MAX_XP;
     if (xpPct > 1.0f) xpPct = 1.0f;
-    DrawRectangle(xpBarX - 1, xpBarY - 1, xpBarW + 2, xpBarH + 2, (Color){0, 0, 0, 100});
-    DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){30, 30, 30, 200});
-    // Teal gradient fill (matches the HUD accent palette)
+    DrawRectangle(xpBarX - 1, xpBarY - 1, xpBarW + 2, xpBarH + 2, (Color){0, 0, 0, 140});
+    DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){20, 20, 20, 230});
+    // Flat green XP fill (MC experience bar), with a bright top line.
     int fillW = (int)(xpBarW * xpPct);
     if (fillW > 0) {
-        DrawRectangle(xpBarX, xpBarY, fillW, xpBarH / 2, (Color){56, 217, 169, 220});
-        DrawRectangle(xpBarX, xpBarY + xpBarH / 2, fillW, xpBarH / 2, (Color){40, 170, 150, 220});
-        DrawRectangle(xpBarX, xpBarY, fillW, 1, (Color){160, 245, 220, 180});
+        DrawRectangle(xpBarX, xpBarY, fillW, xpBarH, (Color){80, 200, 60, 255});
+        DrawRectangle(xpBarX, xpBarY, fillW, 1, (Color){150, 255, 130, 220});
     }
     // XP level number, to the left of the bar (keeps the band above the bar free)
     if (player.xp > 0) {
         const char *lvlStr = TextFormat("%d", player.xp / 10);
         int lvlW = MeasureGameTextWidth(lvlStr, 11);
-        DrawGameText(lvlStr, xpBarX - lvlW - 6, xpBarY - 3, 11, (Color){120, 235, 190, 220});
+        DrawGameText(lvlStr, xpBarX - lvlW - 6, xpBarY - 3, 11, (Color){120, 235, 130, 230});
     }
     // XP text
     char xpText[32];
@@ -2669,8 +2650,8 @@ void DrawHotbar(void)
     slotBounce *= powf(0.05f, GetFrameTime());
     if (slotBounce < 0.01f) slotBounce = 0.0f;
 
-    // Gradient backing panel (rounded, teal-tinted) behind the slots
-    DrawUiPanel(startX - 6, startY - 6, totalW + 12, slotSize + 12, 220);
+    // MC hotbar backing: hard dark strip (no transparency/rounding)
+    DrawUiPanel(startX - 6, startY - 6, totalW + 12, slotSize + 12, 255);
 
     for (int i = 0; i < HOTBAR_SLOTS; i++) {
         int x = startX + i * (slotSize + padding);
@@ -2726,7 +2707,7 @@ void DrawHotbar(void)
         }
 
         // Slot number — subtle, top-left
-        Color numColor = selected ? (Color){56, 217, 169, 200} : (Color){154, 168, 184, 120};
+        Color numColor = selected ? (Color){255, 255, 255, 220} : (Color){180, 180, 180, 140};
         DrawGameText(TextFormat("%d", i + 1), x + 3, drawY + 2, 10, numColor);
     }
 
@@ -2739,19 +2720,9 @@ void DrawHotbar(void)
         int barH = 3;
         int barY = startY + slotSize + 2;
         int bx = (int)selBarX;
-        DrawRectangle(bx, barY + 1, slotSize, barH, (Color){0, 0, 0, 70});
-        // Teal→blue horizontal gradient with a bright center highlight
-        for (int i = 0; i < slotSize; i++) {
-            float t = (float)i / (float)(slotSize - 1);
-            Color c = (Color){
-                (unsigned char)(56 + (74 - 56) * t),
-                (unsigned char)(217 + (157 - 217) * t),
-                (unsigned char)(169 + (235 - 169) * t),
-                235
-            };
-            DrawRectangle(bx + i, barY, 1, barH, c);
-        }
-        DrawRectangle(bx + slotSize / 4, barY, slotSize / 2, 1, (Color){220, 255, 245, 200});
+        DrawRectangle(bx, barY + 1, slotSize, barH, (Color){0, 0, 0, 120});
+        // Flat white selection marker (MC selected-slot frame)
+        DrawRectangle(bx, barY, slotSize, barH, (Color){235, 235, 235, 255});
     }
 
     // Tooltip for hovered slot
@@ -2810,10 +2781,10 @@ void DrawHotbar(void)
         int selX = (SCREEN_WIDTH - maxW) / 2;
         int selY = HUD_SEL_NAME_Y;
         int h = hasEnchant ? 32 : 16;
-        DrawRectangle(selX - 4, selY - 2, maxW + 8, h, (Color){31, 39, 52, 180});
-        DrawGameText(selName, selX, selY, 13, (Color){232, 237, 245, 200});
+        DrawRectangle(selX - 4, selY - 2, maxW + 8, h, (Color){0, 0, 0, 170});
+        DrawGameText(selName, selX, selY, 13, (Color){255, 255, 255, 230});
         if (hasEnchant) {
-            DrawGameText(enchBuf, selX, selY + 16, 11, (Color){180, 120, 255, 200});
+            DrawGameText(enchBuf, selX, selY + 16, 11, (Color){180, 120, 255, 220});
         }
     }
 }
@@ -3735,15 +3706,19 @@ void DrawMainMenu(void)
     float elapsed = time - menuEnterTime;
 
     // ================================================================
-    // Background: colorful dawn/dusk sky gradient
+    // Background: MC-style dark stone, tiled with a subtle checker
     // ================================================================
-    for (int y = 0; y < SCREEN_HEIGHT; y += 2) {
-        float t = (float)y / SCREEN_HEIGHT;
-        // Deep indigo-blue top → teal mid → warm amber horizon
-        unsigned char r = (unsigned char)(26 + t * 118 + sinf(time * 0.05f) * 5);
-        unsigned char g = (unsigned char)(38 + t * 82 + sinf(time * 0.07f + 1.0f) * 5);
-        unsigned char b = (unsigned char)(92 - (unsigned char)(t * 48));
-        DrawRectangle(0, y, SCREEN_WIDTH, 2, (Color){r, g, b, 255});
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){26, 26, 26, 255});
+    {
+        const int tile = 16;
+        for (int ty = 0; ty < SCREEN_HEIGHT; ty += tile) {
+            for (int tx = 0; tx < SCREEN_WIDTH; tx += tile) {
+                // Deterministic per-tile shade (stable across frames)
+                unsigned int h = (unsigned int)((tx / tile) * 73856093u ^ (ty / tile) * 19349663u);
+                unsigned char v = (unsigned char)(34 + (h % 5) * 4);
+                DrawRectangle(tx, ty, tile, tile, (Color){v, v, v, 255});
+            }
+        }
     }
 
     // Sun with soft glow near the horizon
@@ -3942,18 +3917,11 @@ void DrawMainMenu(void)
         DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 215, 165, ca});
     }
 
-    // Final title — vibrant gradient with clean shadow
+    // Final title — flat MC gold with a hard drop shadow
     if (elapsed > titleTotalDur) {
-        DrawGameText(title, titleX + 3, titleY + 4, titleSize, (Color){0, 0, 0, 160});
-        DrawGameText(title, titleX + 1, titleY + 2, titleSize, (Color){0, 0, 0, 90});
-        // Rich gradient: emerald → gold
-        Color titleLeft = (Color){84, 214, 160, 255};    // emerald
-        Color titleRight = (Color){255, 205, 90, 255};   // warm gold
-        DrawGradientText(title, titleX, titleY, titleSize, titleLeft, titleRight);
-        // Small animated highlight sheen across the title
-        float sheen = sinf(time * 0.8f) * 0.5f + 0.5f;
-        int sheenX = titleX + (int)(sheen * (titleW + 80)) - 40;
-        DrawRectangle(sheenX, titleY + titleSize / 2 - 14, 40, 3, (Color){255, 255, 255, 40});
+        DrawGameText(title, titleX + 3, titleY + 4, titleSize, (Color){0, 0, 0, 180});
+        DrawGameText(title, titleX + 1, titleY + 2, titleSize, (Color){60, 48, 20, 200});
+        DrawGameText(title, titleX, titleY, titleSize, (Color){252, 220, 120, 255});
     }
 
     // ================================================================
@@ -4104,19 +4072,11 @@ void DrawSlotSelectScreen(void)
 {
     float time = (float)GetTime();
 
-    // Background gradient (richer)
-    for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
-        float t = (float)y / SCREEN_HEIGHT;
-        unsigned char r = (unsigned char)(12 + t * 22 + sinf(time * 0.05f + y * 0.01f) * 3);
-        unsigned char g = (unsigned char)(15 + t * 18 + sinf(time * 0.07f + y * 0.008f) * 3);
-        unsigned char b = (unsigned char)(32 + t * 30 + sinf(time * 0.04f + y * 0.006f) * 6);
-        DrawRectangle(0, y, SCREEN_WIDTH, 4, (Color){r, g, b, 255});
-    }
+    // Background: flat MC dark backdrop
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){26, 26, 26, 255});
 
-    // Shared screen card keeps slot content legible over the animated background.
-    DrawUiBox(270, 24, 740, 668, 0.035f, (Color){8, 14, 26, 185});
-    DrawRectangleLines(270, 24, 740, 668, (Color){88, 112, 145, 180});
-    DrawRectangle(320, 26, 640, 2, (Color){74, 157, 235, 120});
+    // Shared screen card keeps slot content legible.
+    DrawUiPanel(270, 24, 740, 668, 255);
 
     // Title with gradient
     const char *title = (slotSelectMode == 0) ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
@@ -4356,25 +4316,17 @@ void DrawConfirmDialog(void)
 //----------------------------------------------------------------------------------
 void DrawSettingsScreen(void)
 {
-    // Background gradient (richer)
+    // Background: flat MC dark backdrop
     float stime = (float)GetTime();
-    for (int y = 0; y < SCREEN_HEIGHT; y += 4) {
-        float t = (float)y / SCREEN_HEIGHT;
-        unsigned char r = (unsigned char)(12 + t * 18 + sinf(stime * 0.06f + y * 0.008f) * 3);
-        unsigned char g = (unsigned char)(14 + t * 14 + sinf(stime * 0.08f + y * 0.006f) * 2);
-        unsigned char b = (unsigned char)(28 + t * 26 + sinf(stime * 0.05f + y * 0.005f) * 6);
-        DrawRectangle(0, y, SCREEN_WIDTH, 4, (Color){r, g, b, 255});
-    }
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){26, 26, 26, 255});
 
-    // Title with gradient
+    // Title
     const char *title = S(STR_SETTINGS);
     int titleW = MeasureGameTextWidth(title, 42);
-    float titlePulse = sinf(stime * 0.7f) * 0.2f + 0.8f;
-    DrawGlowCircle(SCREEN_WIDTH / 2, 35, 50, (Color){130, 90, 170, (unsigned char)(25 * titlePulse)}, 0.3f);
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 1, 20, 42, (Color){0, 0, 0, 80});
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 18, 42, (Color){200, 190, 220, 255});
-    // Subtle line under title
-    DrawRectangle((SCREEN_WIDTH - 120) / 2, 65, 120, 1, (Color){80, 85, 100, 100});
+    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 2, 20, 42, (Color){0, 0, 0, 150});
+    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 18, 42, (Color){255, 255, 255, 255});
+    // Hard separator under the title
+    DrawRectangle((SCREEN_WIDTH - 160) / 2, 66, 160, 2, (Color){120, 120, 120, 180});
 
     Vector2 mouse = Win32GetMousePosition();
 
