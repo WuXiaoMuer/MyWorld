@@ -100,6 +100,37 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
     (void)ACCENT_BLUE;
 }
 
+//----------------------------------------------------------------------------------
+// Shared UI panel: rounded card with drop shadow, vertical gradient body and a
+// double border (dark outline + accent inner line). Used by tooltips, the
+// hotbar backing bar and menu panels for a consistent cold-teal look.
+//----------------------------------------------------------------------------------
+void DrawUiPanel(int x, int y, int w, int h, unsigned char alpha)
+{
+    if (w <= 0 || h <= 0) return;
+    Color top    = (Color){36, 45, 60, alpha};
+    Color bottom = (Color){24, 30, 42, alpha};
+    // Drop shadow
+    DrawRoundedRect(x + 2, y + 3, w, h, 0.06f, (Color){0, 0, 0, (unsigned char)(60 * alpha / 255)});
+    // Vertical gradient body, drawn in strips so we keep rounded corners.
+    for (int i = 0; i < h; i++) {
+        float t = (h > 1) ? (float)i / (float)(h - 1) : 0.0f;
+        Color c = (Color){
+            (unsigned char)(top.r + (bottom.r - top.r) * t),
+            (unsigned char)(top.g + (bottom.g - top.g) * t),
+            (unsigned char)(top.b + (bottom.b - top.b) * t),
+            alpha
+        };
+        int lx = x, lw = w;
+        if (i == 0) { lx = x + 3; lw = w - 6; }
+        else if (i == h - 1) { lx = x + 3; lw = w - 6; }
+        DrawRectangle(lx, y + i, lw, 1, c);
+    }
+    // Borders: outer dark, inner teal-tinted highlight on the top edge
+    DrawRectangleLines(x, y, w, h, (Color){58, 71, 92, alpha});
+    DrawRectangle(x + 3, y, w - 6, 1, (Color){56, 217, 169, (unsigned char)(90 * alpha / 255)});
+}
+
 // Modern dark-flat UI slot (inventory, creative palette, hotbar)
 void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha)
 {
@@ -2657,9 +2688,8 @@ void DrawHotbar(void)
     slotBounce *= powf(0.05f, GetFrameTime());
     if (slotBounce < 0.01f) slotBounce = 0.0f;
 
-    // MC-style dark translucent bar background (square corners)
-    DrawRectangle(startX - 6, startY - 6, totalW + 12, slotSize + 12, (Color){0, 0, 0, 140});
-    DrawRectangleLines(startX - 6, startY - 6, totalW + 12, slotSize + 12, (Color){58, 71, 92, 200});
+    // Gradient backing panel (rounded, teal-tinted) behind the slots
+    DrawUiPanel(startX - 6, startY - 6, totalW + 12, slotSize + 12, 220);
 
     for (int i = 0; i < HOTBAR_SLOTS; i++) {
         int x = startX + i * (slotSize + padding);
@@ -2725,11 +2755,22 @@ void DrawHotbar(void)
         if (selBarX < 0) selBarX = (float)(startX + player.selectedSlot * (slotSize + padding));
         float targetX = (float)(startX + player.selectedSlot * (slotSize + padding));
         selBarX += (targetX - selBarX) * 12.0f * GetFrameTime();
-        int barH = 2;
-        int barY = startY + slotSize + 4;
-        DrawRectangle((int)selBarX, barY + 1, slotSize, barH, (Color){0, 0, 0, 60});
-        DrawRectangle((int)selBarX, barY, slotSize, barH, (Color){56, 217, 169, 220});
-        DrawRectangle((int)(selBarX + slotSize * 0.2f), barY, (int)(slotSize * 0.6f), barH, (Color){56, 217, 169, 240});
+        int barH = 3;
+        int barY = startY + slotSize + 2;
+        int bx = (int)selBarX;
+        DrawRectangle(bx, barY + 1, slotSize, barH, (Color){0, 0, 0, 70});
+        // Teal→blue horizontal gradient with a bright center highlight
+        for (int i = 0; i < slotSize; i++) {
+            float t = (float)i / (float)(slotSize - 1);
+            Color c = (Color){
+                (unsigned char)(56 + (74 - 56) * t),
+                (unsigned char)(217 + (157 - 217) * t),
+                (unsigned char)(169 + (235 - 169) * t),
+                235
+            };
+            DrawRectangle(bx + i, barY, 1, barH, c);
+        }
+        DrawRectangle(bx + slotSize / 4, barY, slotSize / 2, 1, (Color){220, 255, 245, 200});
     }
 
     // Tooltip for hovered slot
