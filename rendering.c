@@ -16,6 +16,21 @@ static void DrawCompetitionIcon(int x, int y, int size, unsigned char alpha, boo
 static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned char alpha, bool unlocked);
 
 //----------------------------------------------------------------------------------
+// HUD vertical layout — single source of truth
+// The hotbar, selected-item name and player-status bars all stack above the
+// hotbar; each gets its own reserved band so nothing overlaps. Bands are laid
+// out bottom-up from the screen edge (720-high screen assumed).
+//----------------------------------------------------------------------------------
+#define HUD_SLOT_SIZE     44
+#define HUD_SLOT_PAD      4
+#define HUD_HOTBAR_Y      (SCREEN_HEIGHT - HUD_SLOT_SIZE - 12)          // 664
+#define HUD_XP_BAR_H      4
+#define HUD_XP_BAR_Y      (HUD_HOTBAR_Y - HUD_XP_BAR_H - 4)             // 656
+#define HUD_XP_LABEL_Y    (HUD_XP_BAR_Y + HUD_XP_BAR_H + 2)             // 662
+#define HUD_SEL_NAME_Y    (HUD_XP_BAR_Y - 34)                           // 622 name box 620-652 (enchant)
+#define HUD_STATUS_Y      (HUD_SEL_NAME_Y - 34)                         // 588 status icons
+
+//----------------------------------------------------------------------------------
 // Smooth hover animation system
 //----------------------------------------------------------------------------------
 #define MAX_HOVER_SLOTS 768
@@ -2534,26 +2549,33 @@ void DrawPlayerSprite(void)
 //----------------------------------------------------------------------------------
 void DrawHotbar(void)
 {
-    int slotSize = 44;
-    int padding = 4;
+    int slotSize = HUD_SLOT_SIZE;
+    int padding = HUD_SLOT_PAD;
     int totalW = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * padding;
     int startX = (SCREEN_WIDTH - totalW) / 2;
-    int startY = SCREEN_HEIGHT - slotSize - 12;
+    int startY = HUD_HOTBAR_Y;
 
-    // --- XP Bar above hotbar ---
+    // --- XP Bar above hotbar (the single XP bar; status bar no longer draws one) ---
     int xpBarW = totalW;
-    int xpBarH = 4;
+    int xpBarH = HUD_XP_BAR_H;
     int xpBarX = startX;
-    int xpBarY = startY - xpBarH - 4;
+    int xpBarY = HUD_XP_BAR_Y;
     float xpPct = (float)player.xp / MAX_XP;
     if (xpPct > 1.0f) xpPct = 1.0f;
     DrawRectangle(xpBarX - 1, xpBarY - 1, xpBarW + 2, xpBarH + 2, (Color){0, 0, 0, 100});
     DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){30, 30, 30, 200});
-    // Gradient fill: green → bright green
+    // Teal gradient fill (matches the HUD accent palette)
     int fillW = (int)(xpBarW * xpPct);
     if (fillW > 0) {
-        DrawRectangle(xpBarX, xpBarY, fillW, xpBarH / 2, (Color){80, 220, 80, 220});
-        DrawRectangle(xpBarX, xpBarY + xpBarH / 2, fillW, xpBarH / 2, (Color){60, 200, 60, 220});
+        DrawRectangle(xpBarX, xpBarY, fillW, xpBarH / 2, (Color){56, 217, 169, 220});
+        DrawRectangle(xpBarX, xpBarY + xpBarH / 2, fillW, xpBarH / 2, (Color){40, 170, 150, 220});
+        DrawRectangle(xpBarX, xpBarY, fillW, 1, (Color){160, 245, 220, 180});
+    }
+    // XP level number, to the left of the bar (keeps the band above the bar free)
+    if (player.xp > 0) {
+        const char *lvlStr = TextFormat("%d", player.xp / 10);
+        int lvlW = MeasureGameTextWidth(lvlStr, 11);
+        DrawGameText(lvlStr, xpBarX - lvlW - 6, xpBarY - 3, 11, (Color){120, 235, 190, 220});
     }
     // XP text
     char xpText[32];
@@ -2714,7 +2736,7 @@ void DrawHotbar(void)
         int selW = MeasureGameTextWidth(selName, 13);
         int maxW = (enchW > selW) ? enchW : selW;
         int selX = (SCREEN_WIDTH - maxW) / 2;
-        int selY = startY - 18;
+        int selY = HUD_SEL_NAME_Y;
         int h = hasEnchant ? 32 : 16;
         DrawRectangle(selX - 4, selY - 2, maxW + 8, h, (Color){31, 39, 52, 180});
         DrawGameText(selName, selX, selY, 13, (Color){232, 237, 245, 200});
@@ -2725,15 +2747,17 @@ void DrawHotbar(void)
 }
 
 //----------------------------------------------------------------------------------
-// Player Status Bars (health, hunger, oxygen, XP)
+// Player Status Bars (armor, health, hunger, oxygen)
+// The XP bar lives with the hotbar (see DrawHotbar) so the two never overlap.
 //----------------------------------------------------------------------------------
 void DrawPlayerStatus(void)
 {
-    int slotSize = 44;
-    int padding = 4;
+    int slotSize = HUD_SLOT_SIZE;
+    int padding = HUD_SLOT_PAD;
     int totalW = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * padding;
     int startX = (SCREEN_WIDTH - totalW) / 2;
-    int barY = SCREEN_HEIGHT - slotSize - 48;
+    // Dedicated status band above the selected-item name (see HUD_* layout).
+    int barY = HUD_STATUS_Y;
 
     int iconSize = 12;
     int iconPad = 3;
@@ -2836,28 +2860,6 @@ void DrawPlayerStatus(void)
             if (filled) {
                 DrawCircle(bx - 1, by - 2, 1.5f, (Color){160, 220, 255, 180}); // highlight
             }
-        }
-    }
-
-    // XP bar — sleek thin bar
-    {
-        int xpBarX = startX;
-        int xpBarY = barY + iconSize + 5;
-        int xpBarW = totalW;
-        int xpBarH = 4;
-        float xpPct = (float)player.xp / MAX_XP;
-        // Background
-        DrawRectangle(xpBarX, xpBarY, xpBarW, xpBarH, (Color){20, 20, 25, 180});
-        if (player.xp > 0) {
-            // XP fill with glow
-            DrawRectangle(xpBarX, xpBarY, (int)(xpBarW * xpPct), xpBarH, (Color){60, 220, 80, 230});
-            DrawRectangle(xpBarX, xpBarY, (int)(xpBarW * xpPct), 1, (Color){100, 255, 120, 180});
-        }
-        // XP level number
-        if (player.xp > 0) {
-            const char *xpStr = TextFormat("%d", player.xp / 10);
-            int xpTextW = MeasureGameTextWidth(xpStr, 11);
-            DrawGameText(xpStr, xpBarX - xpTextW - 6, xpBarY - 1, 11, (Color){80, 220, 100, 180});
         }
     }
 }
