@@ -78,19 +78,36 @@ static void DrawTextMC(const char *text, int x, int y, int fontSize, Color color
     DrawGameText(text, x, y, fontSize, color);
 }
 
-// Dark title-screen background: tiled dirt in warm browns with a slight
-// per-tile shade variation, like the vanilla menu.
+// Title-screen background: vanilla-style dirt. Each 16px tile has a few
+// chunky grains (matching MC's 16x16 tile scaled up) so it reads as soil
+// rather than a flat checkerboard. A dark overlay keeps UI text legible.
 static void DrawDirtBackground(unsigned char overlayAlpha)
 {
     const int tile = 16;
+    // Base dirt tones (warm browns)
+    static const Color base[4] = {
+        {134,  96,  67, 255},
+        {124,  88,  60, 255},
+        {143, 103,  72, 255},
+        {117,  82,  56, 255}
+    };
+    static const Color grain[2] = {
+        { 96,  67,  45, 255},   // dark grain
+        {160, 118,  84, 255}    // light grain
+    };
+
     for (int ty = 0; ty < SCREEN_HEIGHT; ty += tile) {
         for (int tx = 0; tx < SCREEN_WIDTH; tx += tile) {
-            unsigned int h = (unsigned int)((tx / tile) * 73856093u ^ (ty / tile) * 19349663u);
-            unsigned char v = (unsigned char)(h % 4);   // 0..3 shade jitter
-            Color c = (Color){(unsigned char)(58 + v * 6), (unsigned char)(40 + v * 5), (unsigned char)(26 + v * 4), 255};
-            DrawRectangle(tx, ty, tile, tile, c);
-            // A few darker speckles for texture
-            if (h % 5 == 0) DrawRectangle(tx + (int)(h % 12), ty + (int)(h % 9), 2, 2, (Color){40, 27, 16, 255});
+            unsigned int h0 = (unsigned int)((tx / tile) * 73856093u ^ (ty / tile) * 19349663u);
+            DrawRectangle(tx, ty, tile, tile, base[h0 % 4]);
+
+            // Exactly two chunky 4x4 grains per tile, placed deterministically
+            for (int g = 0; g < 2; g++) {
+                unsigned int h = h0 ^ (unsigned int)(g * 2654435761u);
+                int gx = (int)((h >> 4) % 3) * 4;   // 0, 4, 8
+                int gy = (int)((h >> 8) % 3) * 4;
+                DrawRectangle(tx + gx, ty + gy, 4, 4, grain[(h >> 12) & 1]);
+            }
         }
     }
     if (overlayAlpha > 0) DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, overlayAlpha});
@@ -3962,74 +3979,84 @@ void DrawSlotSelectScreen(void)
     // Background: flat MC dark backdrop
     DrawDirtBackground(40);
 
-    // Shared screen card keeps slot content legible.
-    DrawUiPanel(270, 24, 740, 668, 255);
+    // ---- Layout: size the panel to its content and center it ----
+    int slotW = 360, slotH = 78;
+    int spacing = 88;
+    int backH = 30;
+    int isNew = (slotSelectMode == 0);
 
-    // Title with gradient
-    const char *title = (slotSelectMode == 0) ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
-    int titleSize = 48;
+    int titleH   = 92;                       // title + subtitle block
+    int seedH    = isNew ? 46 : 0;           // seed + game-mode row
+    int listH    = SLOT_VISIBLE * spacing;
+    int panelW   = 520;
+    int panelH   = titleH + seedH + listH + 56;
+    int panelX   = (SCREEN_WIDTH - panelW) / 2;
+    int panelY   = (SCREEN_HEIGHT - panelH) / 2;
+    DrawUiPanel(panelX, panelY, panelW, panelH, 255);
+
+    int contentW = panelW - 56;
+    int contentX = panelX + 28;
+    int slotX    = panelX + (panelW - slotW) / 2;
+
+    // Title — white with a hard dark outline (MC title style, reads on dirt)
+    const char *title = isNew ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
+    int titleSize = 40;
     int titleW = MeasureGameTextWidth(title, titleSize);
-    float titlePulse = sinf(time * 0.8f) * 0.2f + 0.8f;
-    DrawGlowCircle(SCREEN_WIDTH / 2, 60, 60, (Color){80, 120, 200, (unsigned char)(25 * titlePulse)}, 0.3f);
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 2, 42, titleSize, (Color){0, 0, 0, 100});
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 40, titleSize, (Color){62, 62, 62, 255});
+    int titleX = (SCREEN_WIDTH - titleW) / 2;
+    int titleY = panelY + 18;
+    DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX + 2, titleY, titleSize, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX, titleY + 2, titleSize, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX, titleY, titleSize, (Color){242, 242, 242, 255});
 
     // Subtitle
-    const char *sub = (slotSelectMode == 0) ? S(STR_NEW_GAME_SUB) : S(STR_LOAD_GAME_SUB);
-    int subW = MeasureGameTextWidth(sub, 16);
-    DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, 100, 16, (Color){95, 95, 95, 210});
+    const char *sub = isNew ? S(STR_NEW_GAME_SUB) : S(STR_LOAD_GAME_SUB);
+    int subW = MeasureGameTextWidth(sub, 15);
+    DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, titleY + 50, 15, (Color){110, 110, 110, 220});
 
     Vector2 mouse = Win32GetMousePosition();
 
-    // Seed input (new game mode only)
-    int seedBoxY = 126;
-    if (slotSelectMode == 0) {
-        int seedBoxW = 240;
-        int seedBoxH = 22;
-        int seedBoxX = (SCREEN_WIDTH - seedBoxW) / 2;
+    int cursorY = panelY + titleH;
+
+    // Seed input + game mode (new game mode only)
+    if (isNew) {
+        int seedBoxW = 200;
+        int seedBoxH = 24;
+        int seedBoxX = contentX;
+        int seedBoxY = cursorY;
         Rectangle seedBox = { (float)seedBoxX, (float)seedBoxY, (float)seedBoxW, (float)seedBoxH };
         bool seedFocused = CheckCollisionPointRec(mouse, seedBox);
 
-        DrawGameText(S(STR_SEED), seedBoxX - 42, seedBoxY + 4,14, (Color){95, 95, 95, 220});
-        DrawUiBox(seedBoxX, seedBoxY, seedBoxW, seedBoxH, 0.15f, (Color){36, 36, 36, 230});
-        DrawRectangleLinesEx(seedBox, 2,
-                             seedFocused ? (Color){200, 200, 200, 255} : (Color){90, 90, 90, 220});
-
+        DrawGameText(S(STR_SEED), seedBoxX, seedBoxY - 16, 13, (Color){90, 90, 90, 220});
+        // Recessed MC text field
+        DrawRectangle(seedBoxX, seedBoxY, seedBoxW, seedBoxH, (Color){60, 60, 60, 255});
+        DrawRectangle(seedBoxX, seedBoxY, seedBoxW, 1, (Color){30, 30, 30, 255});
+        DrawRectangle(seedBoxX, seedBoxY, 1, seedBoxH, (Color){30, 30, 30, 255});
+        DrawRectangleLinesEx(seedBox, 1, seedFocused ? (Color){255, 255, 255, 255} : (Color){120, 120, 120, 255});
         if (seedInputLen > 0) {
-            DrawGameText(seedInputBuf, seedBoxX + 6, seedBoxY + 5,14, (Color){200, 220, 200, 255});
+            DrawGameText(seedInputBuf, seedBoxX + 6, seedBoxY + 5, 14, (Color){255, 255, 255, 255});
         } else {
-            DrawGameText(S(STR_RANDOM), seedBoxX + 6, seedBoxY + 5,14, (Color){130, 130, 130, 170});
+            DrawGameText(S(STR_RANDOM), seedBoxX + 6, seedBoxY + 5, 14, (Color){150, 150, 150, 255});
         }
-        seedBoxY += seedBoxH + 8;
 
-        // Game mode toggle on the same row as the seed box, to its right
-        int lblW = 50, survW = 88, creatW = 88, gap = 6, btnH = 22;
-        int modeX = seedBoxX + seedBoxW + 20;
-        int modeY = 126;
-        DrawGameText(S(STR_GAMEMODE), modeX, modeY + 5, 14, (Color){180, 175, 195, 200});
-
-        Rectangle survRect = { (float)(modeX + lblW), (float)modeY, (float)survW, (float)btnH };
-        Rectangle creatRect = { (float)(modeX + lblW + survW + gap), (float)modeY, (float)creatW, (float)btnH };
-
+        // Game mode toggle to the right of the seed box
+        int lblW = 50, survW = 84, creatW = 84, gap = 6;
+        int modeX = seedBoxX + seedBoxW + 24;
+        DrawGameText(S(STR_GAMEMODE), modeX, seedBoxY + 6, 13, (Color){90, 90, 90, 220});
+        Rectangle survRect = { (float)(modeX + lblW), (float)seedBoxY, (float)survW, (float)seedBoxH };
+        Rectangle creatRect = { (float)(modeX + lblW + survW + gap), (float)seedBoxY, (float)creatW, (float)seedBoxH };
         bool survHover = CheckCollisionPointRec(mouse, survRect);
         bool creatHover = CheckCollisionPointRec(mouse, creatRect);
-
-        // Survival / Creative toggles (MC-style buttons, same rects as hit-testing)
         DrawUiButton(survRect.x, survRect.y, survRect.width, survRect.height,
                      S(STR_MODE_SURVIVAL), 13, survHover, (pendingGameMode == GAME_SURVIVAL), true, 1.0f);
         DrawUiButton(creatRect.x, creatRect.y, creatRect.width, creatRect.height,
                      S(STR_MODE_CREATIVE), 13, creatHover, (pendingGameMode == GAME_CREATIVE), true, 1.0f);
+
+        cursorY += seedH;
     }
 
-    // Decorative line
-    int lineW = 240;
-    int lineX = (SCREEN_WIDTH - lineW) / 2;
-    DrawRectangle(lineX, seedBoxY + 6, lineW, 1, (Color){100, 95, 110, 150});
-
-    int slotW = 340, slotH = 80;
-    int slotX = (SCREEN_WIDTH - slotW) / 2;
-    int slotY = (slotSelectMode == 0) ? 185 : 160;
-    int spacing = 96;
+    int slotY = cursorY;
+    int listRight = slotX + slotW;
 
     // Draw visible slots
     for (int vi = 0; vi < SLOT_VISIBLE; vi++) {
@@ -4046,92 +4073,99 @@ void DrawSlotSelectScreen(void)
         float hA = GetHoverAlpha(60 + i, hover && !sel, GetFrameTime());
 
         // Determine if this slot is usable
-        bool usable = (slotSelectMode == 0) || info.exists;
+        bool usable = isNew || info.exists;
 
-        // Modern dark-flat card per slot (rounded, subtle border, teal when selected)
-        Color fill = {150, 150, 150, 245};
+        // Slot card: MC stone gray, brighter when selected/hovered
+        Color fill;
         Color border = {85, 85, 85, 255};
         if (!usable) {
-            fill = (Color){125, 125, 125, 170};
-            border = (Color){85, 85, 85, 130};
+            fill = (Color){150, 150, 150, 160};
+            border = (Color){110, 110, 110, 150};
         } else if (sel) {
-            fill = (Color){158, 158, 158, 245};
-    DrawDirtBackground(40);
+            fill = (Color){205, 205, 205, 255};
+            border = (Color){255, 255, 255, 255};
         } else if (hA > 0.01f) {
-            fill.r = (unsigned char)(31 + (int)(12 * hA));
-            fill.g = (unsigned char)(39 + (int)(12 * hA));
-            fill.b = (unsigned char)(52 + (int)(14 * hA));
+            fill = (Color){180, 180, 180, 255};
+        } else {
+            fill = (Color){160, 160, 160, 255};
         }
 
-        DrawUiBox(slotX, sy, slotW, slotH, 0.04f, fill);
+        // Beveled MC-style card
+        DrawRectangle(slotX, sy, slotW, slotH, fill);
+        DrawRectangle(slotX, sy, slotW, 2, (Color){215, 215, 215, fill.a});
+        DrawRectangle(slotX, sy, 2, slotH, (Color){215, 215, 215, fill.a});
+        DrawRectangle(slotX, sy + slotH - 2, slotW, 2, (Color){95, 95, 95, fill.a});
+        DrawRectangle(slotX + slotW - 2, sy, 2, slotH, (Color){95, 95, 95, fill.a});
         DrawRectangleLines(slotX, sy, slotW, slotH, border);
-        // Top highlight
-        DrawRectangle(slotX + 10, sy, slotW - 20, 1, (Color){255, 255, 255, 16});
 
         // Slot number
-        char slotLabel[16];
+        char slotLabel[24];
         snprintf(slotLabel, sizeof(slotLabel), S(STR_SLOT), i + 1);
-        Color labelColor = usable ? (Color){62, 62, 62, 255} : (Color){120, 120, 120, 170};
-        DrawGameText(slotLabel, slotX + 16, sy + 10,22, labelColor);
+        Color labelColor = usable ? (Color){48, 48, 48, 255} : (Color){130, 130, 130, 190};
+        DrawGameText(slotLabel, slotX + 14, sy + 12, 22, labelColor);
 
         if (info.exists) {
-            char seedText[32];
+            char seedText[40];
             snprintf(seedText, sizeof(seedText), S(STR_SEED_DISPLAY), info.seed);
-            DrawGameText(seedText, slotX + 16, sy + 36,14, (Color){75, 75, 75, 230});
+            DrawGameText(seedText, slotX + 14, sy + 40, 13, (Color){70, 70, 70, 235});
 
             char sizeText[32];
             snprintf(sizeText, sizeof(sizeText), "%dx%d", info.worldW, info.worldH);
-            DrawGameText(sizeText, slotX + 16, sy + 54,14, (Color){95, 95, 95, 210});
+            int sizeW = MeasureGameTextWidth(sizeText, 13);
+            DrawGameText(sizeText, slotX + slotW - sizeW - 14, sy + 40, 13, (Color){70, 70, 70, 235});
 
+            // "已占用" badge with a small grass icon, top-right
             const char *status = S(STR_OCCUPIED);
-            int statusW = MeasureGameTextWidth(status,14);
-            DrawGameText(status, slotX + slotW - statusW - 16, sy + 12,14, (Color){45, 125, 45, 235});
-
+            int statusW = MeasureGameTextWidth(status, 13);
+            int badgeW = statusW + 34;
+            int badgeX = slotX + slotW - badgeW - 12;
+            DrawRectangle(badgeX, sy + 12, badgeW, 20, (Color){0, 0, 0, 45});
+            DrawRectangleLines(badgeX, sy + 12, badgeW, 20, (Color){60, 130, 60, 200});
             if (blockAtlas.id > 0) {
                 Rectangle src = { (float)(BLOCK_GRASS * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
-                Rectangle dst = { (float)(slotX + slotW - 48), (float)(sy + 36), 24, 24 };
-                DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, (Color){255, 255, 255, 150});
+                Rectangle dst = { (float)(badgeX + 5), (float)(sy + 15), 14, 14 };
+                DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
             }
+            DrawGameText(status, badgeX + 24, sy + 16, 13, (Color){40, 120, 40, 255});
         } else {
-            const char *emptyText = (slotSelectMode == 0) ? S(STR_EMPTY_NEW) : S(STR_EMPTY_LOAD);
-            Color emptyColor = (slotSelectMode == 0) ? (Color){95, 95, 95, 210} : (Color){120, 120, 120, 170};
-            DrawGameText(emptyText, slotX + 16, sy + 40,16, emptyColor);
+            const char *emptyText = isNew ? S(STR_EMPTY_NEW) : S(STR_EMPTY_LOAD);
+            Color emptyColor = isNew ? (Color){75, 75, 75, 220} : (Color){120, 120, 120, 190};
+            DrawGameText(emptyText, slotX + 14, sy + 36, 16, emptyColor);
         }
     }
 
-    // Scrollbar
+    // Scrollbar (drawn inside the panel, right of the list)
     if (MAX_SAVE_SLOTS > SLOT_VISIBLE) {
-        int trackX = slotX + slotW + 8;
-        int trackY = slotY;
-        int trackH = SLOT_VISIBLE * spacing - 16;
-        DrawRectangle(trackX, trackY, 4, trackH, (Color){45, 45, 45, 200});
-
+        int trackX = listRight + 10;
+        int trackY = slotY + 2;
+        int trackH = listH - 12;
+        DrawRectangle(trackX, trackY, 6, trackH, (Color){70, 70, 70, 255});
         float viewRatio = (float)SLOT_VISIBLE / MAX_SAVE_SLOTS;
         int maxScroll = MAX_SAVE_SLOTS - SLOT_VISIBLE;
         float scrollRatio = maxScroll > 0 ? (float)slotScrollOffset / maxScroll : 0;
         int thumbH = (int)(trackH * viewRatio);
-        if (thumbH < 12) thumbH = 12;
+        if (thumbH < 20) thumbH = 20;
         int thumbY = trackY + (int)((trackH - thumbH) * scrollRatio);
-        DrawRectangle(trackX, thumbY, 4, thumbH, (Color){160, 160, 160, 200});
+        DrawRectangle(trackX, thumbY, 6, thumbH, (Color){170, 170, 170, 255});
     }
 
-    // Back button
-    int backBtnW = 160;
-    int backBtnH = 38;
-    int backBtnX = (SCREEN_WIDTH - backBtnW) / 2;
-    int backBtnY = slotY + SLOT_VISIBLE * spacing + 10;
-    Rectangle backBtn = { (float)backBtnX, (float)backBtnY, (float)backBtnW, (float)backBtnH };
-    bool backHover = CheckCollisionPointRec(mouse, backBtn);
-    DrawUiButton(backBtnX, backBtnY, backBtnW, backBtnH, S(STR_BACK), 18, backHover, false, true, 1.0f);
+    // Footer: back button right-aligned; hint centered below the panel
+    int backW = 100, backH2 = 28;
+    int backX = panelX + panelW - backW - 28;
+    int backY = panelY + panelH - 40;
+    Rectangle backRect = { (float)backX, (float)backY, (float)backW, (float)backH2 };
+    bool backHover = CheckCollisionPointRec(mouse, backRect);
+    DrawUiButton(backRect.x, backRect.y, backRect.width, backRect.height,
+                 S(STR_BACK), 14, backHover, false, true, 1.0f);
 
-    // Hints
-    const char *hint = S(STR_HINT_SLOT);
-    DrawGameText(hint, (SCREEN_WIDTH - MeasureGameTextWidth(hint,14)) / 2, SCREEN_HEIGHT - 30, 14,
-             (Color){140, 135, 155, 160});
-
-    // Confirmation dialog overlay
-    if (confirmDialogActive) {
-        DrawConfirmDialog();
+    // Hint line below the panel (white with MC shadow so it reads on dirt)
+    {
+        const char *hint = S(STR_HINT_SLOT);
+        int hw = MeasureGameTextWidth(hint, 12);
+        int hx = (SCREEN_WIDTH - hw) / 2;
+        int hy = panelY + panelH + 8;
+        DrawGameText(hint, hx + 1, hy + 1, 12, (Color){0, 0, 0, 200});
+        DrawGameText(hint, hx, hy, 12, (Color){235, 235, 235, 235});
     }
 }
 
@@ -4299,8 +4333,6 @@ void DrawSettingsScreen(void)
     DrawGameText(S(STR_SECTION_DISPLAY), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
     sectionY += 24;
-
-    DrawDirtBackground(40);
     DrawGameText(S(STR_WINDOW_MODE), leftX, sectionY, 13, (Color){70, 70, 70, 230});
     sectionY += 20;
 
