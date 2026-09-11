@@ -31,6 +31,40 @@ static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned ch
 #define HUD_STATUS_Y      (HUD_SEL_NAME_Y - 34)                         // 588 status icons
 
 //----------------------------------------------------------------------------------
+// Minecraft-style UI palette
+// Flat stone panels with beveled 3D edges (light top-left, dark bottom-right).
+// All UI primitives draw from these so the look stays consistent everywhere.
+//----------------------------------------------------------------------------------
+#define UI_PANEL      (Color){ 60,  60,  60, 255}   // stone panel body
+#define UI_PANEL_DEEP (Color){ 40,  40,  40, 255}   // darker recess
+#define UI_PANEL_DARK (Color){ 32,  32,  32, 255}   // slot recess
+#define UI_BEVEL_LT   (Color){158, 158, 158, 255}   // top-left highlight edge
+#define UI_BEVEL_DK   (Color){ 22,  22,  22, 255}   // bottom-right shadow edge
+#define UI_SLOT       (Color){ 45,  45,  45, 255}   // slot background
+#define UI_SLOT_HOVER (Color){ 74,  74,  74, 255}
+#define UI_SEL_WHITE  (Color){255, 255, 255, 255}   // selected outline
+#define UI_TEXT       (Color){255, 255, 255, 255}
+#define UI_TEXT_DIM   (Color){170, 170, 170, 255}
+#define UI_TEXT_OFF   (Color){110, 110, 110, 255}
+#define UI_DANGER     (Color){255,  85,  85, 255}
+#define UI_GOLD       (Color){255, 205,  90, 255}
+
+// Draw a Minecraft-style beveled box: flat fill with light edges on the
+// top/left and dark edges on the bottom/right. `raised` flips it so the box
+// looks pressed in (used for slots).
+static void DrawBevelBox(int x, int y, int w, int h, Color fill, bool raised)
+{
+    if (w <= 0 || h <= 0) return;
+    DrawRectangle(x, y, w, h, fill);
+    Color lt = raised ? UI_BEVEL_LT : UI_BEVEL_DK;
+    Color dk = raised ? UI_BEVEL_DK : UI_BEVEL_LT;
+    DrawRectangle(x, y, w, 1, lt);                 // top
+    DrawRectangle(x, y, 1, h, lt);                 // left
+    DrawRectangle(x, y + h - 1, w, 1, dk);         // bottom
+    DrawRectangle(x + w - 1, y, 1, h, dk);         // right
+}
+
+//----------------------------------------------------------------------------------
 // Smooth hover animation system
 //----------------------------------------------------------------------------------
 #define MAX_HOVER_SLOTS 768
@@ -57,38 +91,30 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
 {
     if (alpha <= 0.01f || w <= 0 || h <= 0) return;
     int ix = (int)x, iy = (int)y, iw = (int)w, ih = (int)h;
-    unsigned char a = (unsigned char)(255 * alpha);
 
-    // Accent colors
-    const Color ACCENT_TEAL = {56, 217, 169, 255};
-    const Color ACCENT_BLUE = {74, 157, 235, 255};
-
-    Color fill, border, textCol;
+    // MC-styled stone button: flat gray body with beveled edges. Hover/selected
+    // brighten the body and draw a white inset outline.
+    Color fill = UI_PANEL;
+    Color textCol = UI_TEXT;
     if (!enabled) {
-        fill    = (Color){24, 29, 38, (unsigned char)(150 * alpha)};
-        border  = (Color){42, 49, 63, (unsigned char)(140 * alpha)};
-        textCol = (Color){110, 120, 134, (unsigned char)(150 * alpha)};
+        fill = (Color){44, 44, 44, (unsigned char)(200 * alpha)};
+        textCol = UI_TEXT_OFF;
     } else if (hover || selected) {
-        fill    = (Color){38, 86, 84, a};           // teal-tinted dark
-        border  = ACCENT_TEAL;
-        textCol = (Color){240, 250, 246, a};
-    } else {
-        fill    = (Color){40, 49, 64, a};           // dark slate
-        border  = (Color){74, 88, 112, a};
-        textCol = (Color){232, 237, 245, a};
+        fill = (Color){92, 92, 92, 255};
     }
 
-    // Soft drop shadow
-    DrawRoundedRect(ix + 1, iy + 2, iw, ih, 0.08f, (Color){0, 0, 0, (unsigned char)(55 * alpha)});
-    // Body
-    DrawRoundedRect(ix, iy, iw, ih, 0.08f, fill);
-    // Border (2px when selected)
-    if (selected && enabled) {
-        DrawRectangleLines(ix - 1, iy - 1, iw + 2, ih + 2, ACCENT_TEAL);
+    if (alpha < 1.0f) {
+        fill.a = (unsigned char)(fill.a * alpha);
+        textCol.a = (unsigned char)(textCol.a * alpha);
     }
-    DrawRectangleLines(ix, iy, iw, ih, border);
-    // Subtle top highlight
-    DrawRectangle(ix + 6, iy, iw - 12, 1, (Color){255, 255, 255, (unsigned char)(18 * alpha)});
+
+    DrawBevelBox(ix, iy, iw, ih, fill, true);
+
+    // Selected/hover: white inset outline (MC highlight)
+    if (enabled && (hover || selected)) {
+        DrawRectangleLines(ix + 1, iy + 1, iw - 2, ih - 2, (Color){255, 255, 255,
+                            (unsigned char)((selected ? 220 : 130) * alpha)});
+    }
 
     // Label
     if (label && label[0]) {
@@ -97,67 +123,41 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
         int ty = iy + (ih - fontSize) / 2;
         DrawGameText(label, tx, ty, fontSize, textCol);
     }
-    (void)ACCENT_BLUE;
 }
 
 //----------------------------------------------------------------------------------
-// Shared UI panel: rounded card with drop shadow, vertical gradient body and a
-// double border (dark outline + accent inner line). Used by tooltips, the
-// hotbar backing bar and menu panels for a consistent cold-teal look.
+// Shared UI panel: flat stone card with a beveled 3D border (MC inventory look).
 //----------------------------------------------------------------------------------
 void DrawUiPanel(int x, int y, int w, int h, unsigned char alpha)
 {
     if (w <= 0 || h <= 0) return;
-    Color top    = (Color){36, 45, 60, alpha};
-    Color bottom = (Color){24, 30, 42, alpha};
-    // Drop shadow
-    DrawRoundedRect(x + 2, y + 3, w, h, 0.06f, (Color){0, 0, 0, (unsigned char)(60 * alpha / 255)});
-    // Vertical gradient body, drawn in strips so we keep rounded corners.
-    for (int i = 0; i < h; i++) {
-        float t = (h > 1) ? (float)i / (float)(h - 1) : 0.0f;
-        Color c = (Color){
-            (unsigned char)(top.r + (bottom.r - top.r) * t),
-            (unsigned char)(top.g + (bottom.g - top.g) * t),
-            (unsigned char)(top.b + (bottom.b - top.b) * t),
-            alpha
-        };
-        int lx = x, lw = w;
-        if (i == 0) { lx = x + 3; lw = w - 6; }
-        else if (i == h - 1) { lx = x + 3; lw = w - 6; }
-        DrawRectangle(lx, y + i, lw, 1, c);
-    }
-    // Borders: outer dark, inner teal-tinted highlight on the top edge
-    DrawRectangleLines(x, y, w, h, (Color){58, 71, 92, alpha});
-    DrawRectangle(x + 3, y, w - 6, 1, (Color){56, 217, 169, (unsigned char)(90 * alpha / 255)});
+    Color body = UI_PANEL;
+    body.a = alpha;
+    DrawBevelBox(x, y, w, h, body, true);
+    // Inner dark recess line for depth
+    DrawRectangleLines(x + 1, y + 1, w - 2, h - 2, (Color){0, 0, 0, (unsigned char)(alpha * 0.35f)});
 }
 
-// Modern dark-flat UI slot (inventory, creative palette, hotbar)
+// Minecraft-style slot: dark recessed square; hover lightens, selected gets a
+// white outline (MC's item-on-cursor look).
 void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha)
 {
-    unsigned char a = (unsigned char)(255 * alpha);
-    Color fill, border, inner;
+    int a = (int)(255 * alpha);
+    Color fill = UI_SLOT;
+    fill.a = (unsigned char)a;
+    if (hover) { fill = UI_SLOT_HOVER; fill.a = (unsigned char)a; }
+
+    // Recessed (pressed-in) bevel
+    DrawBevelBox(x, y, size, size, fill, false);
+
+    // Subtle inner shade
+    if (hover) {
+        DrawRectangle(x + 1, y + 1, size - 2, size - 2, (Color){255, 255, 255, (unsigned char)(14 * alpha)});
+    }
     if (selected) {
-        fill   = (Color){36, 62, 70, a};
-        border = (Color){56, 217, 169, a};
-        inner  = (Color){90, 235, 200, (unsigned char)(70 * alpha)};
-    } else if (hover) {
-        fill   = (Color){44, 58, 80, a};
-        border = (Color){74, 157, 235, a};
-        inner  = (Color){110, 180, 250, (unsigned char)(50 * alpha)};
-    } else {
-        fill   = (Color){34, 42, 56, a};
-        border = (Color){58, 71, 92, a};
-        inner  = (Color){255, 255, 255, (unsigned char)(14 * alpha)};
+        DrawRectangleLines(x, y, size, size, (Color){255, 255, 255, (unsigned char)(235 * alpha)});
+        DrawRectangleLines(x + 1, y + 1, size - 2, size - 2, (Color){255, 255, 255, (unsigned char)(120 * alpha)});
     }
-    DrawRoundedRect(x, y, size, size, 0.10f, fill);
-    // Outer soft glow for the active states, then the crisp border.
-    if (selected || hover) {
-        DrawRectangleLines(x - 1, y - 1, size + 2, size + 2, (Color){border.r, border.g, border.b, (unsigned char)(90 * alpha)});
-    }
-    DrawRectangleLines(x, y, size, size, border);
-    // Inner top highlight + bottom shade give the slot subtle depth.
-    DrawRectangle(x + 3, y + 1, size - 6, 1, inner);
-    DrawRectangle(x + 3, y + size - 2, size - 6, 1, (Color){0, 0, 0, (unsigned char)(40 * alpha)});
 }
 
 //----------------------------------------------------------------------------------
