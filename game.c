@@ -4080,6 +4080,40 @@ draw_finish:
         DrawTexturePro(logicalCanvas.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
     }
 
+    // TEMP capture hook (MYWORLD_SHOT / MYWORLD_WORLD / MYWORLD_OPEN / MYWORLD_STATE)
+    {
+        static int inited = 0, frame = 0;
+        static const char *name = NULL;
+        static int at = 60;
+        if (!inited) {
+            inited = 1;
+            name = getenv("MYWORLD_SHOT");
+            if (name) { const char *q = strchr(name, '?'); if (q) at = atoi(q + 1); }
+            const char *ws = getenv("MYWORLD_WORLD");
+            if (ws) StartGameFromSlot(atoi(ws), false);
+            const char *st = getenv("MYWORLD_STATE");
+            if (st && !strcmp(st, "slotsel")) {
+                slotSelectMode = getenv("MYWORLD_MODE") ? atoi(getenv("MYWORLD_MODE")) : 1;
+                gameState = STATE_SLOT_SELECT;
+            }
+        }
+        const char *open = getenv("MYWORLD_OPEN");
+        if (open && gameState == STATE_PLAYING) {
+            if (!strcmp(open, "inv")) inventoryOpen = true;
+            else if (!strcmp(open, "creative")) creativeOpen = true;
+            else if (!strcmp(open, "pause")) gamePaused = true;
+        }
+        if (name && ++frame == at) {
+            char path[256];
+            const char *q = strchr(name, '?');
+            int n = q ? (int)(q - name) : (int)strlen(name);
+            snprintf(path, sizeof(path), "shots/%.*s.png", n, name);
+            Image img = LoadImageFromTexture(logicalCanvas.texture);
+            ImageFlipVertical(&img);
+            ExportImage(img, path);
+            UnloadImage(img);
+        }
+    }
 
     EndDrawing();
 }

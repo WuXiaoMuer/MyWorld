@@ -76,7 +76,9 @@ static void DrawBevelBox(int x, int y, int w, int h, Color fill, bool raised)
 // any text sitting directly on the game world or on gray slots.
 static void DrawTextMC(const char *text, int x, int y, int fontSize, Color color)
 {
-    DrawGameText(text, x + 1, y + 1, fontSize, (Color){62, 62, 62, color.a});
+    // Hard 1px black shadow (MC style). The shadow must be much darker than the
+    // glyph or the text looks doubled instead of outlined.
+    DrawGameText(text, x + 1, y + 1, fontSize, (Color){0, 0, 0, color.a});
     DrawGameText(text, x, y, fontSize, color);
 }
 
@@ -154,16 +156,18 @@ void DrawUiButton(float x, float y, float w, float h, const char *label,
     fill.a = (unsigned char)(fill.a * alpha);
     textCol.a = (unsigned char)(textCol.a * alpha);
 
-    // MC stone button: black outline, then a 3px raised bevel (light top-left,
-    // dark bottom-right) around a flat gray face.
+    // MC stone button: black outline, then a raised bevel (light top-left, dark
+    // bottom-right) around a flat gray face. Small buttons get a 2px bevel so
+    // the text still has room; large ones get 3px.
+    int bev = (ih >= 26) ? 3 : 2;
     DrawRectangle(ix - 1, iy - 1, iw + 2, ih + 2, (Color){0, 0, 0, (unsigned char)(255 * alpha)});
     DrawRectangle(ix, iy, iw, ih, fill);
     Color top = {UI_BTN_TOP.r, UI_BTN_TOP.g, UI_BTN_TOP.b, (unsigned char)(255 * alpha)};
     Color bot = {UI_BTN_BOT.r, UI_BTN_BOT.g, UI_BTN_BOT.b, (unsigned char)(255 * alpha)};
-    DrawRectangle(ix, iy, iw, 3, top);
-    DrawRectangle(ix, iy, 3, ih, top);
-    DrawRectangle(ix, iy + ih - 3, iw, 3, bot);
-    DrawRectangle(ix + iw - 3, iy, 3, ih, bot);
+    DrawRectangle(ix, iy, iw, bev, top);
+    DrawRectangle(ix, iy, bev, ih, top);
+    DrawRectangle(ix, iy + ih - bev, iw, bev, bot);
+    DrawRectangle(ix + iw - bev, iy, bev, ih, bot);
 
     // Hover/selected: white inset frame (MC highlight)
     if (enabled && (hover || selected)) {
@@ -1561,8 +1565,8 @@ void DrawInventoryScreen(void)
 
     // Sort button
     {
-        int sortBtnX = invX + 80;
-        int sortBtnY = invY - 24;
+        int sortBtnX = invX + 84;
+        int sortBtnY = invY - 26;
         int sortBtnW = 40;
         int sortBtnH = 16;
         Rectangle sortBtn = { (float)sortBtnX, (float)sortBtnY, (float)sortBtnW, (float)sortBtnH };
@@ -2165,7 +2169,7 @@ void DrawCreativeScreen(void)
         footer = footerBuf;
     }
     int footerW = MeasureGameTextWidth(footer, 13);
-    DrawGameText(footer, panelX + panelW / 2 - footerW / 2, footerY, 13, (Color){170, 170, 170, 230});
+    DrawGameText(footer, panelX + panelW / 2 - footerW / 2, footerY, 13, (Color){78, 78, 78, 240});
 
     // Scroll indicator
     if (maxScroll > 0) {
@@ -3129,7 +3133,7 @@ void DrawPauseMenu(void)
     static int activeSlider = -1;
 
     // BGM Volume
-    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 15, (Color){170, 170, 170, 220});
+    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 15, (Color){62, 62, 62, 255});
     sliderY += 20;
     Rectangle bgmTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 4.0f };
     DrawRectangleRec(bgmTrack, (Color){30, 30, 30, 255});
@@ -3149,11 +3153,11 @@ void DrawPauseMenu(void)
     DrawRectangle((int)(sliderX + bgmVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, bgmHandleColor);
     char bgmText[16];
     snprintf(bgmText, sizeof(bgmText), "%d%%", (int)(bgmVolumeSlider * 100));
-    DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){170, 170, 170, 200});
+    DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){62, 62, 62, 255});
 
     // SFX Volume
     sliderY += 36;
-    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 15, (Color){170, 170, 170, 220});
+    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 15, (Color){62, 62, 62, 255});
     sliderY += 20;
     Rectangle sfxTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 4.0f };
     DrawRectangleRec(sfxTrack, (Color){30, 30, 30, 255});
@@ -3173,7 +3177,7 @@ void DrawPauseMenu(void)
     DrawRectangle((int)(sliderX + sfxVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, sfxHandleColor);
     char sfxText[16];
     snprintf(sfxText, sizeof(sfxText), "%d%%", (int)(sfxVolumeSlider * 100));
-    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){170, 170, 170, 200});
+    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){62, 62, 62, 255});
 
     // --- Game Mode Toggle (Survival / Creative) ---
     sliderY += 40;
@@ -3205,7 +3209,7 @@ void DrawPauseMenu(void)
     // --- Controls ---
     int ctrlY = sliderY + 36;
     const char *ctrlTitle = S(STR_CONTROLS_TITLE);
-    DrawGameText(ctrlTitle, boxX + (boxW - MeasureGameTextWidth(ctrlTitle, 16)) / 2, ctrlY, 16, (Color){170, 170, 170, 200});
+    DrawGameText(ctrlTitle, boxX + (boxW - MeasureGameTextWidth(ctrlTitle, 16)) / 2, ctrlY, 16, (Color){62, 62, 62, 255});
     ctrlY += 6;
     DrawRectangle(boxX + 24, ctrlY, boxW - 48, 1, (Color){90, 90, 90, 80});
     ctrlY += 14;
@@ -3218,7 +3222,7 @@ void DrawPauseMenu(void)
 
     for (int i = 0; i < numControls; i++) {
         DrawGameText(keys[i], keyX, ctrlY, 12, (Color){200, 200, 200, 210});
-        DrawGameText(acts[i], actX, ctrlY, 12, (Color){170, 170, 170, 200});
+        DrawGameText(acts[i], actX, ctrlY, 12, (Color){70, 70, 70, 255});
         ctrlY += 15;
     }
 
@@ -3341,7 +3345,7 @@ void DrawAchievementsUI(void)
     DrawUiPanel(panelX, panelY, panelW, panelH, 255);
     DrawCompetitionIcon(panelX + 24, panelY + 22, 56, 255, true);
     DrawGameText(S(STR_COLLECTION_TITLE), panelX + 96, panelY + 28, 30, (Color){62, 62, 62, 255});
-    DrawGameText(S(STR_COLLECTION_CHALLENGES), panelX + 98, panelY + 64, 14, (Color){90, 90, 90, 220});
+    DrawGameText(S(STR_COLLECTION_CHALLENGES), panelX + 98, panelY + 64, 14, (Color){78, 78, 78, 240});
     static const StringId achNames[ACH_COUNT] = {
         STR_ACH_FIRST_STEPS, STR_ACH_DEEP_DIG, STR_ACH_MONSTER_HUNTER, STR_ACH_ARCHITECT,
         STR_ACH_REDSTONE_ENGINEER, STR_ACH_COLLECTOR, STR_ACH_ANGLER, STR_ACH_BREEDER,
@@ -4174,7 +4178,7 @@ void DrawConfirmDialog(void)
     char msg[64];
     snprintf(msg, sizeof(msg), S(STR_SLOT_HAS_DATA), confirmDialogSlot + 1);
     int msgW = MeasureGameTextWidth(msg,16);
-    DrawGameText(msg, dlgX + (dlgW - msgW) / 2, dlgY + 52,16, (Color){200, 195, 215, 255});
+    DrawGameText(msg, dlgX + (dlgW - msgW) / 2, dlgY + 52,16, (Color){62, 62, 62, 255});
 
     const char *warn = S(STR_CANNOT_UNDO);
     int warnW = MeasureGameTextWidth(warn,14);
@@ -4479,13 +4483,13 @@ void DrawSettingsScreen(void)
     int halfCtrl = (numControls + 1) / 2;
     for (int i = 0; i < halfCtrl; i++) {
         // Left column
-        DrawGameText(controls[i * 2], keyX1, sectionY, 12, (Color){200, 195, 215, 220});
-        DrawGameText(controls[i * 2 + 1], actX1, sectionY, 12, (Color){150, 145, 165, 200});
+        DrawGameText(controls[i * 2], keyX1, sectionY, 12, (Color){70, 70, 70, 255});
+        DrawGameText(controls[i * 2 + 1], actX1, sectionY, 12, (Color){95, 95, 95, 255});
         // Right column
         int ri = i + halfCtrl;
         if (ri < numControls) {
-            DrawGameText(controls[ri * 2], keyX2, sectionY, 12, (Color){200, 195, 215, 220});
-            DrawGameText(controls[ri * 2 + 1], actX2, sectionY, 12, (Color){150, 145, 165, 200});
+            DrawGameText(controls[ri * 2], keyX2, sectionY, 12, (Color){70, 70, 70, 255});
+            DrawGameText(controls[ri * 2 + 1], actX2, sectionY, 12, (Color){95, 95, 95, 255});
         }
         sectionY += 14;
     }

@@ -19,6 +19,11 @@ Font gameFont = { 0 };
 bool useCustomFont = false;
 char customFontPath[256] = { 0 };
 
+// The glyph atlas is baked once at this size. UI text is mostly 12-16px, so
+// baking near that range keeps small text sharp instead of downscaling a large
+// atlas (which looked blurry). Large titles scale this up acceptably.
+#define FONT_ATLAS_SIZE 24
+
 //----------------------------------------------------------------------------------
 // String Table
 //----------------------------------------------------------------------------------
@@ -2032,8 +2037,10 @@ static Font TryLoadFont(const char *path, int fontSize)
 
     Font f = LoadFontEx(path, fontSize, g_codepoints, g_codepointCount);
     if (f.texture.id > 0) {
-        GenTextureMipmaps(&f.texture);
-        SetTextureFilter(f.texture, TEXTURE_FILTER_BILINEAR);
+        // Point filtering (no mipmaps): UI text is drawn at 9-16px while the
+        // atlas is baked at FONT_ATLAS_SIZE. Linear filtering + mipmaps makes
+        // small glyphs blurry; nearest-neighbour keeps them crisp.
+        SetTextureFilter(f.texture, TEXTURE_FILTER_POINT);
     }
     return f;
 }
@@ -2042,7 +2049,7 @@ void LoadGameFont(void)
 {
     // Try bundled font first
     const char *bundled = "assets/fonts/LXGWWenKaiLite-Regular.ttf";
-    gameFont = TryLoadFont(bundled, 48);
+    gameFont = TryLoadFont(bundled, FONT_ATLAS_SIZE);
     if (gameFont.texture.id > 0) {
         useCustomFont = true;
         return;
@@ -2050,7 +2057,7 @@ void LoadGameFont(void)
 
     // Try custom path if set
     if (customFontPath[0]) {
-        gameFont = TryLoadFont(customFontPath, 48);
+        gameFont = TryLoadFont(customFontPath, FONT_ATLAS_SIZE);
         if (gameFont.texture.id > 0) {
             useCustomFont = true;
             return;
@@ -2066,7 +2073,7 @@ void LoadGameFont(void)
         NULL
     };
     for (int i = 0; systemFonts[i]; i++) {
-        gameFont = TryLoadFont(systemFonts[i], 48);
+        gameFont = TryLoadFont(systemFonts[i], FONT_ATLAS_SIZE);
         if (gameFont.texture.id > 0) {
             useCustomFont = true;
             return;
@@ -2089,7 +2096,7 @@ void UnloadGameFont(void)
 bool ReloadGameFont(const char *path)
 {
     UnloadGameFont();
-    gameFont = TryLoadFont(path, 48);
+    gameFont = TryLoadFont(path, FONT_ATLAS_SIZE);
     if (gameFont.texture.id > 0) {
         useCustomFont = true;
         return true;

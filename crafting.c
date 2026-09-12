@@ -334,7 +334,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             craftScrollOffset = 0;
         }
     } else {
-        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){170, 170, 170, 150});
+        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){175, 175, 175, 255});
         if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
             DrawRectangle(panelX + 4, panelY + 3, 1, 11, (Color){170, 170, 170, 150});
         }
@@ -412,17 +412,17 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         Color rowBorder;
         if (canCraft) {
             bgColor = (Color){
-                (unsigned char)(150 + (int)(20 * hA)),
-                (unsigned char)(150 + (int)(20 * hA)),
-                (unsigned char)(150 + (int)(20 * hA)),
+                (unsigned char)(178 + (int)(16 * hA)),
+                (unsigned char)(178 + (int)(16 * hA)),
+                (unsigned char)(178 + (int)(16 * hA)),
                 (unsigned char)(230 + (int)(25 * hA))
             };
             rowBorder = hover ? (Color){255, 255, 255, 230} : (Color){110, 110, 110, 200};
         } else {
             bgColor = (Color){
-                (unsigned char)(128 + (int)(10 * hA)),
-                (unsigned char)(128 + (int)(10 * hA)),
-                (unsigned char)(128 + (int)(10 * hA)),
+                (unsigned char)(160 + (int)(12 * hA)),
+                (unsigned char)(160 + (int)(12 * hA)),
+                (unsigned char)(160 + (int)(12 * hA)),
                 (unsigned char)(215 + (int)(20 * hA))
             };
             rowBorder = hover ? (Color){232, 87, 92, 200} : (Color){110, 110, 110, 170};
@@ -473,11 +473,11 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             for (int s = 0; s < INVENTORY_SLOTS; s++) {
                 if (player.inventory[s] == r->input) have += player.inventoryCount[s];
             }
-            Color countColor = have >= r->inputCount ? (Color){45, 125, 45, 255} : (Color){232, 87, 92, 255};
+            Color countColor = have >= r->inputCount ? (Color){22, 88, 28, 255} : (Color){150, 40, 45, 255};
             DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
         }
 
-        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){95, 95, 95, 220});
+        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){62, 62, 62, 240});
 
         // Output icon
         if (r->output < BLOCK_COUNT && blockAtlas.id > 0) {
@@ -488,7 +488,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){62, 62, 62, 255});
 
         // Recipe name
-        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 10, (Color){95, 95, 95, 225});
+        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 11, (Color){62, 62, 62, 245});
 
         // Max craftable count
         if (canCraft && r->inputCount > 0) {
@@ -528,16 +528,16 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     int listH = visibleCount * (slotH + pad);
     if (craftScrollOffset > 0) {
         DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){55, 55, 55, 180});
-        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){95, 95, 95, 180});
+        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){80, 80, 80, 230});
     }
     if (endIdx < filteredCount) {
         DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){55, 55, 55, 180});
-        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){95, 95, 95, 180});
+        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){80, 80, 80, 230});
     }
 
     if (filteredCount == 0) {
         const char *msg = craftSearchLen > 0 ? S(STR_NO_MATCHES) : S(STR_NO_RECIPES);
-        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){95, 95, 95, 200});
+        DrawGameText(msg, panelX + 8, panelY + 20, 14, (Color){62, 62, 62, 240});
     }
 }
 
@@ -576,7 +576,7 @@ void DrawFurnaceUI(void)
     if (fuelHover) DrawRectangle(fuelX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(fuelX, slotY, slotSize, slotSize, fuelBg);
     DrawRectangleLines(fuelX, slotY, slotSize, slotSize, fuelBorder);
-    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 10, (Color){95, 95, 95, 210});
+    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 10, (Color){62, 62, 62, 245});
 
     // Input slot (center)
     int inputX = panelX + panelW / 2 - slotSize / 2;
@@ -587,7 +587,7 @@ void DrawFurnaceUI(void)
     if (inputHover) DrawRectangle(inputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(inputX, slotY, slotSize, slotSize, inputBg);
     DrawRectangleLines(inputX, slotY, slotSize, slotSize, inputBorder);
-    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 10, (Color){95, 95, 95, 210});
+    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 10, (Color){62, 62, 62, 245});
 
     // Output slot (right)
     int outputX = panelX + panelW - 30 - slotSize;
@@ -598,7 +598,7 @@ void DrawFurnaceUI(void)
     if (outputHover) DrawRectangle(outputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(outputX, slotY, slotSize, slotSize, outputBg);
     DrawRectangleLines(outputX, slotY, slotSize, slotSize, outputBorder);
-    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 10, (Color){95, 95, 95, 210});
+    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 10, (Color){62, 62, 62, 245});
 
     // Draw items in slots
     if (furnaceFuel != BLOCK_AIR && blockAtlas.id > 0) {
@@ -645,7 +645,7 @@ void DrawFurnaceUI(void)
 
     // Fuel flame indicator
     int flameY = slotY + slotSize + 10;
-    DrawGameText(TextFormat("%s:", S(STR_FUEL)), fuelX, flameY, 10, (Color){95, 95, 95, 210});
+    DrawGameText(TextFormat("%s:", S(STR_FUEL)), fuelX, flameY, 10, (Color){62, 62, 62, 245});
     if (furnaceFuelBurn > 0.0f) {
         int flameW = 60;
         int flameH = 8;
@@ -661,7 +661,7 @@ void DrawFurnaceUI(void)
         int ri = FindSmeltRecipe((BlockType)furnaceInput);
         if (ri >= 0) {
             DrawGameText(Sf(STR_MSG_SMELTING, S(smeltRecipes[ri].nameId)),
-                     panelX + 10, panelY + panelH - 40, 10, (Color){95, 95, 95, 210});
+                     panelX + 10, panelY + panelH - 40, 10, (Color){62, 62, 62, 245});
         } else {
             DrawGameText(S(STR_MSG_CANNOT_SMELT),
                      panelX + 10, panelY + panelH - 40, 10, (Color){200, 100, 100, 200});
@@ -670,7 +670,7 @@ void DrawFurnaceUI(void)
 
     // Close hint
     DrawGameText(S(STR_PRESS_E_ESC_CLOSE), panelX + panelW / 2 - MeasureGameTextWidth(S(STR_PRESS_E_ESC_CLOSE), 10) / 2,
-             panelY + panelH - 18, 10, (Color){95, 95, 95, 200});
+             panelY + panelH - 18, 10, (Color){62, 62, 62, 240});
 
     // --- Click handling for furnace slots ---
 
