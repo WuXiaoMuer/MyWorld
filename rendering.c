@@ -3394,10 +3394,10 @@ void DrawAchievementsUI(void)
         DrawUiBox(x, y, 340, 60, 0.0f, unlocked ? (Color){150, 150, 150, 245} : (Color){120, 120, 120, 245});
         DrawRectangleLines(x, y, 340, 60, unlocked ? (Color){170, 130, 20, 255} : (Color){85, 85, 85, 255});
         DrawCollectibleIcon(x + 8, y + 8, 44, i % 3, 255, unlocked);
-        DrawGameText(S(achNames[i]), x + 62, y + 11, 13, (Color){62, 62, 62, unlocked ? (unsigned char)255 : (unsigned char)150});
-        DrawGameText(S(unlocked ? STR_COLLECTION_UNLOCKED : STR_COLLECTION_LOCKED), x + 62, y + 36, 11, unlocked ? (Color){170, 130, 20, 255} : (Color){120, 120, 120, 190});
+        DrawGameText(S(achNames[i]), x + 62, y + 11, 13, (Color){62, 62, 62, unlocked ? (unsigned char)255 : (unsigned char)205});
+        DrawGameText(S(unlocked ? STR_COLLECTION_UNLOCKED : STR_COLLECTION_LOCKED), x + 62, y + 36, 11, unlocked ? (Color){150, 112, 12, 255} : (Color){95, 95, 95, 255});
     }
-    DrawGameText(S(STR_COLLECTION_CLOSE), panelX + 250, panelY + panelH - 30, 14, (Color){100, 100, 100, 220});
+    DrawGameText(S(STR_COLLECTION_CLOSE), panelX + 250, panelY + panelH - 30, 14, (Color){72, 72, 72, 245});
 }
 
 void DrawDeathScreen(float dt)

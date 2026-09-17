@@ -4097,6 +4097,14 @@ draw_finish:
                 gameState = STATE_SLOT_SELECT;
             } else if (st && !strcmp(st, "settings")) {
                 gameState = STATE_SETTINGS;   // forced each frame below
+            } else if (st && !strcmp(st, "dialog")) {
+                confirmDialogActive = true;
+                confirmDialogSlot = 0;
+                confirmDialogMode = 0;
+                gameState = STATE_SLOT_SELECT;
+            } else if (st && !strcmp(st, "ach")) {
+                gameState = STATE_PLAYING;
+                achievementsOpen = true;
             }
         }
         // Keep the forced state stable (menu logic overwrites it otherwise)
