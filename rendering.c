@@ -4280,7 +4280,7 @@ void DrawSettingsScreen(void)
 
     // Settings panel
     int panelW = 520;
-    int panelH = 634;
+    int panelH = 644;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
     int panelY = 84;
 
@@ -4300,7 +4300,7 @@ void DrawSettingsScreen(void)
     // Section header
     DrawGameText(S(STR_SECTION_AUDIO), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
-    sectionY += 28;
+    sectionY += 32;
 
     // Music Volume
     DrawGameText(S(STR_MUSIC_VOLUME), leftX, sectionY, 14, (Color){70, 70, 70, 230});
@@ -4348,7 +4348,7 @@ void DrawSettingsScreen(void)
     // ============================================================
     DrawGameText(S(STR_SECTION_DISPLAY), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
-    sectionY += 24;
+    sectionY += 28;
     DrawGameText(S(STR_WINDOW_MODE), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     sectionY += 20;
 
@@ -4400,14 +4400,14 @@ void DrawSettingsScreen(void)
     char resInfo[64];
     snprintf(resInfo, sizeof(resInfo), "Window: %dx%d", GetScreenWidth(), GetScreenHeight());
     DrawGameText(resInfo, rightX, sectionY, 14, (Color){95, 95, 95, 180});
-    sectionY += 20;
+    sectionY += 26;
 
     // ============================================================
     // Section: Language & Font
     // ============================================================
     DrawGameText(S(STR_SECTION_LANGUAGE), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
-    sectionY += 28;
+    sectionY += 32;
 
     // Language buttons
     DrawGameText(S(STR_LANGUAGE), leftX, sectionY, 14, (Color){70, 70, 70, 230});
@@ -4435,7 +4435,7 @@ void DrawSettingsScreen(void)
 
     // Font buttons
     DrawGameText(S(STR_FONT), leftX, sectionY, 14, (Color){70, 70, 70, 230});
-    sectionY += 18;
+    sectionY += 24;
 
     const char *fontNames[] = { S(STR_FONT_NAME_BUILTIN), S(STR_FONT_NAME_LXGW) };
     int fontBtnW = 130;
@@ -4459,14 +4459,14 @@ void DrawSettingsScreen(void)
             PlaySoundUIClick();
         }
     }
-    sectionY += fontBtnH + 18;
+    sectionY += fontBtnH + 22;
 
     // ============================================================
     // Section: Difficulty
     // ============================================================
     DrawGameText(S(STR_DIFFICULTY), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
-    sectionY += 28;
+    sectionY += 32;
 
     const char *diffNames[] = {
         S(STR_DIFFICULTY_PEACEFUL), S(STR_DIFFICULTY_EASY),
@@ -4489,14 +4489,14 @@ void DrawSettingsScreen(void)
             PlaySoundUIClick();
         }
     }
-    sectionY += diffBtnH + 18;
+    sectionY += diffBtnH + 22;
 
     // ============================================================
     // Section: Controls
     // ============================================================
     DrawGameText(S(STR_CONTROLS_TITLE), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
-    sectionY += 22;
+    sectionY += 26;
 
     const char *controls[] = {
         S(STR_KEY_WASD),    S(STR_ACT_MOVE),
@@ -4513,29 +4513,25 @@ void DrawSettingsScreen(void)
         S(STR_KEY_19),      S(STR_ACT_HOTBAR)
     };
     int numControls = sizeof(controls) / sizeof(controls[0]) / 2;
-    int keyX1 = leftX + 6;
-    int actX1 = leftX + 100;
-    int keyX2 = rightX + 6;
-    int actX2 = rightX + 100;
-    int halfCtrl = (numControls + 1) / 2;
-    for (int i = 0; i < halfCtrl; i++) {
-        // Left column
-        DrawGameText(controls[i * 2], keyX1, sectionY, 14, (Color){70, 70, 70, 255});
-        DrawGameText(controls[i * 2 + 1], actX1, sectionY, 14, (Color){95, 95, 95, 255});
-        // Right column
-        int ri = i + halfCtrl;
-        if (ri < numControls) {
-            DrawGameText(controls[ri * 2], keyX2, sectionY, 14, (Color){70, 70, 70, 255});
-            DrawGameText(controls[ri * 2 + 1], actX2, sectionY, 14, (Color){95, 95, 95, 255});
-        }
-        sectionY += 14;
+    // Three columns keep the list short enough to clear the Back button.
+    const int ctrlCols = 3;
+    int ctrlRows = (numControls + ctrlCols - 1) / ctrlCols;
+    int ctrlColW = (panelW - 60) / ctrlCols;
+    for (int i = 0; i < numControls; i++) {
+        int col = i / ctrlRows;
+        int row = i % ctrlRows;
+        int kx = leftX + col * ctrlColW;
+        int yy = sectionY + row * 15;
+        DrawGameText(controls[i * 2], kx, yy, 14, (Color){70, 70, 70, 255});
+        DrawGameText(controls[i * 2 + 1], kx + 62, yy, 14, (Color){95, 95, 95, 255});
     }
+    sectionY += ctrlRows * 15;
 
     // Back button (MC-style)
     int backBtnW = 130;
     int backBtnH = 30;
     int backBtnX = (SCREEN_WIDTH - backBtnW) / 2;
-    int backBtnY = panelY + panelH - backBtnH - 14;
+    int backBtnY = sectionY + 12;
     Rectangle backBtn = { (float)backBtnX, (float)backBtnY, (float)backBtnW, (float)backBtnH };
     bool backHover = CheckCollisionPointRec(mouse, backBtn);
     DrawUiButton(backBtnX, backBtnY, backBtnW, backBtnH, S(STR_BACK), 15, backHover, false, true, 1.0f);
