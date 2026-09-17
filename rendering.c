@@ -4243,7 +4243,7 @@ void DrawConfirmDialog(void)
     // Key hints
     const char *keyHint = S(STR_CONFIRM_KEYS);
     int keyHintW = MeasureGameTextWidth(keyHint,13);
-    DrawGameText(keyHint, dlgX + (dlgW - keyHintW) / 2, dlgY + dlgH - 14,13, (Color){140, 135, 155, 180});
+    DrawGameText(keyHint, dlgX + (dlgW - keyHintW) / 2, dlgY + dlgH - 14, 13, (Color){95, 95, 95, 235});
 }
 
 //----------------------------------------------------------------------------------
@@ -4255,11 +4255,16 @@ void DrawSettingsScreen(void)
     float stime = (float)GetTime();
     DrawDirtBackground(40);
 
-    // Title
+    // Title — white with a hard dark outline so it reads on the dirt backdrop
     const char *title = S(STR_SETTINGS);
-    int titleW = MeasureGameTextWidth(title, 42);
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2 + 2, 20, 42, (Color){0, 0, 0, 150});
-    DrawGameText(title, (SCREEN_WIDTH - titleW) / 2, 18, 42, (Color){40, 40, 40, 255});
+    int titleW = MeasureGameTextWidth(title, 40);
+    int titleX = (SCREEN_WIDTH - titleW) / 2;
+    DrawGameText(title, titleX + 2, 22, 40, (Color){0, 0, 0, 200});
+    DrawGameText(title, titleX - 2, 20, 40, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX + 2, 20, 40, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX, 18, 40, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX, 22, 40, (Color){40, 40, 40, 255});
+    DrawGameText(title, titleX, 20, 40, (Color){240, 240, 240, 255});
     // Hard separator under the title
     DrawRectangle((SCREEN_WIDTH - 160) / 2, 66, 160, 2, (Color){120, 120, 120, 180});
 
@@ -4267,9 +4272,9 @@ void DrawSettingsScreen(void)
 
     // Settings panel
     int panelW = 520;
-    int panelH = 650;
+    int panelH = 634;
     int panelX = (SCREEN_WIDTH - panelW) / 2;
-    int panelY = 60;
+    int panelY = 84;
 
     // Panel shadow
     DrawUiBox(panelX + 3, panelY + 4, panelW, panelH, 0.03f, (Color){0, 0, 0, 45});

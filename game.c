@@ -4096,7 +4096,16 @@ draw_finish:
                 slotSelectMode = getenv("MYWORLD_MODE") ? atoi(getenv("MYWORLD_MODE")) : 1;
                 gameState = STATE_SLOT_SELECT;
             } else if (st && !strcmp(st, "settings")) {
-                StartTransition(STATE_SETTINGS);
+                gameState = STATE_SETTINGS;   // forced each frame below
+            }
+        }
+        // Keep the forced state stable (menu logic overwrites it otherwise)
+        {
+            const char *st = getenv("MYWORLD_STATE");
+            static int forced = 0;
+            if (st && !strcmp(st, "settings")) {
+                if (!forced) { forced = 1; }
+                else { gameState = STATE_SETTINGS; transitionAlpha = 0.0f; }
             }
         }
         const char *open = getenv("MYWORLD_OPEN");
