@@ -22,7 +22,7 @@ char customFontPath[256] = { 0 };
 // The glyph atlas is baked once at this size. UI text is mostly 12-16px, so
 // baking near that range keeps small text sharp instead of downscaling a large
 // atlas (which looked blurry). Large titles scale this up acceptably.
-#define FONT_ATLAS_SIZE 24
+#define FONT_ATLAS_SIZE 14
 
 //----------------------------------------------------------------------------------
 // String Table

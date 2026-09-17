@@ -287,7 +287,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 
     // Title
     const char *title = showAdvanced ? S(STR_CRAFTING_TABLE) : S(STR_CRAFTING);
-    DrawGameText(title, panelX, panelY, 16, (Color){62, 62, 62, 255});
+    DrawGameText(title, panelX, panelY, 14, (Color){62, 62, 62, 255});
     panelY += 22;
 
     // Search box
@@ -320,13 +320,13 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     }
 
     if (craftSearchLen > 0) {
-        DrawGameText(craftSearchBuf, panelX + 4, panelY + 3, 11, (Color){255, 255, 255, 255});
+        DrawGameText(craftSearchBuf, panelX + 4, panelY + 3, 14, (Color){255, 255, 255, 255});
         if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
             int cursorX = panelX + 4 + MeasureGameTextWidth(craftSearchBuf, 11);
             DrawRectangle(cursorX, panelY + 3, 1, 11, (Color){255, 255, 255, 200});
         }
         int clearX = panelX + searchBoxW - 14;
-        DrawGameText("x", clearX, panelY + 3, 11, (Color){232, 87, 92, 200});
+        DrawGameText("x", clearX, panelY + 3, 14, (Color){232, 87, 92, 200});
         if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse.x >= clearX && mouse.x <= clearX + 12
             && mouse.y >= panelY && mouse.y <= panelY + searchBoxH) {
             craftSearchLen = 0;
@@ -334,7 +334,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             craftScrollOffset = 0;
         }
     } else {
-        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 11, (Color){175, 175, 175, 255});
+        DrawGameText(S(STR_SEARCH), panelX + 4, panelY + 3, 14, (Color){175, 175, 175, 255});
         if (searchFocused && ((int)(GetTime() * 2.0) % 2 == 0)) {
             DrawRectangle(panelX + 4, panelY + 3, 1, 11, (Color){170, 170, 170, 150});
         }
@@ -477,7 +477,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
         }
 
-        DrawGameText(">", x + iconSize + 35, textY, 11, (Color){62, 62, 62, 240});
+        DrawGameText(">", x + iconSize + 35, textY, 14, (Color){62, 62, 62, 240});
 
         // Output icon
         if (r->output < BLOCK_COUNT && blockAtlas.id > 0) {
@@ -485,10 +485,10 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             Rectangle dstOut = { (float)(x + iconSize + 50), (float)(slotY + 3), (float)iconSize, (float)iconSize };
             DrawTexturePro(blockAtlas, srcOut, dstOut, (Vector2){0, 0}, 0, WHITE);
         }
-        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 11, (Color){62, 62, 62, 255});
+        DrawGameText(TextFormat("x%d", r->outputCount), x + iconSize * 2 + 52, textY, 14, (Color){62, 62, 62, 255});
 
         // Recipe name
-        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 11, (Color){62, 62, 62, 245});
+        DrawGameText(S(r->nameId), x + iconSize * 2 + 85, textY, 14, (Color){62, 62, 62, 245});
 
         // Max craftable count
         if (canCraft && r->inputCount > 0) {
@@ -504,7 +504,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
                 int bx = panelX + panelW - bw - 8;
                 DrawRectangle(bx, textY - 1, bw, 14, (Color){36, 36, 36, 200});
                 DrawRectangleLines(bx, textY - 1, bw, 14, (Color){85, 85, 85, 200});
-                DrawGameText(buf, bx + 3, textY, 9, (Color){70, 70, 70, 230});
+                DrawGameText(buf, bx + 3, textY, 14, (Color){70, 70, 70, 230});
             }
         }
     }
@@ -528,11 +528,11 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
     int listH = visibleCount * (slotH + pad);
     if (craftScrollOffset > 0) {
         DrawRectangle(panelX, panelY, panelW - 6, 8, (Color){55, 55, 55, 180});
-        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 11, (Color){80, 80, 80, 230});
+        DrawGameText("^", panelX + panelW / 2 - 4, panelY - 2, 14, (Color){80, 80, 80, 230});
     }
     if (endIdx < filteredCount) {
         DrawRectangle(panelX, panelY + listH - 8, panelW - 6, 8, (Color){55, 55, 55, 180});
-        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 11, (Color){80, 80, 80, 230});
+        DrawGameText("v", panelX + panelW / 2 - 4, panelY + listH - 13, 14, (Color){80, 80, 80, 230});
     }
 
     if (filteredCount == 0) {
@@ -576,7 +576,7 @@ void DrawFurnaceUI(void)
     if (fuelHover) DrawRectangle(fuelX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(fuelX, slotY, slotSize, slotSize, fuelBg);
     DrawRectangleLines(fuelX, slotY, slotSize, slotSize, fuelBorder);
-    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 10, (Color){62, 62, 62, 245});
+    DrawGameText(S(STR_FUEL), fuelX, slotY - 14, 14, (Color){62, 62, 62, 245});
 
     // Input slot (center)
     int inputX = panelX + panelW / 2 - slotSize / 2;
@@ -587,7 +587,7 @@ void DrawFurnaceUI(void)
     if (inputHover) DrawRectangle(inputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(inputX, slotY, slotSize, slotSize, inputBg);
     DrawRectangleLines(inputX, slotY, slotSize, slotSize, inputBorder);
-    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 10, (Color){62, 62, 62, 245});
+    DrawGameText(S(STR_INPUT), inputX, slotY - 14, 14, (Color){62, 62, 62, 245});
 
     // Output slot (right)
     int outputX = panelX + panelW - 30 - slotSize;
@@ -598,7 +598,7 @@ void DrawFurnaceUI(void)
     if (outputHover) DrawRectangle(outputX - 1, slotY - 1, slotSize + 2, slotSize + 2, (Color){100, 95, 120, 30});
     DrawRectangle(outputX, slotY, slotSize, slotSize, outputBg);
     DrawRectangleLines(outputX, slotY, slotSize, slotSize, outputBorder);
-    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 10, (Color){62, 62, 62, 245});
+    DrawGameText(S(STR_OUTPUT), outputX, slotY - 14, 14, (Color){62, 62, 62, 245});
 
     // Draw items in slots
     if (furnaceFuel != BLOCK_AIR && blockAtlas.id > 0) {
@@ -606,7 +606,7 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(fuelX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceFuelCount > 1)
-            DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 17, slotY + slotSize - 13, 10, (Color){0, 0, 0, 150});
+            DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 150});
             DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
     if (furnaceInput != BLOCK_AIR && blockAtlas.id > 0) {
@@ -614,7 +614,7 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(inputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceInputCount > 1)
-            DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 17, slotY + slotSize - 13, 10, (Color){0, 0, 0, 150});
+            DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 150});
             DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
     if (furnaceOutput != BLOCK_AIR && blockAtlas.id > 0) {
@@ -622,7 +622,7 @@ void DrawFurnaceUI(void)
         Rectangle dst = { (float)(outputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
         if (furnaceOutputCount > 1)
-            DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 17, slotY + slotSize - 13, 10, (Color){0, 0, 0, 150});
+            DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 150});
             DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
     }
 
@@ -653,7 +653,7 @@ void DrawFurnaceUI(void)
         DrawRectangle(fuelX, flameY + 14, flameW, flameH, (Color){40, 38, 48, 200});
         DrawRectangle(fuelX, flameY + 14, (int)(flameW * fuelPct), flameH, (Color){220, 120, 40, 255});
     } else {
-        DrawGameText(S(STR_MSG_NO_FUEL), fuelX, flameY + 14, 10, (Color){150, 80, 80, 200});
+        DrawGameText(S(STR_MSG_NO_FUEL), fuelX, flameY + 14, 14, (Color){150, 80, 80, 200});
     }
 
     // Smelting recipe info
@@ -664,7 +664,7 @@ void DrawFurnaceUI(void)
                      panelX + 10, panelY + panelH - 40, 10, (Color){62, 62, 62, 245});
         } else {
             DrawGameText(S(STR_MSG_CANNOT_SMELT),
-                     panelX + 10, panelY + panelH - 40, 10, (Color){200, 100, 100, 200});
+                     panelX + 10, panelY + panelH - 40, 14, (Color){200, 100, 100, 200});
         }
     }
 
@@ -766,7 +766,7 @@ void DrawTradeUI(void)
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){80, 68, 48, 220});
 
     // Title
-    DrawGameText(S(STR_MOB_VILLAGER), panelX + 18, panelY + 8, 20, (Color){240, 215, 140, 255});
+    DrawGameText(S(STR_MOB_VILLAGER), panelX + 18, panelY + 8, 28, (Color){240, 215, 140, 255});
 
     // ---- Close Button (X) ----
     Vector2 mouse = Win32GetMousePosition();
@@ -858,7 +858,7 @@ void DrawTradeUI(void)
         }
         char recvText[64];
         snprintf(recvText, sizeof(recvText), "%dx %s", trades[i].receiveCount, GetBlockName((BlockType)trades[i].receiveItem));
-        DrawGameText(recvText, rx + 30, ty + 18, 13, (Color){130, 240, 130, 245});
+        DrawGameText(recvText, rx + 30, ty + 18, 14, (Color){130, 240, 130, 245});
 
         if (click && canAfford) {
             int remaining = trades[i].giveCount;
@@ -886,7 +886,7 @@ void DrawTradeUI(void)
     char hint[48];
     snprintf(hint, sizeof(hint), "ESC / X  Close  |  Click to Trade");
     int hintW = MeasureGameTextWidth(hint, 11);
-    DrawGameText(hint, panelX + panelW - hintW - 16, footY, 11, (Color){110, 105, 140, 170});
+    DrawGameText(hint, panelX + panelW - hintW - 16, footY, 14, (Color){110, 105, 140, 170});
 
     // Keyboard close
     if (Win32IsKeyPressed(KEY_ESCAPE) || Win32IsKeyPressed(KEY_E)) {

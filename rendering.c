@@ -561,7 +561,7 @@ void DrawInventoryScreen(void)
             Rectangle dst = { (float)(fuelX + 4), (float)(fuSlotY + 4), (float)(fuSlotSize - 8), (float)(fuSlotSize - 8) };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
             if (furnaceFuelCount > 1) {
-                DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + fuSlotSize - 19, fuSlotY + fuSlotSize - 13, 13, (Color){0, 0, 0, 150});
+                DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + fuSlotSize - 19, fuSlotY + fuSlotSize - 13, 14, (Color){0, 0, 0, 150});
                 DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + fuSlotSize - 20, fuSlotY + fuSlotSize - 14, 13, WHITE);
             }
         }
@@ -570,7 +570,7 @@ void DrawInventoryScreen(void)
             Rectangle dst = { (float)(inputX + 4), (float)(fuSlotY + 4), (float)(fuSlotSize - 8), (float)(fuSlotSize - 8) };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
             if (furnaceInputCount > 1) {
-                DrawGameText(TextFormat("%d", furnaceInputCount), inputX + fuSlotSize - 19, fuSlotY + fuSlotSize - 13, 13, (Color){0, 0, 0, 150});
+                DrawGameText(TextFormat("%d", furnaceInputCount), inputX + fuSlotSize - 19, fuSlotY + fuSlotSize - 13, 14, (Color){0, 0, 0, 150});
                 DrawGameText(TextFormat("%d", furnaceInputCount), inputX + fuSlotSize - 20, fuSlotY + fuSlotSize - 14, 13, WHITE);
             }
         }
@@ -579,7 +579,7 @@ void DrawInventoryScreen(void)
             Rectangle dst = { (float)(outputX + 4), (float)(fuSlotY + 4), (float)(fuSlotSize - 8), (float)(fuSlotSize - 8) };
             DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
             if (furnaceOutputCount > 1) {
-                DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + fuSlotSize - 19, fuSlotY + fuSlotSize - 13, 13, (Color){0, 0, 0, 150});
+                DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + fuSlotSize - 19, fuSlotY + fuSlotSize - 13, 14, (Color){0, 0, 0, 150});
                 DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + fuSlotSize - 20, fuSlotY + fuSlotSize - 14, 13, WHITE);
             }
         }
@@ -593,7 +593,7 @@ void DrawInventoryScreen(void)
             DrawRectangle(fuelX, flameY + 14, flameW, 8, (Color){36, 36, 36, 200});
             DrawRectangle(fuelX, flameY + 14, (int)(flameW * fuelPct), 8, (Color){200, 200, 200, 255});
         } else {
-            DrawGameText(S(STR_MSG_NO_FUEL), fuelX, flameY + 14, 10, (Color){150, 80, 80, 200});
+            DrawGameText(S(STR_MSG_NO_FUEL), fuelX, flameY + 14, 14, (Color){150, 80, 80, 200});
         }
 
         // Smelting info
@@ -602,7 +602,7 @@ void DrawInventoryScreen(void)
             if (ri >= 0) {
                 DrawGameText(Sf(STR_MSG_SMELTING, S(smeltRecipes[ri].nameId)), contX + panelPad, contY + furnaceH - 18, 10, (Color){150, 145, 160, 200});
             } else {
-                DrawGameText(S(STR_MSG_CANNOT_SMELT), contX + panelPad, contY + furnaceH - 18, 10, (Color){232, 87, 92, 200});
+                DrawGameText(S(STR_MSG_CANNOT_SMELT), contX + panelPad, contY + furnaceH - 18, 14, (Color){232, 87, 92, 200});
             }
         }
 
@@ -694,7 +694,7 @@ void DrawInventoryScreen(void)
                     if (ENCH_TYPE(player.itemEnchantments[idx]) != ENCH_NONE)
                         DrawEnchantGlint(x+4, y+4, slotSize-8);
                     if (player.inventoryCount[idx] > 1) {
-                        DrawGameText(TextFormat("%d",player.inventoryCount[idx]), x+slotSize-19, y+slotSize-13, 13, (Color){0,0,0,150});
+                        DrawGameText(TextFormat("%d",player.inventoryCount[idx]), x+slotSize-19, y+slotSize-13, 14, (Color){0,0,0,150});
                         DrawGameText(TextFormat("%d",player.inventoryCount[idx]), x+slotSize-20, y+slotSize-14, 13, WHITE);
                     }
                     if (IsTool((BlockType)item)) {
@@ -708,7 +708,7 @@ void DrawInventoryScreen(void)
                         }
                     }
                 }
-                if (row == 0) DrawGameText(TextFormat("%d",col+1), x+2, y+1, 10, (Color){170,170,170,120});
+                if (row == 0) DrawGameText(TextFormat("%d",col+1), x+2, y+1, 14, (Color){170,170,170,120});
 
                 // Click handling
                 if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -859,7 +859,7 @@ void DrawInventoryScreen(void)
                         DrawRectangleLines(tx, ty, boxW, boxH, (Color){90,90,90,220});
                         DrawGameText(typeLabel, tx+4, ty+2, 11, typeColor);
                         DrawGameText(name, tx+4, ty+16, 14, (Color){230,225,240,255});
-                        if (info[0]) DrawGameText(info, tx+4, ty+32, 13, (Color){180,200,180,255});
+                        if (info[0]) DrawGameText(info, tx+4, ty+32, 14, (Color){180,200,180,255});
                     }
                 }
             }
@@ -1023,7 +1023,7 @@ void DrawInventoryScreen(void)
                         DrawRectangleLines(ttx, tty, boxW, boxH, (Color){90,90,90,220});
                         DrawGameText(typeLabel, ttx+4, tty+2, 11, typeColor);
                         DrawGameText(name, ttx+4, tty+16, 14, (Color){230,225,240,255});
-                        if (info[0]) DrawGameText(info, ttx+4, tty+32, 13, (Color){180,200,180,255});
+                        if (info[0]) DrawGameText(info, ttx+4, tty+32, 14, (Color){180,200,180,255});
                     }
                 }
 
@@ -1217,7 +1217,7 @@ void DrawInventoryScreen(void)
                 GetUiTooltipPos(tooltipX, tooltipY, tw, th, &tx, &ty);
                 DrawRectangle(tx, ty, tw, th, (Color){16, 0, 16, 235});
                 DrawRectangleLines(tx, ty, tw, th, (Color){80, 0, 255, 170});
-                DrawGameText(TextFormat("%s %d", enchName, enchLvl), tx + 5, ty + 18, 12, (Color){180, 120, 255, 255});
+                DrawGameText(TextFormat("%s %d", enchName, enchLvl), tx + 5, ty + 18, 14, (Color){180, 120, 255, 255});
             }
         }
 
@@ -1307,7 +1307,7 @@ void DrawInventoryScreen(void)
     int invX = containerX + panelPad + previewW + previewPad + armorColW;
     int invY = containerY + panelPad;
     Vector2 mouse = Win32GetMousePosition();
-    DrawGameText(S(STR_INVENTORY), invX, invY, 16, (Color){62, 62, 62, 255});
+    DrawGameText(S(STR_INVENTORY), invX, invY, 14, (Color){62, 62, 62, 255});
     invY += 24;
 
     // --- Player Preview ---
@@ -1423,7 +1423,7 @@ void DrawInventoryScreen(void)
             // Shield icon (small)
             DrawRectangle(armorIconX, armorIconY, 8, 10, (Color){100, 100, 120, 200});
             DrawRectangle(armorIconX + 1, armorIconY + 1, 6, 4, (Color){140, 140, 160, 200});
-            DrawGameText(TextFormat("%d", totalArmor), armorIconX + 10, armorIconY, 11, (Color){180, 200, 220, 255});
+            DrawGameText(TextFormat("%d", totalArmor), armorIconX + 10, armorIconY, 14, (Color){180, 200, 220, 255});
         }
     }
 
@@ -1584,13 +1584,13 @@ void DrawInventoryScreen(void)
 
                     ty += 16;
                     DrawRectangle(tx - 4, ty - 2, boxW, 15, (Color){36, 36, 36, 230});
-                    DrawGameText(info, tx, ty,13, (Color){180, 200, 180, 255});
+                    DrawGameText(info, tx, ty,14, (Color){180, 200, 180, 255});
 
                     if (enchBuf[0]) {
                         ty += 16;
                         DrawRectangle(tx - 4, ty - 2, boxW, 15, (Color){16, 0, 16, 235});
                         DrawRectangleLines(tx - 4, ty - 2, boxW, 15, (Color){150, 150, 150, 210});
-                        DrawGameText(enchBuf, tx, ty, 12, (Color){180, 120, 255, 255});
+                        DrawGameText(enchBuf, tx, ty, 14, (Color){180, 120, 255, 255});
                     }
                 }
             }
@@ -1650,7 +1650,7 @@ void DrawInventoryScreen(void)
                 if (player.inventoryCount[idx] > 1) {
                     // Shadow for readability
                     DrawGameText(TextFormat("%d", player.inventoryCount[idx]),
-                             x + slotSize - 19, y + slotSize - 13, 13, (Color){0, 0, 0, 150});
+                             x + slotSize - 19, y + slotSize - 13, 14, (Color){0, 0, 0, 150});
                     DrawGameText(TextFormat("%d", player.inventoryCount[idx]),
                              x + slotSize - 20, y + slotSize - 14, 13, WHITE);
                 }
@@ -1941,13 +1941,13 @@ void DrawInventoryScreen(void)
 
                     // Info line
                     if (info[0]) {
-                        DrawGameText(info, tx + 4, ty + 32, 13, (Color){180, 200, 180, 255});
+                        DrawGameText(info, tx + 4, ty + 32, 14, (Color){180, 200, 180, 255});
                     }
 
                     // Enchantment line
                     if (enchBuf[0]) {
                         int ety = ty + 32 + (info[0] ? 16 : 0);
-                        DrawGameText(enchBuf, tx + 4, ety, 12, (Color){180, 120, 255, 255});
+                        DrawGameText(enchBuf, tx + 4, ety, 14, (Color){180, 120, 255, 255});
                     }
                 }
             }
@@ -2048,7 +2048,7 @@ void DrawCreativeScreen(void)
     // Title
     const char *title = S(STR_CREATIVE_TITLE);
     int titleW = MeasureGameTextWidth(title, 16);
-    DrawGameText(title, panelX + panelW / 2 - titleW / 2, panelY + 7, 16, (Color){62, 62, 62, 255});
+    DrawGameText(title, panelX + panelW / 2 - titleW / 2, panelY + 7, 14, (Color){62, 62, 62, 255});
 
     // Backpack button: open the normal 36-slot inventory
     Rectangle backpackBtn = { (float)(panelX + panelW - 82), (float)(panelY + 4), 70.0f, 20.0f };
@@ -2098,9 +2098,9 @@ void DrawCreativeScreen(void)
     DrawRectangleLines(searchBox.x, searchBox.y, searchBox.width, searchBox.height,
         creativeSearchFocused ? (Color){255, 255, 255, 255} : (Color){110, 110, 110, 255});
     if (creativeSearch[0]) {
-        DrawGameText(creativeSearch, gridX + 6, panelY + titleH + 5, 13, (Color){255, 255, 255, 255});
+        DrawGameText(creativeSearch, gridX + 6, panelY + titleH + 5, 14, (Color){255, 255, 255, 255});
     } else {
-        DrawGameText(S(STR_CREATIVE_SEARCH), gridX + 6, panelY + titleH + 5, 13, (Color){170, 170, 170, 255});
+        DrawGameText(S(STR_CREATIVE_SEARCH), gridX + 6, panelY + titleH + 5, 14, (Color){170, 170, 170, 255});
     }
 
     static int scrollOffset = 0;
@@ -2213,7 +2213,7 @@ void DrawCreativeScreen(void)
         footer = footerBuf;
     }
     int footerW = MeasureGameTextWidth(footer, 13);
-    DrawGameText(footer, panelX + panelW / 2 - footerW / 2, footerY, 13, (Color){78, 78, 78, 240});
+    DrawGameText(footer, panelX + panelW / 2 - footerW / 2, footerY, 14, (Color){78, 78, 78, 240});
 
     // Scroll indicator
     if (maxScroll > 0) {
@@ -2472,7 +2472,7 @@ void DrawRemotePlayers(void)
         // Name tag
         const char *nameTag = players[i].playerName[0] ? players[i].playerName : "Player";
         int nameW = MeasureGameTextWidth(nameTag, 12);
-        DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(bobY - 6), 12,
+        DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(bobY - 6), 14,
                      (Color){255, 255, 255, 200});
     }
 }
@@ -2677,7 +2677,7 @@ void DrawHotbar(void)
     if (player.xp > 0) {
         const char *lvlStr = TextFormat("%d", player.xp / 10);
         int lvlW = MeasureGameTextWidth(lvlStr, 11);
-        DrawGameText(lvlStr, xpBarX - lvlW - 6, xpBarY - 3, 11, (Color){120, 235, 130, 230});
+        DrawGameText(lvlStr, xpBarX - lvlW - 6, xpBarY - 3, 14, (Color){120, 235, 130, 230});
     }
     // XP text
     char xpText[32];
@@ -2693,9 +2693,9 @@ void DrawHotbar(void)
         }
         char invCount[24];
         snprintf(invCount, sizeof(invCount), "%d/%d", cnt, INVENTORY_SLOTS);
-        DrawGameText(invCount, xpBarX, labelY, 9, (Color){140, 135, 160, 170});
+        DrawGameText(invCount, xpBarX, labelY, 14, (Color){140, 135, 160, 170});
     }
-    DrawGameText(xpText, xpBarX + xpBarW - xpTextW, labelY, 9, (Color){170, 220, 170, 190});
+    DrawGameText(xpText, xpBarX + xpBarW - xpTextW, labelY, 14, (Color){170, 220, 170, 190});
 
     Vector2 mouse = Win32GetMousePosition();
     int hoveredSlot = -1;
@@ -2740,8 +2740,8 @@ void DrawHotbar(void)
                 int ctw = MeasureGameTextWidth(countStr, 12);
                 int badgeX = x + slotSize - ctw - 4;
                 int badgeY = drawY + slotSize - 15;
-                DrawGameText(countStr, badgeX + 1, badgeY + 1, 12, (Color){0, 0, 0, 220});
-                DrawGameText(countStr, badgeX, badgeY, 12, (Color){255, 255, 255, 255});
+                DrawGameText(countStr, badgeX + 1, badgeY + 1, 14, (Color){0, 0, 0, 220});
+                DrawGameText(countStr, badgeX, badgeY, 14, (Color){255, 255, 255, 255});
             }
 
             if (IsTool((BlockType)item)) {
@@ -2816,7 +2816,7 @@ void DrawHotbar(void)
                 DrawRectangle(tx + 2, ty + 2, tw, 15, (Color){0, 0, 0, 50});
                 DrawRectangle(tx, ty, tw, 15, (Color){16, 0, 16, 235});
                 DrawRectangleLines(tx, ty, tw, 15, (Color){80, 0, 255, 170});
-                DrawGameText(info, tx + 6, ty + 2,13, (Color){180, 200, 180, 255});
+                DrawGameText(info, tx + 6, ty + 2,14, (Color){180, 200, 180, 255});
             }
         }
     }
@@ -2841,9 +2841,9 @@ void DrawHotbar(void)
         int selY = HUD_SEL_NAME_Y;
         int h = hasEnchant ? 32 : 16;
         DrawRectangle(selX - 4, selY - 2, maxW + 8, h, (Color){0, 0, 0, 170});
-        DrawGameText(selName, selX, selY, 13, (Color){255, 255, 255, 230});
+        DrawGameText(selName, selX, selY, 14, (Color){255, 255, 255, 230});
         if (hasEnchant) {
-            DrawGameText(enchBuf, selX, selY + 16, 11, (Color){180, 120, 255, 220});
+            DrawGameText(enchBuf, selX, selY + 16, 14, (Color){180, 120, 255, 220});
         }
     }
 }
@@ -3177,7 +3177,7 @@ void DrawPauseMenu(void)
     static int activeSlider = -1;
 
     // BGM Volume
-    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 15, (Color){235, 235, 235, 255});
+    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 14, (Color){235, 235, 235, 255});
     sliderY += 20;
     Rectangle bgmArea = { (float)(sliderX - 10), (float)(sliderY - 12), (float)(sliderW + 20), 26.0f };
     bool bgmHover = CheckCollisionPointRec(mouse, bgmArea);
@@ -3194,7 +3194,7 @@ void DrawPauseMenu(void)
 
     // SFX Volume
     sliderY += 36;
-    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 15, (Color){235, 235, 235, 255});
+    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 14, (Color){235, 235, 235, 255});
     sliderY += 20;
     Rectangle sfxArea = { (float)(sliderX - 10), (float)(sliderY - 8), (float)(sliderW + 20), 24.0f };
     bool sfxHover = CheckCollisionPointRec(mouse, sfxArea);
@@ -3210,7 +3210,7 @@ void DrawPauseMenu(void)
     DrawUiSlider(sliderX, sliderY, sliderW, sfxVolumeSlider, activeSlider == 1 || sfxHover, 1.0f);
     char sfxText[16];
     snprintf(sfxText, sizeof(sfxText), "%d%%", (int)(sfxVolumeSlider * 100));
-    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){235, 235, 235, 255});
+    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 14, (Color){235, 235, 235, 255});
 
     // --- Game Mode Toggle (Survival / Creative) ---
     sliderY += 40;
@@ -3257,8 +3257,8 @@ void DrawPauseMenu(void)
         int row = (i < halfControls) ? i : i - halfControls;
         int kx = boxX + 30 + col * ctrlColW;
         int yy = ctrlY + row * 15;
-        DrawGameText(keys[i], kx, yy, 12, (Color){190, 190, 190, 235});
-        DrawGameText(acts[i], kx + 68, yy, 12, (Color){225, 225, 225, 255});
+        DrawGameText(keys[i], kx, yy, 14, (Color){190, 190, 190, 235});
+        DrawGameText(acts[i], kx + 68, yy, 14, (Color){225, 225, 225, 255});
     }
     ctrlY += halfControls * 15;
 
@@ -3277,7 +3277,7 @@ void DrawPauseMenu(void)
             DrawUiBox(lanX, lanY, lanW, lanH, 0.06f, (Color){55, 55, 55, (unsigned char)(200 * pauseAnim)});
             DrawRectangleLinesEx((Rectangle){(float)lanX, (float)lanY, (float)lanW, (float)lanH}, 1, (Color){200, 200, 200, (unsigned char)(150 * pauseAnim)});
             int tw = MeasureGameTextWidth(st, 13);
-            DrawGameText(st, lanX + (lanW - tw) / 2, lanY + 9, 13, (Color){190, 220, 200, (unsigned char)(230 * pauseAnim)});
+            DrawGameText(st, lanX + (lanW - tw) / 2, lanY + 9, 14, (Color){190, 220, 200, (unsigned char)(230 * pauseAnim)});
         } else {
             Rectangle r = {(float)lanX, (float)lanY, (float)lanW, (float)lanH};
             bool hover = CheckCollisionPointRec(mouse, r);
@@ -3380,7 +3380,7 @@ void DrawAchievementsUI(void)
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, 185});
     DrawUiPanel(panelX, panelY, panelW, panelH, 255);
     DrawCompetitionIcon(panelX + 24, panelY + 22, 56, 255, true);
-    DrawGameText(S(STR_COLLECTION_TITLE), panelX + 96, panelY + 28, 30, (Color){62, 62, 62, 255});
+    DrawGameText(S(STR_COLLECTION_TITLE), panelX + 96, panelY + 28, 28, (Color){62, 62, 62, 255});
     DrawGameText(S(STR_COLLECTION_CHALLENGES), panelX + 98, panelY + 64, 14, (Color){78, 78, 78, 240});
     static const StringId achNames[ACH_COUNT] = {
         STR_ACH_FIRST_STEPS, STR_ACH_DEEP_DIG, STR_ACH_MONSTER_HUNTER, STR_ACH_ARCHITECT,
@@ -3394,7 +3394,7 @@ void DrawAchievementsUI(void)
         DrawUiBox(x, y, 340, 60, 0.0f, unlocked ? (Color){150, 150, 150, 245} : (Color){120, 120, 120, 245});
         DrawRectangleLines(x, y, 340, 60, unlocked ? (Color){170, 130, 20, 255} : (Color){85, 85, 85, 255});
         DrawCollectibleIcon(x + 8, y + 8, 44, i % 3, 255, unlocked);
-        DrawGameText(S(achNames[i]), x + 62, y + 11, 13, (Color){62, 62, 62, unlocked ? (unsigned char)255 : (unsigned char)205});
+        DrawGameText(S(achNames[i]), x + 62, y + 11, 14, (Color){62, 62, 62, unlocked ? (unsigned char)255 : (unsigned char)205});
         DrawGameText(S(unlocked ? STR_COLLECTION_UNLOCKED : STR_COLLECTION_LOCKED), x + 62, y + 36, 11, unlocked ? (Color){150, 112, 12, 255} : (Color){95, 95, 95, 255});
     }
     DrawGameText(S(STR_COLLECTION_CLOSE), panelX + 250, panelY + panelH - 30, 14, (Color){72, 72, 72, 245});
@@ -3469,13 +3469,13 @@ void DrawDeathScreen(float dt)
         // Death cause
         const char *cause = S(lastDeathCause);
         int causeW = MeasureGameTextWidth(cause, 18);
-        DrawGameText(cause, (SCREEN_WIDTH - causeW) / 2, ty + 75, 18, (Color){200, 180, 170, textA});
+        DrawGameText(cause, (SCREEN_WIDTH - causeW) / 2, ty + 75, 14, (Color){200, 180, 170, textA});
 
         // Score (XP)
         char scoreBuf[64];
         snprintf(scoreBuf, sizeof(scoreBuf), S(STR_DEATH_SCORE), player.xp);
         int scoreW = MeasureGameTextWidth(scoreBuf, 16);
-        DrawGameText(scoreBuf, (SCREEN_WIDTH - scoreW) / 2, ty + 92, 16, (Color){220, 200, 120, textA});
+        DrawGameText(scoreBuf, (SCREEN_WIDTH - scoreW) / 2, ty + 92, 14, (Color){220, 200, 120, textA});
     }
 
     if (deathFadeTimer > DEATH_RESPAWN_READY_TIME) {
@@ -3725,8 +3725,8 @@ void DrawLargeMap(void)
     DrawRectangle(pdx - 1, pdy - 1, 3, 3, (Color){255, 255, 200, 255});
 
     // Title and hints
-    DrawGameText(S(STR_WORLD_MAP), mapX, mapY - 22, 16, (Color){200, 195, 210, 255});
-    DrawGameText(S(STR_PRESS_M_CLOSE), SCREEN_WIDTH / 2 - 70, SCREEN_HEIGHT - margin + 5,16, (Color){150, 145, 165, 200});
+    DrawGameText(S(STR_WORLD_MAP), mapX, mapY - 22, 14, (Color){200, 195, 210, 255});
+    DrawGameText(S(STR_PRESS_M_CLOSE), SCREEN_WIDTH / 2 - 70, SCREEN_HEIGHT - margin + 5,14, (Color){150, 145, 165, 200});
 
     // Player coordinates
     DrawGameText(TextFormat(S(STR_PLAYER_COORD), playerBX, playerBY), mapX + mapW - 150, mapY - 22,16, (Color){180, 175, 195, 200});
@@ -3805,7 +3805,7 @@ void DrawMainMenu(void)
     // Title — block-themed with decorative icons and sparkles
     // ================================================================
     const char *title = S(STR_TITLE);
-    int titleSize = 72;
+    int titleSize = 84;
     int titleW = MeasureGameTextWidth(title, titleSize);
     int titleX = (SCREEN_WIDTH - titleW) / 2;
     int titleY = 62;
@@ -3848,11 +3848,10 @@ void DrawMainMenu(void)
     // Final title — MC gold with a full dark outline + hard drop shadow
     if (elapsed > titleTotalDur) {
         Color outline = (Color){52, 36, 12, 255};
-        DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){0, 0, 0, 170});
-        DrawGameText(title, titleX - 2, titleY, titleSize, outline);
-        DrawGameText(title, titleX + 2, titleY, titleSize, outline);
-        DrawGameText(title, titleX, titleY - 2, titleSize, outline);
-        DrawGameText(title, titleX, titleY + 2, titleSize, outline);
+        DrawGameText(title, titleX + 3, titleY + 4, titleSize, (Color){0, 0, 0, 180});
+        for (int dy = -3; dy <= 3; dy += 3)
+            for (int dx = -3; dx <= 3; dx += 3)
+                if (dx || dy) DrawGameText(title, titleX + dx, titleY + dy, titleSize, outline);
         DrawGameText(title, titleX, titleY, titleSize, (Color){252, 226, 130, 255});
     }
 
@@ -3866,7 +3865,7 @@ void DrawMainMenu(void)
         int subW = MeasureGameTextWidth(sub, 17);
         unsigned char subA = (unsigned char)(subFade * 170);
         float subY = 155.0f + (1.0f - subFade) * 8.0f;
-        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, (int)subY, 17, (Color){145, 145, 165, subA});
+        DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, (int)subY, 14, (Color){145, 145, 165, subA});
     }
 
     // ================================================================
@@ -3972,12 +3971,12 @@ void DrawMainMenu(void)
         const char *hint1 = S(STR_HINT_NAVIGATE);
         int hint1W = MeasureGameTextWidth(hint1, 12);
         int h1x = (SCREEN_WIDTH - hint1W) / 2;
-        DrawGameText(hint1, h1x + 1, SCREEN_HEIGHT - 53, 12, (Color){0, 0, 0, a});
-        DrawGameText(hint1, h1x, SCREEN_HEIGHT - 54, 12, (Color){235, 235, 235, a});
+        DrawGameText(hint1, h1x + 1, SCREEN_HEIGHT - 53, 14, (Color){0, 0, 0, a});
+        DrawGameText(hint1, h1x, SCREEN_HEIGHT - 54, 14, (Color){235, 235, 235, a});
         const char *hint2 = S(STR_HINT_CONTROLS);
         int h2x = (SCREEN_WIDTH - MeasureGameTextWidth(hint2, 12)) / 2;
-        DrawGameText(hint2, h2x + 1, SCREEN_HEIGHT - 37, 12, (Color){0, 0, 0, a});
-        DrawGameText(hint2, h2x, SCREEN_HEIGHT - 38, 12, (Color){225, 225, 225, a});
+        DrawGameText(hint2, h2x + 1, SCREEN_HEIGHT - 37, 14, (Color){0, 0, 0, a});
+        DrawGameText(hint2, h2x, SCREEN_HEIGHT - 38, 14, (Color){225, 225, 225, a});
     }
 
     // Version text intentionally omitted from the playable UI; keep the footer quiet.
@@ -4013,21 +4012,24 @@ void DrawSlotSelectScreen(void)
     int contentX = panelX + 28;
     int slotX    = panelX + (panelW - slotW) / 2;
 
-    // Title — white with a hard dark outline (MC title style, reads on dirt)
+    // Title — dark text with a light outline: the panel behind it is light gray
     const char *title = isNew ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
-    int titleSize = 40;
+    int titleSize = 42;
     int titleW = MeasureGameTextWidth(title, titleSize);
     int titleX = (SCREEN_WIDTH - titleW) / 2;
     int titleY = panelY + 18;
-    DrawGameText(title, titleX + 2, titleY + 2, titleSize, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX + 2, titleY, titleSize, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX, titleY + 2, titleSize, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX, titleY, titleSize, (Color){242, 242, 242, 255});
+    {
+        Color ol = {255, 255, 255, 200};
+        for (int dy = -2; dy <= 2; dy += 2)
+            for (int dx = -2; dx <= 2; dx += 2)
+                if (dx || dy) DrawGameText(title, titleX + dx, titleY + dy, titleSize, ol);
+        DrawGameText(title, titleX, titleY, titleSize, (Color){58, 58, 58, 255});
+    }
 
     // Subtitle
     const char *sub = isNew ? S(STR_NEW_GAME_SUB) : S(STR_LOAD_GAME_SUB);
     int subW = MeasureGameTextWidth(sub, 15);
-    DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, titleY + 50, 15, (Color){110, 110, 110, 220});
+    DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, titleY + 50, 14, (Color){110, 110, 110, 220});
 
     Vector2 mouse = Win32GetMousePosition();
 
@@ -4042,7 +4044,7 @@ void DrawSlotSelectScreen(void)
         Rectangle seedBox = { (float)seedBoxX, (float)seedBoxY, (float)seedBoxW, (float)seedBoxH };
         bool seedFocused = CheckCollisionPointRec(mouse, seedBox);
 
-        DrawGameText(S(STR_SEED), seedBoxX, seedBoxY - 16, 13, (Color){90, 90, 90, 220});
+        DrawGameText(S(STR_SEED), seedBoxX, seedBoxY - 16, 14, (Color){90, 90, 90, 220});
         // Recessed MC text field
         DrawRectangle(seedBoxX, seedBoxY, seedBoxW, seedBoxH, (Color){60, 60, 60, 255});
         DrawRectangle(seedBoxX, seedBoxY, seedBoxW, 1, (Color){30, 30, 30, 255});
@@ -4057,7 +4059,7 @@ void DrawSlotSelectScreen(void)
         // Game mode toggle to the right of the seed box
         int lblW = 50, survW = 84, creatW = 84, gap = 6;
         int modeX = seedBoxX + seedBoxW + 24;
-        DrawGameText(S(STR_GAMEMODE), modeX, seedBoxY + 6, 13, (Color){90, 90, 90, 220});
+        DrawGameText(S(STR_GAMEMODE), modeX, seedBoxY + 6, 14, (Color){90, 90, 90, 220});
         Rectangle survRect = { (float)(modeX + lblW), (float)seedBoxY, (float)survW, (float)seedBoxH };
         Rectangle creatRect = { (float)(modeX + lblW + survW + gap), (float)seedBoxY, (float)creatW, (float)seedBoxH };
         bool survHover = CheckCollisionPointRec(mouse, survRect);
@@ -4122,12 +4124,12 @@ void DrawSlotSelectScreen(void)
         if (info.exists) {
             char seedText[40];
             snprintf(seedText, sizeof(seedText), S(STR_SEED_DISPLAY), info.seed);
-            DrawGameText(seedText, slotX + 14, sy + 40, 13, (Color){70, 70, 70, 235});
+            DrawGameText(seedText, slotX + 14, sy + 40, 14, (Color){70, 70, 70, 235});
 
             char sizeText[32];
             snprintf(sizeText, sizeof(sizeText), "%dx%d", info.worldW, info.worldH);
             int sizeW = MeasureGameTextWidth(sizeText, 13);
-            DrawGameText(sizeText, slotX + slotW - sizeW - 14, sy + 40, 13, (Color){70, 70, 70, 235});
+            DrawGameText(sizeText, slotX + slotW - sizeW - 14, sy + 40, 14, (Color){70, 70, 70, 235});
 
             // "已占用" badge with a small grass icon, top-right
             const char *status = S(STR_OCCUPIED);
@@ -4141,7 +4143,7 @@ void DrawSlotSelectScreen(void)
                 Rectangle dst = { (float)(badgeX + 5), (float)(sy + 15), 14, 14 };
                 DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
             }
-            DrawGameText(status, badgeX + 24, sy + 16, 13, (Color){40, 120, 40, 255});
+            DrawGameText(status, badgeX + 24, sy + 16, 14, (Color){40, 120, 40, 255});
         } else {
             const char *emptyText = isNew ? S(STR_EMPTY_NEW) : S(STR_EMPTY_LOAD);
             Color emptyColor = isNew ? (Color){75, 75, 75, 220} : (Color){120, 120, 120, 190};
@@ -4179,8 +4181,8 @@ void DrawSlotSelectScreen(void)
         int hw = MeasureGameTextWidth(hint, 12);
         int hx = (SCREEN_WIDTH - hw) / 2;
         int hy = panelY + panelH + 8;
-        DrawGameText(hint, hx + 1, hy + 1, 12, (Color){0, 0, 0, 200});
-        DrawGameText(hint, hx, hy, 12, (Color){235, 235, 235, 235});
+        DrawGameText(hint, hx + 1, hy + 1, 14, (Color){0, 0, 0, 200});
+        DrawGameText(hint, hx, hy, 14, (Color){235, 235, 235, 235});
     }
 }
 
@@ -4214,7 +4216,7 @@ void DrawConfirmDialog(void)
     char msg[64];
     snprintf(msg, sizeof(msg), S(STR_SLOT_HAS_DATA), confirmDialogSlot + 1);
     int msgW = MeasureGameTextWidth(msg,16);
-    DrawGameText(msg, dlgX + (dlgW - msgW) / 2, dlgY + 52,16, (Color){62, 62, 62, 255});
+    DrawGameText(msg, dlgX + (dlgW - msgW) / 2, dlgY + 52,14, (Color){62, 62, 62, 255});
 
     const char *warn = S(STR_CANNOT_UNDO);
     int warnW = MeasureGameTextWidth(warn,14);
@@ -4243,7 +4245,7 @@ void DrawConfirmDialog(void)
     // Key hints
     const char *keyHint = S(STR_CONFIRM_KEYS);
     int keyHintW = MeasureGameTextWidth(keyHint,13);
-    DrawGameText(keyHint, dlgX + (dlgW - keyHintW) / 2, dlgY + dlgH - 14, 13, (Color){95, 95, 95, 235});
+    DrawGameText(keyHint, dlgX + (dlgW - keyHintW) / 2, dlgY + dlgH - 14, 14, (Color){95, 95, 95, 235});
 }
 
 //----------------------------------------------------------------------------------
@@ -4255,16 +4257,17 @@ void DrawSettingsScreen(void)
     float stime = (float)GetTime();
     DrawDirtBackground(40);
 
-    // Title — white with a hard dark outline so it reads on the dirt backdrop
+    // Title — white with a full dark outline so it reads on the dirt backdrop
     const char *title = S(STR_SETTINGS);
-    int titleW = MeasureGameTextWidth(title, 40);
+    int titleW = MeasureGameTextWidth(title, 42);
     int titleX = (SCREEN_WIDTH - titleW) / 2;
-    DrawGameText(title, titleX + 2, 22, 40, (Color){0, 0, 0, 200});
-    DrawGameText(title, titleX - 2, 20, 40, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX + 2, 20, 40, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX, 18, 40, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX, 22, 40, (Color){40, 40, 40, 255});
-    DrawGameText(title, titleX, 20, 40, (Color){240, 240, 240, 255});
+    {
+        Color ol = {40, 40, 40, 255};
+        for (int dy = -2; dy <= 2; dy += 2)
+            for (int dx = -2; dx <= 2; dx += 2)
+                if (dx || dy) DrawGameText(title, titleX + dx, 20 + dy, 42, ol);
+        DrawGameText(title, titleX, 20, 42, (Color){240, 240, 240, 255});
+    }
     // Hard separator under the title
     DrawRectangle((SCREEN_WIDTH - 160) / 2, 66, 160, 2, (Color){120, 120, 120, 180});
 
@@ -4295,7 +4298,7 @@ void DrawSettingsScreen(void)
     sectionY += 28;
 
     // Music Volume
-    DrawGameText(S(STR_MUSIC_VOLUME), leftX, sectionY, 13, (Color){70, 70, 70, 230});
+    DrawGameText(S(STR_MUSIC_VOLUME), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     int musicSliderX = leftX + MeasureGameTextWidth(S(STR_MUSIC_VOLUME), 13) + 12;
     int musicSliderW = panelX + panelW - 30 - musicSliderX - 45;
     {
@@ -4311,11 +4314,11 @@ void DrawSettingsScreen(void)
         DrawUiSlider(musicSliderX, sectionY + 9, musicSliderW, bgmVolumeSlider, bgmHover, 1.0f);
         char buf[16];
         snprintf(buf, sizeof(buf), "%d%%", (int)(bgmVolumeSlider * 100));
-        DrawGameText(buf, musicSliderX + musicSliderW + 10, sectionY + 2, 13, (Color){70, 70, 70, 240});
+        DrawGameText(buf, musicSliderX + musicSliderW + 10, sectionY + 2, 14, (Color){70, 70, 70, 240});
     }
     sectionY += 26;
     // SFX Volume
-    DrawGameText(S(STR_SOUND_EFFECTS), leftX, sectionY, 13, (Color){70, 70, 70, 230});
+    DrawGameText(S(STR_SOUND_EFFECTS), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     int sfxSliderX = leftX + MeasureGameTextWidth(S(STR_SOUND_EFFECTS), 13) + 12;
     int sfxSliderW = panelX + panelW - 30 - sfxSliderX - 45;
     {
@@ -4331,7 +4334,7 @@ void DrawSettingsScreen(void)
         DrawUiSlider(sfxSliderX, sectionY + 9, sfxSliderW, sfxVolumeSlider, sfxHover, 1.0f);
         char buf[16];
         snprintf(buf, sizeof(buf), "%d%%", (int)(sfxVolumeSlider * 100));
-        DrawGameText(buf, sfxSliderX + sfxSliderW + 10, sectionY + 2, 13, (Color){70, 70, 70, 240});
+        DrawGameText(buf, sfxSliderX + sfxSliderW + 10, sectionY + 2, 14, (Color){70, 70, 70, 240});
     }
     sectionY += 26;
 
@@ -4341,7 +4344,7 @@ void DrawSettingsScreen(void)
     DrawGameText(S(STR_SECTION_DISPLAY), leftX, sectionY, 14, (Color){70, 70, 70, 220});
     DrawRectangle(leftX, sectionY + 18, panelW - 60, 1, (Color){90, 90, 90, 100});
     sectionY += 24;
-    DrawGameText(S(STR_WINDOW_MODE), leftX, sectionY, 13, (Color){70, 70, 70, 230});
+    DrawGameText(S(STR_WINDOW_MODE), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     sectionY += 20;
 
     int btnW = 100;
@@ -4365,7 +4368,7 @@ void DrawSettingsScreen(void)
     sectionY += btnH + 10;
 
     // Resolution presets keep the 1280x720 logical canvas intact.
-    DrawGameText(S(STR_RESOLUTION), leftX, sectionY, 13, (Color){70, 70, 70, 230});
+    DrawGameText(S(STR_RESOLUTION), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     sectionY += 20;
     const char *resolutionNames[] = { S(STR_RES_960), S(STR_RES_1280), S(STR_RES_1600) };
     int resolutionBtnW = 145;
@@ -4387,11 +4390,11 @@ void DrawSettingsScreen(void)
     int monH = GetMonitorHeight(mon);
     char dpiInfo[64];
     snprintf(dpiInfo, sizeof(dpiInfo), "Monitor: %dx%d  DPI: %.0f%%", monW, monH, dpiScale.x * 100);
-    DrawGameText(dpiInfo, leftX, sectionY, 12, (Color){95, 95, 95, 180});
+    DrawGameText(dpiInfo, leftX, sectionY, 14, (Color){95, 95, 95, 180});
 
     char resInfo[64];
     snprintf(resInfo, sizeof(resInfo), "Window: %dx%d", GetScreenWidth(), GetScreenHeight());
-    DrawGameText(resInfo, rightX, sectionY, 12, (Color){95, 95, 95, 180});
+    DrawGameText(resInfo, rightX, sectionY, 14, (Color){95, 95, 95, 180});
     sectionY += 20;
 
     // ============================================================
@@ -4402,7 +4405,7 @@ void DrawSettingsScreen(void)
     sectionY += 28;
 
     // Language buttons
-    DrawGameText(S(STR_LANGUAGE), leftX, sectionY, 13, (Color){70, 70, 70, 230});
+    DrawGameText(S(STR_LANGUAGE), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     sectionY += 18;
 
     const char *langNames[] = { S(STR_LANG_NAME_EN), S(STR_LANG_NAME_ZH), S(STR_LANG_NAME_JA) };
@@ -4426,7 +4429,7 @@ void DrawSettingsScreen(void)
     sectionY += langBtnH + 14;
 
     // Font buttons
-    DrawGameText(S(STR_FONT), leftX, sectionY, 13, (Color){70, 70, 70, 230});
+    DrawGameText(S(STR_FONT), leftX, sectionY, 14, (Color){70, 70, 70, 230});
     sectionY += 18;
 
     const char *fontNames[] = { S(STR_FONT_NAME_BUILTIN), S(STR_FONT_NAME_LXGW) };
@@ -4512,13 +4515,13 @@ void DrawSettingsScreen(void)
     int halfCtrl = (numControls + 1) / 2;
     for (int i = 0; i < halfCtrl; i++) {
         // Left column
-        DrawGameText(controls[i * 2], keyX1, sectionY, 12, (Color){70, 70, 70, 255});
-        DrawGameText(controls[i * 2 + 1], actX1, sectionY, 12, (Color){95, 95, 95, 255});
+        DrawGameText(controls[i * 2], keyX1, sectionY, 14, (Color){70, 70, 70, 255});
+        DrawGameText(controls[i * 2 + 1], actX1, sectionY, 14, (Color){95, 95, 95, 255});
         // Right column
         int ri = i + halfCtrl;
         if (ri < numControls) {
-            DrawGameText(controls[ri * 2], keyX2, sectionY, 12, (Color){70, 70, 70, 255});
-            DrawGameText(controls[ri * 2 + 1], actX2, sectionY, 12, (Color){95, 95, 95, 255});
+            DrawGameText(controls[ri * 2], keyX2, sectionY, 14, (Color){70, 70, 70, 255});
+            DrawGameText(controls[ri * 2 + 1], actX2, sectionY, 14, (Color){95, 95, 95, 255});
         }
         sectionY += 14;
     }
@@ -4568,7 +4571,7 @@ void DrawEnchantingTableUI(void)
     DrawRectangleLines(panelX, panelY, panelW, panelH, (Color){100, 60, 180, 200});
 
     // Title
-    DrawGameText(S(STR_BLOCK_ENCHANTING_TABLE), panelX + panelW / 2 - 60, panelY + 10, 18, (Color){180, 120, 255, 255});
+    DrawGameText(S(STR_BLOCK_ENCHANTING_TABLE), panelX + panelW / 2 - 60, panelY + 10, 14, (Color){180, 120, 255, 255});
 
     // Item preview slot (left side)
     int slotX = panelX + 20;
@@ -4585,7 +4588,7 @@ void DrawEnchantingTableUI(void)
     DrawGameText(GetBlockName((BlockType)localEnchantSession.heldItem), slotX + slotSize + 8, slotY + 18, 11, (Color){200, 200, 200, 255});
 
     // XP available
-    DrawGameText(TextFormat("XP: %d", player.xp), panelX + panelW / 2 - 30, panelY + 270, 12, (Color){80, 220, 80, 200});
+    DrawGameText(TextFormat("XP: %d", player.xp), panelX + panelW / 2 - 30, panelY + 270, 14, (Color){80, 220, 80, 200});
 
     // 3 enchantment options (right side, stacked vertically)
     int optX = panelX + 190;
@@ -4621,9 +4624,9 @@ void DrawEnchantingTableUI(void)
 
         // XP cost
         if (canAfford) {
-            DrawGameText(TextFormat("%d XP", eo->xpCost), optX + optW - 80, oy + 26, 12, (Color){80, 220, 80, 220});
+            DrawGameText(TextFormat("%d XP", eo->xpCost), optX + optW - 80, oy + 26, 14, (Color){80, 220, 80, 220});
         } else {
-            DrawGameText(TextFormat("Need %d XP", eo->xpCost), optX + optW - 100, oy + 26, 11, (Color){220, 80, 80, 200});
+            DrawGameText(TextFormat("Need %d XP", eo->xpCost), optX + optW - 100, oy + 26, 14, (Color){220, 80, 80, 200});
         }
 
         // Click detection
@@ -4746,7 +4749,7 @@ void DrawChatUI(void)
         for (int li = lineCount - 1; li >= 0 && shown < maxVisible; li--, shown++) {
             int ly = y - shown * lineH;
             DrawRectangle(x, ly, w, lineH, (Color){0, 0, 0, (unsigned char)(140 * alpha / 255)});
-            DrawGameText(lines[li], x + 4, ly + 2, 12, (Color){230, 230, 230, (unsigned char)alpha});
+            DrawGameText(lines[li], x + 4, ly + 2, 14, (Color){230, 230, 230, (unsigned char)alpha});
         }
     }
 
