@@ -3191,6 +3191,11 @@ void DrawPauseMenu(void)
         SetBGMVolume(bgmVolumeSlider);
     }
     DrawUiSlider(sliderX, sliderY, sliderW, bgmVolumeSlider, activeSlider == 0 || bgmHover, 1.0f);
+    {
+        char bgmText[16];
+        snprintf(bgmText, sizeof(bgmText), "%d%%", (int)(bgmVolumeSlider * 100));
+        DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 7, 14, (Color){235, 235, 235, 255});
+    }
 
     // SFX Volume
     sliderY += 36;
@@ -3210,7 +3215,7 @@ void DrawPauseMenu(void)
     DrawUiSlider(sliderX, sliderY, sliderW, sfxVolumeSlider, activeSlider == 1 || sfxHover, 1.0f);
     char sfxText[16];
     snprintf(sfxText, sizeof(sfxText), "%d%%", (int)(sfxVolumeSlider * 100));
-    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 14, (Color){235, 235, 235, 255});
+    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 7, 14, (Color){235, 235, 235, 255});
 
     // --- Game Mode Toggle (Survival / Creative) ---
     sliderY += 40;
