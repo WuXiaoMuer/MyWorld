@@ -2027,8 +2027,8 @@ void DrawCreativeScreen(void)
     int slotSize = 40, padding = 4, cols = 10, rows = 5;
     int gridW = cols * slotSize + (cols - 1) * padding;
     int gridH = rows * slotSize + (rows - 1) * padding;
-    int titleH = 30;
-    int searchH = 26;
+    int titleH = 26;
+    int searchH = 24;
     int footerH = 26;
     int panelW = gridW + 24;
     int panelH = titleH + searchH + gridH + footerH;
@@ -2048,10 +2048,10 @@ void DrawCreativeScreen(void)
     // Title
     const char *title = S(STR_CREATIVE_TITLE);
     int titleW = MeasureGameTextWidth(title, 16);
-    DrawGameText(title, panelX + panelW / 2 - titleW / 2, panelY + 9, 16, (Color){62, 62, 62, 255});
+    DrawGameText(title, panelX + panelW / 2 - titleW / 2, panelY + 7, 16, (Color){62, 62, 62, 255});
 
     // Backpack button: open the normal 36-slot inventory
-    Rectangle backpackBtn = { (float)(panelX + panelW - 86), (float)(panelY + 4), 74.0f, 22.0f };
+    Rectangle backpackBtn = { (float)(panelX + panelW - 82), (float)(panelY + 4), 70.0f, 20.0f };
     bool bpHover = CheckCollisionPointRec(mouse, backpackBtn);
     DrawUiButton(backpackBtn.x, backpackBtn.y, backpackBtn.width, backpackBtn.height,
                  S(STR_CREATIVE_BACKPACK), 13, bpHover, false, true, 1.0f);
@@ -2068,7 +2068,7 @@ void DrawCreativeScreen(void)
     // Search box
     static char creativeSearch[24] = "";
     static bool creativeSearchFocused = false;
-    Rectangle searchBox = { (float)gridX, (float)(panelY + titleH + 3), (float)(panelW - 24), 20.0f };
+    Rectangle searchBox = { (float)gridX, (float)(panelY + titleH + 3), (float)(panelW - 24), 18.0f };
     bool searchHover = CheckCollisionPointRec(mouse, searchBox);
     if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         creativeSearchFocused = CheckCollisionPointRec(mouse, searchBox);
@@ -2090,13 +2090,18 @@ void DrawCreativeScreen(void)
             creativeSearchFocused = false;
         }
     }
-    DrawUiBox((int)searchBox.x, (int)searchBox.y, (int)searchBox.width, (int)searchBox.height, 0.06f, (Color){36, 36, 36, 220});
-    DrawUiBox((int)searchBox.x, (int)searchBox.y, (int)searchBox.width, (int)searchBox.height, 0.0f, (Color){55, 55, 55, 235});
-    if (creativeSearch[0]) {
-        DrawGameText(creativeSearch, gridX + 66, panelY + titleH + 6, 13, (Color){255, 255, 255, 255});
-    }
+    // Search field — recessed MC text field matching the crafting panel
+    DrawRectangle((int)searchBox.x, (int)searchBox.y, (int)searchBox.width, (int)searchBox.height,
+                  (Color){70, 70, 70, 255});
+    DrawRectangle((int)searchBox.x, (int)searchBox.y, (int)searchBox.width, 1, (Color){40, 40, 40, 255});
+    DrawRectangle((int)searchBox.x, (int)searchBox.y, 1, (int)searchBox.height, (Color){40, 40, 40, 255});
     DrawRectangleLines(searchBox.x, searchBox.y, searchBox.width, searchBox.height,
-        creativeSearchFocused ? (Color){200, 200, 200, 235} : (Color){90, 90, 90, 200});
+        creativeSearchFocused ? (Color){255, 255, 255, 255} : (Color){110, 110, 110, 255});
+    if (creativeSearch[0]) {
+        DrawGameText(creativeSearch, gridX + 6, panelY + titleH + 5, 13, (Color){255, 255, 255, 255});
+    } else {
+        DrawGameText(S(STR_CREATIVE_SEARCH), gridX + 6, panelY + titleH + 5, 13, (Color){170, 170, 170, 255});
+    }
 
     static int scrollOffset = 0;
 
