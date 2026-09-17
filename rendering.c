@@ -224,6 +224,45 @@ void DrawUiSlot(int x, int y, int size, bool hover, bool selected, float alpha)
 }
 
 //----------------------------------------------------------------------------------
+// MC-style slider: recessed dark groove with a raised stone knob.
+// Shared by the pause menu and the settings screen so both look identical.
+//----------------------------------------------------------------------------------
+void DrawUiSlider(int x, int y, int w, float value, bool hot, float alpha)
+{
+    if (value < 0.0f) value = 0.0f;
+    if (value > 1.0f) value = 1.0f;
+    int a = (int)(255 * alpha);
+    const int trackH = 8;
+    int ty = y - trackH / 2;
+
+    // Recessed groove: dark top/left inner edge, light bottom/right
+    DrawRectangle(x, ty, w, trackH, (Color){48, 48, 48, (unsigned char)a});
+    DrawRectangle(x, ty, w, 1, (Color){28, 28, 28, (unsigned char)a});
+    DrawRectangle(x, ty, 1, trackH, (Color){28, 28, 28, (unsigned char)a});
+    DrawRectangle(x, ty + trackH - 1, w, 1, (Color){120, 120, 120, (unsigned char)a});
+
+    // Filled portion
+    int fillW = (int)(value * w);
+    if (fillW > 0) {
+        DrawRectangle(x + 1, ty + 1, fillW > 2 ? fillW - 1 : fillW, trackH - 2,
+                      (Color){178, 178, 178, (unsigned char)a});
+    }
+
+    // Raised stone knob (9x18) with a 1px black outline
+    int kx = x + fillW - 4;
+    if (kx < x - 4) kx = x - 4;
+    if (kx > x + w - 5) kx = x + w - 5;
+    int ky = y - 9;
+    DrawRectangle(kx - 1, ky - 1, 11, 20, (Color){0, 0, 0, (unsigned char)a});
+    Color face = hot ? (Color){225, 225, 225, (unsigned char)a} : (Color){190, 190, 190, (unsigned char)a};
+    DrawRectangle(kx, ky, 9, 18, face);
+    DrawRectangle(kx, ky, 9, 2, (Color){240, 240, 240, (unsigned char)a});
+    DrawRectangle(kx, ky, 2, 18, (Color){240, 240, 240, (unsigned char)a});
+    DrawRectangle(kx, ky + 16, 9, 2, (Color){130, 130, 130, (unsigned char)a});
+    DrawRectangle(kx + 7, ky, 2, 18, (Color){130, 130, 130, (unsigned char)a});
+}
+
+//----------------------------------------------------------------------------------
 // Tooltip placement — clamped to the screen and flipped at edges.
 // Every tooltip (hotbar, inventory, creative, chest, armor) uses this so the
 // panel never runs off-screen and behaves consistently near the right/bottom.
@@ -3103,8 +3142,8 @@ void DrawPauseMenu(void)
         DrawRectangle(0, y, SCREEN_WIDTH, 1, (Color){0, 0, 0, (unsigned char)(8 * pauseAnim)});
     }
 
-    int boxW = 420;
-    int boxH = 560;
+    int boxW = 440;
+    int boxH = 452;
     int boxX = (SCREEN_WIDTH - boxW) / 2;
     int boxY = (SCREEN_HEIGHT - boxH) / 2;
     boxY += (int)((1.0f - pauseAnim) * 40.0f);
@@ -3128,16 +3167,14 @@ void DrawPauseMenu(void)
     // --- Volume Sliders ---
     int sliderX = boxX + 30;
     int sliderW = boxW - 90;
-    int sliderY = boxY + 58;
+    int sliderY = boxY + 62;
 
     static int activeSlider = -1;
 
     // BGM Volume
-    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 15, (Color){62, 62, 62, 255});
+    DrawGameText(S(STR_MUSIC_VOLUME), sliderX, sliderY, 15, (Color){235, 235, 235, 255});
     sliderY += 20;
-    Rectangle bgmTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 4.0f };
-    DrawRectangleRec(bgmTrack, (Color){30, 30, 30, 255});
-    Rectangle bgmArea = { (float)(sliderX - 10), (float)(sliderY - 8), (float)(sliderW + 20), 24.0f };
+    Rectangle bgmArea = { (float)(sliderX - 10), (float)(sliderY - 12), (float)(sliderW + 20), 26.0f };
     bool bgmHover = CheckCollisionPointRec(mouse, bgmArea);
 
     if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && bgmHover) activeSlider = 0;
@@ -3148,19 +3185,12 @@ void DrawPauseMenu(void)
         if (bgmVolumeSlider > 1.0f) bgmVolumeSlider = 1.0f;
         SetBGMVolume(bgmVolumeSlider);
     }
-    DrawRectangle(sliderX, sliderY, (int)(bgmVolumeSlider * sliderW), 4, (Color){200, 200, 200, 235});
-    Color bgmHandleColor = (activeSlider == 0 || bgmHover) ? (Color){255, 255, 255, 255} : (Color){200, 200, 200, 235};
-    DrawRectangle((int)(sliderX + bgmVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, bgmHandleColor);
-    char bgmText[16];
-    snprintf(bgmText, sizeof(bgmText), "%d%%", (int)(bgmVolumeSlider * 100));
-    DrawGameText(bgmText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){62, 62, 62, 255});
+    DrawUiSlider(sliderX, sliderY, sliderW, bgmVolumeSlider, activeSlider == 0 || bgmHover, 1.0f);
 
     // SFX Volume
     sliderY += 36;
-    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 15, (Color){62, 62, 62, 255});
+    DrawGameText(S(STR_SFX_VOLUME), sliderX, sliderY, 15, (Color){235, 235, 235, 255});
     sliderY += 20;
-    Rectangle sfxTrack = { (float)sliderX, (float)sliderY, (float)sliderW, 4.0f };
-    DrawRectangleRec(sfxTrack, (Color){30, 30, 30, 255});
     Rectangle sfxArea = { (float)(sliderX - 10), (float)(sliderY - 8), (float)(sliderW + 20), 24.0f };
     bool sfxHover = CheckCollisionPointRec(mouse, sfxArea);
 
@@ -3172,12 +3202,10 @@ void DrawPauseMenu(void)
         if (sfxVolumeSlider > 1.0f) sfxVolumeSlider = 1.0f;
         SetSFXVolume(sfxVolumeSlider);
     }
-    DrawRectangle(sliderX, sliderY, (int)(sfxVolumeSlider * sliderW), 4, (Color){150, 150, 150, 235});
-    Color sfxHandleColor = (activeSlider == 1 || sfxHover) ? (Color){255, 255, 255, 255} : (Color){150, 150, 150, 235};
-    DrawRectangle((int)(sliderX + sfxVolumeSlider * sliderW) - 4, sliderY - 4, 8, 12, sfxHandleColor);
+    DrawUiSlider(sliderX, sliderY, sliderW, sfxVolumeSlider, activeSlider == 1 || sfxHover, 1.0f);
     char sfxText[16];
     snprintf(sfxText, sizeof(sfxText), "%d%%", (int)(sfxVolumeSlider * 100));
-    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){62, 62, 62, 255});
+    DrawGameText(sfxText, sliderX + sliderW + 8, sliderY - 3, 13, (Color){235, 235, 235, 255});
 
     // --- Game Mode Toggle (Survival / Creative) ---
     sliderY += 40;
@@ -3207,31 +3235,34 @@ void DrawPauseMenu(void)
     sliderY += 28 + 8;
 
     // --- Controls ---
-    int ctrlY = sliderY + 36;
+    int ctrlY = sliderY + 30;
     const char *ctrlTitle = S(STR_CONTROLS_TITLE);
-    DrawGameText(ctrlTitle, boxX + (boxW - MeasureGameTextWidth(ctrlTitle, 16)) / 2, ctrlY, 16, (Color){62, 62, 62, 255});
-    ctrlY += 6;
-    DrawRectangle(boxX + 24, ctrlY, boxW - 48, 1, (Color){90, 90, 90, 80});
+    DrawGameText(ctrlTitle, boxX + (boxW - MeasureGameTextWidth(ctrlTitle, 16)) / 2, ctrlY, 16, (Color){235, 235, 235, 255});
+    ctrlY += 8;
+    DrawRectangle(boxX + 24, ctrlY, boxW - 48, 1, (Color){90, 90, 90, 90});
     ctrlY += 14;
 
-    int keyX = boxX + 30;
-    int actX = boxX + 150;
     const char *keys[] = { S(STR_KEY_WASD), S(STR_KEY_SPACE), S(STR_KEY_CTRL), S(STR_KEY_SHIFT), S(STR_KEY_LCLICK), S(STR_KEY_RCLICK), S(STR_KEY_E), S(STR_KEY_H), S(STR_KEY_F3), S(STR_KEY_ESC), S(STR_KEY_19) };
     const char *acts[] = { S(STR_ACT_MOVE), S(STR_ACT_JUMP), S(STR_ACT_SPRINT), S(STR_ACT_SNEAK), S(STR_ACT_BREAK), S(STR_ACT_PLACE), S(STR_ACT_INVENTORY), S(STR_ACT_HEAL), S(STR_ACT_DEBUG), S(STR_ACT_PAUSE), S(STR_ACT_HOTBAR) };
     int numControls = sizeof(keys) / sizeof(keys[0]);
-
+    int halfControls = (numControls + 1) / 2;
+    int ctrlColW = (boxW - 60) / 2;
     for (int i = 0; i < numControls; i++) {
-        DrawGameText(keys[i], keyX, ctrlY, 12, (Color){200, 200, 200, 210});
-        DrawGameText(acts[i], actX, ctrlY, 12, (Color){70, 70, 70, 255});
-        ctrlY += 15;
+        int col = (i < halfControls) ? 0 : 1;
+        int row = (i < halfControls) ? i : i - halfControls;
+        int kx = boxX + 30 + col * ctrlColW;
+        int yy = ctrlY + row * 15;
+        DrawGameText(keys[i], kx, yy, 12, (Color){190, 190, 190, 235});
+        DrawGameText(acts[i], kx + 68, yy, 12, (Color){225, 225, 225, 255});
     }
+    ctrlY += halfControls * 15;
 
     // --- Open to LAN (contextual; hidden for clients who can't host) ---
     if (!NetIsClient()) {
         int lanW = boxW - 60;
         int lanX = boxX + 30;
         int lanH = 30;
-        int lanY = boxY + boxH - 52 - 42;
+        int lanY = ctrlY + 16;
         char lanIp[64];
         NetGetLocalIP(lanIp, sizeof(lanIp));
         if (NetIsHost()) {
@@ -3263,7 +3294,7 @@ void DrawPauseMenu(void)
     {
         int btnW = 110;
         int btnH = 34;
-        int btnY = boxY + boxH - 52;
+        int btnY = ctrlY + (NetIsClient() ? 20 : 60);
         int btnGap = 12;
         int totalBtnW = btnW * 3 + btnGap * 2;
         int btnStartX = boxX + (boxW - totalBtnW) / 2;
@@ -4257,52 +4288,40 @@ void DrawSettingsScreen(void)
     DrawGameText(S(STR_MUSIC_VOLUME), leftX, sectionY, 13, (Color){70, 70, 70, 230});
     int musicSliderX = leftX + MeasureGameTextWidth(S(STR_MUSIC_VOLUME), 13) + 12;
     int musicSliderW = panelX + panelW - 30 - musicSliderX - 45;
-    // Track
-    DrawRectangle(musicSliderX, sectionY + 7, musicSliderW, 4, (Color){30, 30, 30, 220});
-    // Fill
-    extern float bgmVolumeSlider;
-    float bgmVal = bgmVolumeSlider;
-    DrawRectangle(musicSliderX, sectionY + 7, (int)(bgmVal * musicSliderW), 4, (Color){200, 200, 200, 235});
-    DrawRectangle(musicSliderX, sectionY + 7, (int)(bgmVal * musicSliderW), 1, (Color){140, 255, 220, 140});
-    // Handle
-    int handleX = musicSliderX + (int)(bgmVal * musicSliderW);
-    Rectangle bgmHandle = { (float)(handleX - 5), (float)(sectionY - 2), 10, 16 };
-    bool bgmHover = CheckCollisionPointRec(mouse, bgmHandle);
-    DrawRectangle(handleX - 5, sectionY - 2, 10, 16, bgmHover ? (Color){40, 40, 40, 255} : (Color){200, 200, 200, 255});
-    sprintf(volText, "%d%%", (int)(bgmVal * 100));
-    DrawGameText(volText, musicSliderX + musicSliderW + 8, sectionY, 13, (Color){70, 70, 70, 210});
-
-    Rectangle bgmTrack = { (float)musicSliderX, (float)(sectionY - 4), (float)musicSliderW, 26 };
-    if (win32LMB && (bgmHover || CheckCollisionPointRec(mouse, bgmTrack))) {
-        bgmVolumeSlider = (mouse.x - musicSliderX) / (float)musicSliderW;
-        if (bgmVolumeSlider < 0.0f) bgmVolumeSlider = 0.0f;
-        if (bgmVolumeSlider > 1.0f) bgmVolumeSlider = 1.0f;
-        SetBGMVolume(bgmVolumeSlider);
+    {
+        Rectangle bgmTrack = { (float)(musicSliderX - 10), (float)(sectionY - 4), (float)(musicSliderW + 20), 26 };
+        bool bgmHover = CheckCollisionPointRec(mouse, bgmTrack);
+        extern float bgmVolumeSlider;
+        if (win32LMB && bgmHover) {
+            bgmVolumeSlider = (mouse.x - musicSliderX) / (float)musicSliderW;
+            if (bgmVolumeSlider < 0.0f) bgmVolumeSlider = 0.0f;
+            if (bgmVolumeSlider > 1.0f) bgmVolumeSlider = 1.0f;
+            SetBGMVolume(bgmVolumeSlider);
+        }
+        DrawUiSlider(musicSliderX, sectionY + 9, musicSliderW, bgmVolumeSlider, bgmHover, 1.0f);
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d%%", (int)(bgmVolumeSlider * 100));
+        DrawGameText(buf, musicSliderX + musicSliderW + 10, sectionY + 2, 13, (Color){70, 70, 70, 240});
     }
     sectionY += 26;
-
     // SFX Volume
     DrawGameText(S(STR_SOUND_EFFECTS), leftX, sectionY, 13, (Color){70, 70, 70, 230});
     int sfxSliderX = leftX + MeasureGameTextWidth(S(STR_SOUND_EFFECTS), 13) + 12;
     int sfxSliderW = panelX + panelW - 30 - sfxSliderX - 45;
-    DrawRectangle(sfxSliderX, sectionY + 7, sfxSliderW, 4, (Color){30, 30, 30, 220});
-    extern float sfxVolumeSlider;
-    float sfxVal = sfxVolumeSlider;
-    DrawRectangle(sfxSliderX, sectionY + 7, (int)(sfxVal * sfxSliderW), 4, (Color){150, 150, 150, 235});
-    DrawRectangle(sfxSliderX, sectionY + 7, (int)(sfxVal * sfxSliderW), 1, (Color){200, 200, 200, 160});
-    int sfxHandleX = sfxSliderX + (int)(sfxVal * sfxSliderW);
-    Rectangle sfxHandle = { (float)(sfxHandleX - 5), (float)(sectionY - 2), 10, 16 };
-    bool sfxHover = CheckCollisionPointRec(mouse, sfxHandle);
-    DrawRectangle(sfxHandleX - 5, sectionY - 2, 10, 16, sfxHover ? (Color){40, 40, 40, 255} : (Color){190, 190, 190, 255});
-    sprintf(volText, "%d%%", (int)(sfxVal * 100));
-    DrawGameText(volText, sfxSliderX + sfxSliderW + 8, sectionY, 13, (Color){95, 95, 95, 200});
-
-    Rectangle sfxTrack = { (float)sfxSliderX, (float)(sectionY - 4), (float)sfxSliderW, 26 };
-    if (win32LMB && (sfxHover || CheckCollisionPointRec(mouse, sfxTrack))) {
-        sfxVolumeSlider = (mouse.x - sfxSliderX) / (float)sfxSliderW;
-        if (sfxVolumeSlider < 0.0f) sfxVolumeSlider = 0.0f;
-        if (sfxVolumeSlider > 1.0f) sfxVolumeSlider = 1.0f;
-        SetSFXVolume(sfxVolumeSlider);
+    {
+        Rectangle sfxTrack = { (float)(sfxSliderX - 10), (float)(sectionY - 4), (float)(sfxSliderW + 20), 26 };
+        bool sfxHover = CheckCollisionPointRec(mouse, sfxTrack);
+        extern float sfxVolumeSlider;
+        if (win32LMB && sfxHover) {
+            sfxVolumeSlider = (mouse.x - sfxSliderX) / (float)sfxSliderW;
+            if (sfxVolumeSlider < 0.0f) sfxVolumeSlider = 0.0f;
+            if (sfxVolumeSlider > 1.0f) sfxVolumeSlider = 1.0f;
+            SetSFXVolume(sfxVolumeSlider);
+        }
+        DrawUiSlider(sfxSliderX, sectionY + 9, sfxSliderW, sfxVolumeSlider, sfxHover, 1.0f);
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%d%%", (int)(sfxVolumeSlider * 100));
+        DrawGameText(buf, sfxSliderX + sfxSliderW + 10, sectionY + 2, 13, (Color){70, 70, 70, 240});
     }
     sectionY += 26;
 
