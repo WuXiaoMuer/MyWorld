@@ -2593,8 +2593,10 @@ void RemoveLavaAt(int bx, int by)
     int radius = LAVA_MAX_LEVEL + 1;
     int minX = bx - radius, maxX = bx + radius;
     int minY = by - radius, maxY = by + radius;
-    if (minX < 0) minX = 0; if (maxX >= WORLD_WIDTH) maxX = WORLD_WIDTH - 1;
-    if (minY < 0) minY = 0; if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
+    if (minX < 0) minX = 0;
+    if (maxX >= WORLD_WIDTH) maxX = WORLD_WIDTH - 1;
+    if (minY < 0) minY = 0;
+    if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
     for (int x = minX; x <= maxX; x++) for (int y = minY; y <= maxY; y++) {
         if (world[x][y] == BLOCK_LAVA) {
             bool dynamic = lavaSource[x][y] || lavaLevel[x][y] > 0;

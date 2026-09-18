@@ -2551,7 +2551,6 @@ void UpdateGame(float dt)
             }
             // Mouse click on respawn text
             Vector2 mpos = Win32GetMousePosition();
-            const char *rsText = S(STR_PRESS_SPACE_RESPAWN);
             Rectangle rsRect = {
                 (float)(SCREEN_WIDTH - DEATH_RESPAWN_BUTTON_W) / 2.0f,
                 (float)DEATH_RESPAWN_BUTTON_Y,
@@ -2904,28 +2903,28 @@ void UpdateGame(float dt)
                     }
                     // Handle block place from remote player
                     if (input->place) {
-                        int bx = (int)(input->cursorX / BLOCK_SIZE);
-                        int by = (int)(input->cursorY / BLOCK_SIZE);
+                        int placeBx = (int)(input->cursorX / BLOCK_SIZE);
+                        int placeBy = (int)(input->cursorY / BLOCK_SIZE);
                         uint8_t held = (input->selectedSlot < INVENTORY_SLOTS) ? rp->inventory[input->selectedSlot] : BLOCK_AIR;
                         if (held == ITEM_BUCKET || held == ITEM_WATER_BUCKET || held == ITEM_LAVA_BUCKET) {
-                            bool accepted = (held == ITEM_BUCKET)
-                                ? TryUseItemRemote(rp, bx, by, input->cursorX, input->cursorY)
-                                : TryPlaceBlockRemote(rp, bx, by);
-                            if (accepted) {
+                            bool placeOk = (held == ITEM_BUCKET)
+                                ? TryUseItemRemote(rp, placeBx, placeBy, input->cursorX, input->cursorY)
+                                : TryPlaceBlockRemote(rp, placeBx, placeBy);
+                            if (placeOk) {
                                 uint8_t sbuf[NET_PACKET_MAX]; sbuf[0] = PKT_INVENTORY_SYNC;
                                 PktInventorySync ipkt; PackInventorySync(&ipkt, fromId);
                                 memcpy(sbuf + 1, &ipkt, sizeof(ipkt));
                                 NetSendTo(fromId, sbuf, 1 + sizeof(ipkt), true);
                             }
                         } else {
-                            TryPlaceBlockRemote(rp, bx, by);
+                            TryPlaceBlockRemote(rp, placeBx, placeBy);
                         }
                     }
                     // Handle item use from remote player
                     if (input->use) {
-                        int bx = (int)(input->cursorX / BLOCK_SIZE);
-                        int by = (int)(input->cursorY / BLOCK_SIZE);
-                        if (TryUseItemRemote(rp, bx, by, input->cursorX, input->cursorY)) {
+                        int useBx = (int)(input->cursorX / BLOCK_SIZE);
+                        int useBy = (int)(input->cursorY / BLOCK_SIZE);
+                        if (TryUseItemRemote(rp, useBx, useBy, input->cursorX, input->cursorY)) {
                             // Send authoritative inventory back to all clients.
                             uint8_t sbuf[NET_PACKET_MAX];
                             sbuf[0] = PKT_INVENTORY_SYNC;
@@ -3171,7 +3170,6 @@ void UpdateGame(float dt)
                     const PktEnderPearlRequest *req = (const PktEnderPearlRequest *)((const uint8_t *)data + 1);
                     if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
                         Player *rp = &players[fromId];
-                        float saveX = rp->position.x, saveY = rp->position.y;
                         if (TryEnderPearlRemote(rp, req->targetX, req->targetY)) {
                             // Broadcast authoritative inventory
                             uint8_t sbuf[NET_PACKET_MAX];
@@ -3900,6 +3898,7 @@ void DrawGame(void)
         char countMsg[64];
         snprintf(countMsg, sizeof(countMsg), S(STR_HOST_PLAYERS_COUNT), NetGetPlayerCount(), NET_MAX_PLAYERS);
         int countW = MeasureGameTextWidth(countMsg, 20);
+        DrawGameText(countMsg, (SCREEN_WIDTH - countW) / 2, 292, 20, (Color){200, 220, 200, 255});
         const char *startHint = S(STR_HOST_START_HINT);
         DrawUiButton((SCREEN_WIDTH - 300) / 2, 340, 300, 46, startHint, 16,
                      false, true, true, 1.0f);
@@ -4071,8 +4070,6 @@ void DrawGame(void)
 draw_finish:
     if (logicalCanvasReady) {
         EndTextureMode();
-        int outputW = GetScreenWidth();
-        int outputH = GetScreenHeight();
         UpdateLogicalViewport();
         ClearBackground((Color){ 8, 10, 18, 255 });
         Rectangle source = { 0, 0, (float)logicalCanvas.texture.width, -(float)logicalCanvas.texture.height };

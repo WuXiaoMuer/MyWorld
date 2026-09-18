@@ -605,25 +605,34 @@ void DrawFurnaceUI(void)
         Rectangle src = { (float)(furnaceFuel * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)(fuelX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
-        if (furnaceFuelCount > 1)
-            DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 150});
-            DrawGameText(TextFormat("%d", furnaceFuelCount), fuelX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
+        if (furnaceFuelCount > 1) {
+            char cntBuf[12];
+            snprintf(cntBuf, sizeof(cntBuf), "%d", furnaceFuelCount);
+            DrawGameText(cntBuf, fuelX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 200});
+            DrawGameText(cntBuf, fuelX + slotSize - 18, slotY + slotSize - 14, 14, (Color){255, 255, 255, 255});
+        }
     }
     if (furnaceInput != BLOCK_AIR && blockAtlas.id > 0) {
         Rectangle src = { (float)(furnaceInput * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)(inputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
-        if (furnaceInputCount > 1)
-            DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 150});
-            DrawGameText(TextFormat("%d", furnaceInputCount), inputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
+        if (furnaceInputCount > 1) {
+            char cntBuf[12];
+            snprintf(cntBuf, sizeof(cntBuf), "%d", furnaceInputCount);
+            DrawGameText(cntBuf, inputX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 200});
+            DrawGameText(cntBuf, inputX + slotSize - 18, slotY + slotSize - 14, 14, (Color){255, 255, 255, 255});
+        }
     }
     if (furnaceOutput != BLOCK_AIR && blockAtlas.id > 0) {
         Rectangle src = { (float)(furnaceOutput * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { (float)(outputX + 4), (float)(slotY + 4), (float)(slotSize - 8), (float)(slotSize - 8) };
         DrawTexturePro(blockAtlas, src, dst, (Vector2){0, 0}, 0, WHITE);
-        if (furnaceOutputCount > 1)
-            DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 150});
-            DrawGameText(TextFormat("%d", furnaceOutputCount), outputX + slotSize - 18, slotY + slotSize - 14, 10, WHITE);
+        if (furnaceOutputCount > 1) {
+            char cntBuf[12];
+            snprintf(cntBuf, sizeof(cntBuf), "%d", furnaceOutputCount);
+            DrawGameText(cntBuf, outputX + slotSize - 17, slotY + slotSize - 13, 14, (Color){0, 0, 0, 200});
+            DrawGameText(cntBuf, outputX + slotSize - 18, slotY + slotSize - 14, 14, (Color){255, 255, 255, 255});
+        }
     }
 
     // Progress arrow between input and output

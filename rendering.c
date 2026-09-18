@@ -938,15 +938,15 @@ void DrawInventoryScreen(void)
 
         // Snapshot chest contents at the start of the frame so we can detect
         // modifications and sync them to the host in multiplayer.
-        uint8_t snapItems[CHEST_SLOTS];
-        int snapCounts[CHEST_SLOTS];
-        int snapDur[CHEST_SLOTS];
-        uint16_t snapEnch[CHEST_SLOTS];
+        uint8_t chestSnapItems[CHEST_SLOTS];
+        int chestSnapCounts[CHEST_SLOTS];
+        int chestSnapDur[CHEST_SLOTS];
+        uint16_t chestSnapEnch[CHEST_SLOTS];
         if (chestIdx >= 0) {
-            memcpy(snapItems, chestData[chestIdx].items, sizeof(snapItems));
-            memcpy(snapCounts, chestData[chestIdx].counts, sizeof(snapCounts));
-            memcpy(snapDur, chestData[chestIdx].durability, sizeof(snapDur));
-            memcpy(snapEnch, chestData[chestIdx].enchantments, sizeof(snapEnch));
+            memcpy(chestSnapItems, chestData[chestIdx].items, sizeof(chestSnapItems));
+            memcpy(chestSnapCounts, chestData[chestIdx].counts, sizeof(chestSnapCounts));
+            memcpy(chestSnapDur, chestData[chestIdx].durability, sizeof(chestSnapDur));
+            memcpy(chestSnapEnch, chestData[chestIdx].enchantments, sizeof(chestSnapEnch));
         }
 
         int chestRows = 3;
@@ -1233,10 +1233,10 @@ void DrawInventoryScreen(void)
         // If this client modified the chest this frame, push changes to the host.
         // If we are the host, broadcast changes to watching clients.
         if (chestIdx >= 0 && NetIsConnected()) {
-            if (memcmp(snapItems, chestData[chestIdx].items, sizeof(snapItems)) != 0 ||
-                memcmp(snapCounts, chestData[chestIdx].counts, sizeof(snapCounts)) != 0 ||
-                memcmp(snapDur, chestData[chestIdx].durability, sizeof(snapDur)) != 0 ||
-                memcmp(snapEnch, chestData[chestIdx].enchantments, sizeof(snapEnch)) != 0) {
+            if (memcmp(chestSnapItems, chestData[chestIdx].items, sizeof(chestSnapItems)) != 0 ||
+                memcmp(chestSnapCounts, chestData[chestIdx].counts, sizeof(chestSnapCounts)) != 0 ||
+                memcmp(chestSnapDur, chestData[chestIdx].durability, sizeof(chestSnapDur)) != 0 ||
+                memcmp(chestSnapEnch, chestData[chestIdx].enchantments, sizeof(chestSnapEnch)) != 0) {
                 if (NetIsClient()) SyncChestToHost(chestIdx);
                 else if (NetIsHost()) SyncChestToAll(chestIdx);
             }
@@ -2445,7 +2445,6 @@ void DrawRemotePlayers(void)
 
         float centerX = px + PLAYER_WIDTH / 2.0f;
         float footY = bobY + PLAYER_HEIGHT;
-        int torsoY = (int)(bobY + 10);
 
         // Shadow
         DrawEllipse((int)centerX, (int)footY, 8, 3, (Color){0, 0, 0, 50});
@@ -2529,7 +2528,6 @@ void DrawPlayerSprite(void)
     float bobY = py - sneakShrink + breath + landSquash;
 
     // Held item wobble + rotation
-    float itemBob = moving ? cosf(walkT + 1.2f) * 0.3f : 0;
     float itemAngle = moving ? sinf(walkT) * (sprinting ? 10.0f : 8.0f) : 0;
 
     // Sprint dust is spawned by PlayerPhysics, not here (avoid duplicates)
@@ -2630,8 +2628,7 @@ void DrawPlayerSprite(void)
     int slotItem = player.inventory[player.selectedSlot];
     if (slotItem != BLOCK_AIR && slotItem < BLOCK_COUNT && blockAtlas.id > 0) {
         int itemSize = 13;
-        float frontArmDY = -armShift + airArm + swing;
-        float itemX, itemY;
+        float itemX, itemY;   // frontArmDY from the arm pass above
         if (facing) {
             itemX = px + 11 + itemSize * 0.5f;
             itemY = bobY + 5 + frontArmDY + itemSize * 0.5f;
@@ -3747,8 +3744,6 @@ void DrawMainMenu(void)
 
     // Menu entrance animation state
     static float menuEnterTime = 0.0f;
-    static float dustX[80], dustY[80], dustSpeed[80], dustSize[80];
-    static float cloudX[6], cloudW[6], cloudY[6];
     static bool menuInited = false;
     extern bool g_resetMenuAnim;
     if (g_resetMenuAnim) {
@@ -3757,17 +3752,6 @@ void DrawMainMenu(void)
     }
     if (!menuInited) {
         menuEnterTime = time;
-        for (int i = 0; i < 80; i++) {
-            dustX[i] = (float)(rand() % SCREEN_WIDTH);
-            dustY[i] = (float)(rand() % SCREEN_HEIGHT);
-            dustSpeed[i] = 5.0f + (float)(rand() % 15);
-            dustSize[i] = 1.0f + (float)(rand() % 3);
-        }
-        for (int i = 0; i < 5; i++) {
-            cloudX[i] = (float)(rand() % (SCREEN_WIDTH + 200) - 100);
-            cloudW[i] = 70.0f + (float)(rand() % 100);
-            cloudY[i] = 50.0f + (float)(rand() % 100);
-        }
         menuInited = true;
     }
     float elapsed = time - menuEnterTime;
@@ -3993,7 +3977,6 @@ void DrawMainMenu(void)
 //----------------------------------------------------------------------------------
 void DrawSlotSelectScreen(void)
 {
-    float time = (float)GetTime();
 
     // Background: flat MC dark backdrop
     DrawDirtBackground(40);
@@ -4001,7 +3984,6 @@ void DrawSlotSelectScreen(void)
     // ---- Layout: size the panel to its content and center it ----
     int slotW = 360, slotH = 78;
     int spacing = 88;
-    int backH = 30;
     int isNew = (slotSelectMode == 0);
 
     int titleH   = 92;                       // title + subtitle block
@@ -4013,7 +3995,6 @@ void DrawSlotSelectScreen(void)
     int panelY   = (SCREEN_HEIGHT - panelH) / 2;
     DrawUiPanel(panelX, panelY, panelW, panelH, 255);
 
-    int contentW = panelW - 56;
     int contentX = panelX + 28;
     int slotX    = panelX + (panelW - slotW) / 2;
 
@@ -4259,7 +4240,6 @@ void DrawConfirmDialog(void)
 void DrawSettingsScreen(void)
 {
     // Background: flat MC dark backdrop
-    float stime = (float)GetTime();
     DrawDirtBackground(40);
 
     // Title — white with a full dark outline so it reads on the dirt backdrop
@@ -4291,7 +4271,6 @@ void DrawSettingsScreen(void)
     DrawRectangle(panelX + 12, panelY, panelW - 24, 1, (Color){255, 255, 255, 16});
     int leftX = panelX + 30;
     int rightX = panelX + panelW / 2 + 10;
-    char volText[16];
 
     // ============================================================
     // Section: Audio
@@ -4693,10 +4672,11 @@ void DrawChatUI(void)
         ChatMessage *cm = &chatHistory[i];
         if (!chatOpen && cm->timer <= 0.0f) continue;
         const char *name = "System";
-        Color nameColor = (Color){200, 200, 200, 255};
         bool isPlayer = cm->playerId < MAX_NET_PLAYERS;
+        Color nameColor = (Color){170, 170, 170, 255};   // system messages
         if (isPlayer) {
             name = players[cm->playerId].playerName;
+            // Own messages green, other players blue (MC chat convention)
             if (cm->playerId == localPlayerId) nameColor = (Color){100, 220, 100, 255};
             else nameColor = (Color){100, 180, 220, 255};
         }
@@ -4750,7 +4730,19 @@ void DrawChatUI(void)
         for (int li = lineCount - 1; li >= 0 && shown < maxVisible; li--, shown++) {
             int ly = y - shown * lineH;
             DrawRectangle(x, ly, w, lineH, (Color){0, 0, 0, (unsigned char)(140 * alpha / 255)});
-            DrawGameText(lines[li], x + 4, ly + 2, 14, (Color){230, 230, 230, (unsigned char)alpha});
+            // First line carries the coloured "<name>: " prefix, the rest is body text
+            if (li == 0 && isPlayer) {
+                int nameW = MeasureGameTextWidth(name, 14);
+                DrawGameText(name, x + 4, ly + 2, 14, (Color){nameColor.r, nameColor.g, nameColor.b, (unsigned char)alpha});
+                DrawGameText(":", x + 4 + nameW, ly + 2, 14, (Color){200, 200, 200, (unsigned char)alpha});
+                // Body starts after the "name: " prefix produced above
+                const char *body = lines[li];
+                int prefixLen = (int)strlen(name) + 2;   // name + ": "
+                if ((int)strlen(body) >= prefixLen) body += prefixLen;
+                DrawGameText(body, x + 10 + nameW, ly + 2, 14, (Color){230, 230, 230, (unsigned char)alpha});
+            } else {
+                DrawGameText(lines[li], x + 4, ly + 2, 14, (Color){230, 230, 230, (unsigned char)alpha});
+            }
         }
     }
 
