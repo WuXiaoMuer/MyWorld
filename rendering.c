@@ -4034,10 +4034,10 @@ void DrawMainMenu(void)
     // Buttons — Minecraft-style chunky gray buttons
     // ================================================================
     // These MUST match game.c UpdateMainMenu exactly
-    int btnW = 280, btnH = 46;
+    int btnW = 260, btnH = 42;
     int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = 225;
-    int spacing = 66;
+    int btnY = 196;
+    int spacing = 58;
     float btnDelay0 = titleTotalDur + 0.15f;
 
     Vector2 mouse = Win32GetMousePosition();
