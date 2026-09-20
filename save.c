@@ -239,9 +239,9 @@ bool SaveWorld(const char *path)
     for (int x = 0; x < WORLD_WIDTH && ok; x++) {
         int y = 0;
         while (y < WORLD_HEIGHT && ok) {
-            uint8_t block = world[x][y];
+            uint8_t block = GetBlock(x, y);
             uint16_t count = 1;
-            while (y + count < WORLD_HEIGHT && world[x][y + count] == block && count < 65535) {
+            while (y + count < WORLD_HEIGHT && GetBlock(x, y + count) == block && count < 65535) {
                 count++;
             }
             ok = ok && fwrite(&block, sizeof(uint8_t), 1, f) == 1;
@@ -275,11 +275,11 @@ bool SaveWorld(const char *path)
         uint32_t cropN = 0;
         for (int x = 0; x < WORLD_WIDTH; x++)
             for (int y = 0; y < WORLD_HEIGHT; y++)
-                if (world[x][y] == BLOCK_CROPS) cropN++;
+                if (GetBlock(x, y) == BLOCK_CROPS) cropN++;
         ok = ok && fwrite(&cropN, sizeof(uint32_t), 1, f) == 1;
         for (int x = 0; x < WORLD_WIDTH && ok; x++) {
             for (int y = 0; y < WORLD_HEIGHT && ok; y++) {
-                if (world[x][y] != BLOCK_CROPS) continue;
+                if (GetBlock(x, y) != BLOCK_CROPS) continue;
                 uint16_t cx = (uint16_t)x, cy = (uint16_t)y;
                 uint8_t g = (uint8_t)GetCropGrowth(x, y);
                 ok = ok && fwrite(&cx, sizeof(uint16_t), 1, f) == 1;
@@ -626,7 +626,7 @@ bool LoadWorld(const char *path)
             if (fread(&block, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
             if (fread(&count, sizeof(uint16_t), 1, f) != 1) { fclose(f); return false; }
             for (int i = 0; i < count && y + i < WORLD_HEIGHT; i++) {
-                world[x][y + i] = block;
+                SetBlock(x, y + i, block);
             }
             y += count > 0 ? count : 1;
         }
@@ -653,7 +653,7 @@ bool LoadWorld(const char *path)
             GenerateWorld(worldSeed);
             for (int x = 0; x < WORLD_WIDTH && modifiedBlockCount < MAX_MODIFIED_BLOCKS; x++) {
                 for (int y = 0; y < WORLD_HEIGHT && modifiedBlockCount < MAX_MODIFIED_BLOCKS; y++) {
-                    if (savedWorld[x][y] != world[x][y]) {
+                    if (savedWorld[x][y] != GetBlock(x, y)) {
                         modifiedBlocks[modifiedBlockCount].x = (uint16_t)x;
                         modifiedBlocks[modifiedBlockCount].y = (uint16_t)y;
                         modifiedBlocks[modifiedBlockCount].blockType = savedWorld[x][y];
@@ -699,8 +699,8 @@ bool LoadWorld(const char *path)
     // Historical formats had no source/level metadata, so do not guess dynamic sources.
     if (version < 16) {
         for (int x = 0; x < WORLD_WIDTH; x++) for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_WATER) RestoreFluidState(x, y, BLOCK_WATER, BLOCK_WATER, 7, false);
-            else if (world[x][y] == BLOCK_LAVA) RestoreFluidState(x, y, BLOCK_LAVA, BLOCK_LAVA, 5, false);
+            if (GetBlock(x, y) == BLOCK_WATER) RestoreFluidState(x, y, BLOCK_WATER, BLOCK_WATER, 7, false);
+            else if (GetBlock(x, y) == BLOCK_LAVA) RestoreFluidState(x, y, BLOCK_LAVA, BLOCK_LAVA, 5, false);
         }
     }
 

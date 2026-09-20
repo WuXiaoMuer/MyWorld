@@ -4571,13 +4571,13 @@ void UpdateChunks(void)
 uint8_t GetBlock(int x, int y)
 {
     if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return BLOCK_AIR;
-    return GetBlock(x, y);
+    return world[x][y];
 }
 
 void SetBlock(int x, int y, uint8_t type)
 {
     if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return;
-    SetBlock(x, y, type);
+    world[x][y] = type;
 }
 
 bool IsBlockSolid(int bx, int by)

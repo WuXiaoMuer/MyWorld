@@ -10,7 +10,7 @@ static int queueLevel[LIGHT_QUEUE_SIZE];
 static bool IsTransparent(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return true;
-    uint8_t block = world[bx][by];
+    uint8_t block = GetBlock(bx, by);
     return block == BLOCK_AIR || block == BLOCK_WATER || block == BLOCK_LAVA || block == BLOCK_TORCH ||
            block == BLOCK_FLOWER || block == BLOCK_TALL_GRASS || block == BLOCK_GLASS ||
            block == BLOCK_LANTERN || block == BLOCK_REDSTONE_WIRE ||
@@ -114,9 +114,9 @@ void RemoveLight(int startX, int startY)
     for (int x = startX - radius; x <= startX + radius; x++) {
         for (int y = startY - radius; y <= startY + radius; y++) {
             if (x >= 0 && x < WORLD_WIDTH && y >= 0 && y < WORLD_HEIGHT) {
-                if (world[x][y] == BLOCK_TORCH || world[x][y] == BLOCK_LANTERN) {
+                if (GetBlock(x, y) == BLOCK_TORCH || GetBlock(x, y) == BLOCK_LANTERN) {
                     PropagateLight(x, y, TORCH_LIGHT);
-                } else if (world[x][y] == BLOCK_REDSTONE_LAMP && IsRedstoneLampPowered(x, y)) {
+                } else if (GetBlock(x, y) == BLOCK_REDSTONE_LAMP && IsRedstoneLampPowered(x, y)) {
                     PropagateLight(x, y, 12);
                 }
             }
@@ -148,9 +148,9 @@ void RecalculateAllLight(void)
     // Second pass: propagate torch light and powered redstone lamps
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_TORCH || world[x][y] == BLOCK_LANTERN) {
+            if (GetBlock(x, y) == BLOCK_TORCH || GetBlock(x, y) == BLOCK_LANTERN) {
                 PropagateLight(x, y, TORCH_LIGHT);
-            } else if (world[x][y] == BLOCK_REDSTONE_LAMP && IsRedstoneLampPowered(x, y)) {
+            } else if (GetBlock(x, y) == BLOCK_REDSTONE_LAMP && IsRedstoneLampPowered(x, y)) {
                 PropagateLight(x, y, 12);
             }
         }

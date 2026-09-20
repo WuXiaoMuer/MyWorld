@@ -2298,7 +2298,7 @@ void DrawFireEffects(float dt)
 
     for (int bx = minBX; bx <= maxBX; bx++) {
         for (int by = minBY; by <= maxBY; by++) {
-            uint8_t block = world[bx][by];
+            uint8_t block = GetBlock(bx, by);
             bool isFire = (block == BLOCK_TORCH || block == BLOCK_LANTERN);
             bool isLava = (block == BLOCK_LAVA);
             if (!isFire && !isLava) continue;
@@ -2384,7 +2384,7 @@ void DrawWater(void)
             if (waterTop < 0) continue;
 
             for (int by = waterTop; by <= maxBY; by++) {
-                if (world[wx][by] != BLOCK_WATER) break;
+                if (GetBlock(wx, by) != BLOCK_WATER) break;
                 float wave = sinf(wx * 0.5f + time * 2.0f) * 1.5f;
                 Color wc = ApplyLighting(blockInfo[BLOCK_WATER].baseColor, wx, by);
                 DrawRectangle(wx * BLOCK_SIZE, (int)(by * BLOCK_SIZE + wave), BLOCK_SIZE, BLOCK_SIZE, wc);
@@ -3003,7 +3003,7 @@ void DrawCrosshair(void)
 
         // Block placement preview (ghost block)
         int selItem = player.inventory[player.selectedSlot];
-        BlockType cursorBlock = (BlockType)world[blockX][blockY];
+        BlockType cursorBlock = (BlockType)GetBlock(blockX, blockY);
         float playerCX = player.position.x + PLAYER_WIDTH / 2.0f;
         float playerCY = player.position.y + PLAYER_HEIGHT / 2.0f;
         float distBlocks = sqrtf(powf((blockX * BLOCK_SIZE + BLOCK_SIZE / 2.0f) - playerCX, 2) +
@@ -3029,7 +3029,7 @@ void DrawCrosshair(void)
             Color bgRing = { 0, 0, 0, 100 };
             DrawRing(center, innerR, outerR, 0, 360, segs, bgRing);
             BlockType heldTool = (BlockType)player.inventory[player.selectedSlot];
-            BlockType minedBlock = (BlockType)world[mBlockX][mBlockY];
+            BlockType minedBlock = (BlockType)GetBlock(mBlockX, mBlockY);
             float speed = GetToolMiningSpeed(heldTool, minedBlock);
             Color arcColor;
             if (speed >= 3.0f) arcColor = (Color){60, 220, 60, 240};
@@ -3538,14 +3538,14 @@ void DrawMinimap(void)
         // Find first non-air block
         int surfaceY = -1;
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[worldBX][y] != BLOCK_AIR) {
+            if (GetBlock(worldBX, y) != BLOCK_AIR) {
                 surfaceY = y;
                 break;
             }
         }
         if (surfaceY < 0) continue;
 
-        BlockType bt = (BlockType)world[worldBX][surfaceY];
+        BlockType bt = (BlockType)GetBlock(worldBX, surfaceY);
         Color c = {100, 100, 100, 255};
         if (bt == BLOCK_GRASS) c = (Color){92, 165, 64, 255};
         else if (bt == BLOCK_DIRT) c = (Color){146, 104, 61, 255};
@@ -3662,7 +3662,7 @@ void DrawLargeMap(void)
             int worldBY = playerBY + (py - mapH / 2) * rangeY / (mapH / 2);
             if (worldBY < 0 || worldBY >= WORLD_HEIGHT) continue;
 
-            uint8_t bt = world[worldBX][worldBY];
+            uint8_t bt = GetBlock(worldBX, worldBY);
             if (bt == BLOCK_AIR) continue;
 
             Color c = {0, 0, 0, 0};

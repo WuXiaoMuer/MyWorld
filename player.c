@@ -20,19 +20,19 @@ static void FindSpawnPoint(int *outX, int *outY)
             if (x < 0 || x >= WORLD_WIDTH) continue;
             // Check surface block - must be grass (land), not water
             for (int y = 0; y < WORLD_HEIGHT - 5; y++) {
-                if (world[x][y] == BLOCK_GRASS) {
+                if (GetBlock(x, y) == BLOCK_GRASS) {
                     *outX = x;
                     *outY = y - 3;
                     return;
                 }
-                if (world[x][y] == BLOCK_WATER) break; // skip water columns
+                if (GetBlock(x, y) == BLOCK_WATER) break; // skip water columns
             }
         }
     }
     // Fallback: find any grass block
     for (int x = 0; x < WORLD_WIDTH; x += 16) {
         for (int y = 0; y < WORLD_HEIGHT - 5; y++) {
-            if (world[x][y] == BLOCK_GRASS) {
+            if (GetBlock(x, y) == BLOCK_GRASS) {
                 *outX = x;
                 *outY = y - 3;
                 return;
@@ -872,7 +872,7 @@ void PlayerBlockInteraction(void)
     }
 
     BlockType selectedTool = (BlockType)player.inventory[player.selectedSlot];
-    float toolSpeed = GetToolMiningSpeed(selectedTool, (BlockType)world[blockX][blockY]);
+    float toolSpeed = GetToolMiningSpeed(selectedTool, (BlockType)GetBlock(blockX, blockY));
 
     // Hold left to mine / attack mobs
     if (win32LMB) {
@@ -949,7 +949,7 @@ void PlayerBlockInteraction(void)
             }
         }
 
-        BlockType bt = (BlockType)world[blockX][blockY];
+        BlockType bt = (BlockType)GetBlock(blockX, blockY);
         if (bt != BLOCK_AIR && bt != BLOCK_WATER && blockInfo[bt].breakable) {
             // Reset progress if target changed
             static float lastParticleThreshold = 0.0f;
@@ -991,7 +991,7 @@ void PlayerBlockInteraction(void)
                     }
                 }
                 ClearFluidStateAt(blockX, blockY);
-                world[blockX][blockY] = BLOCK_AIR;
+                SetBlock(blockX, blockY, BLOCK_AIR);
                 NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                 if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
                 SpawnBlockParticles(blockX, blockY, bt);
@@ -1115,7 +1115,7 @@ void PlayerBlockInteraction(void)
         }
 
         if (blockX >= 0 && blockX < WORLD_WIDTH && blockY >= 0 && blockY < WORLD_HEIGHT) {
-            if (world[blockX][blockY] == BLOCK_BED) {
+            if (GetBlock(blockX, blockY) == BLOCK_BED) {
                 // Check for nearby hostile mobs
                 bool mobsNearby = false;
                 float bcx = blockX * BLOCK_SIZE + BLOCK_SIZE / 2.0f;
@@ -1151,7 +1151,7 @@ void PlayerBlockInteraction(void)
                 return;
             }
             // Interact with crafting table
-            if (world[blockX][blockY] == BLOCK_CRAFTING_TABLE) {
+            if (GetBlock(blockX, blockY) == BLOCK_CRAFTING_TABLE) {
                 inventoryOpen = true;
                 craftingTableOpen = true;
                 gamePaused = false;
@@ -1159,29 +1159,29 @@ void PlayerBlockInteraction(void)
                 return;
             }
             // Interact with furnace
-            if (world[blockX][blockY] == BLOCK_FURNACE) {
+            if (GetBlock(blockX, blockY) == BLOCK_FURNACE) {
                 RequestOpenFurnace(blockX, blockY);
                 return;
             }
             // Interact with chest
-            if (world[blockX][blockY] == BLOCK_CHEST) {
+            if (GetBlock(blockX, blockY) == BLOCK_CHEST) {
                 RequestOpenChest(blockX, blockY);
                 return;
             }
             // Toggle lever
-            if (world[blockX][blockY] == BLOCK_LEVER) {
+            if (GetBlock(blockX, blockY) == BLOCK_LEVER) {
                 ToggleLever(blockX, blockY);
                 PlaySoundUIClick();
                 return;
             }
             // Ignite TNT (right-click lights the fuse)
-            if (world[blockX][blockY] == BLOCK_TNT) {
+            if (GetBlock(blockX, blockY) == BLOCK_TNT) {
                 PrimeTnt(blockX, blockY);
                 ShowMessage(S(STR_BLOCK_TNT), (Color){255, 120, 80, 255});
                 return;
             }
             // Enchanting table interaction
-            if (world[blockX][blockY] == BLOCK_ENCHANTING_TABLE) {
+            if (GetBlock(blockX, blockY) == BLOCK_ENCHANTING_TABLE) {
                 if (IsTool(selectedTool) || IsArmor(selectedTool)) {
                     int slot = player.selectedSlot;
                     // Check if already enchanted
@@ -1196,7 +1196,7 @@ void PlayerBlockInteraction(void)
                             if (dx == 0 && dy == 0) continue;
                             int nx = blockX + dx, ny = blockY + dy;
                             if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
-                                if (world[nx][ny] == BLOCK_BOOKSHELF) bookshelfCount++;
+                                if (GetBlock(nx, ny) == BLOCK_BOOKSHELF) bookshelfCount++;
                             }
                         }
                     }
@@ -1477,7 +1477,7 @@ void PlayerBlockInteraction(void)
         }
 
         // Cauldron interaction
-        if (world[blockX][blockY] == BLOCK_CAULDRON) {
+        if (GetBlock(blockX, blockY) == BLOCK_CAULDRON) {
             if (NetIsClient()) {
                 // Send cauldron interaction to host
                 uint8_t buf[64];
@@ -1534,7 +1534,7 @@ void PlayerBlockInteraction(void)
 
         // Water bucket: place water source
         if (selectedTool == ITEM_WATER_BUCKET) {
-            if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
+            if (GetBlock(blockX, blockY) == BLOCK_AIR || GetBlock(blockX, blockY) == BLOCK_WATER) {
                 SetWaterSource(blockX, blockY);
                 if (gameMode != GAME_CREATIVE) {
                     if (player.inventoryCount[player.selectedSlot] > 1) {
@@ -1552,7 +1552,7 @@ void PlayerBlockInteraction(void)
         }
         // Empty bucket: collect water or lava
         if (selectedTool == ITEM_BUCKET) {
-            if (world[blockX][blockY] == BLOCK_WATER) {
+            if (GetBlock(blockX, blockY) == BLOCK_WATER) {
                 RemoveWaterAt(blockX, blockY);
                 if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_WATER_BUCKET;
                 PlaySoundPlace(BLOCK_WATER);
@@ -1560,7 +1560,7 @@ void PlayerBlockInteraction(void)
                 InvalidateChunkAt(blockX, blockY);
                 return;
             }
-            if (world[blockX][blockY] == BLOCK_LAVA) {
+            if (GetBlock(blockX, blockY) == BLOCK_LAVA) {
                 RemoveLavaAt(blockX, blockY);
                 if (gameMode != GAME_CREATIVE) player.inventory[player.selectedSlot] = ITEM_LAVA_BUCKET;
                 PlaySoundPlace(BLOCK_LAVA);
@@ -1571,8 +1571,8 @@ void PlayerBlockInteraction(void)
         }
         // Lava bucket: place lava source
         if (selectedTool == ITEM_LAVA_BUCKET) {
-            if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
-                if (world[blockX][blockY] == BLOCK_WATER) RemoveWaterAt(blockX, blockY);
+            if (GetBlock(blockX, blockY) == BLOCK_AIR || GetBlock(blockX, blockY) == BLOCK_WATER) {
+                if (GetBlock(blockX, blockY) == BLOCK_WATER) RemoveWaterAt(blockX, blockY);
                 SetLavaSource(blockX, blockY);
                 if (gameMode != GAME_CREATIVE) {
                     if (player.inventoryCount[player.selectedSlot] > 1) {
@@ -1666,8 +1666,8 @@ void PlayerBlockInteraction(void)
 
         // Hoe: till dirt into farmland
         if (IsHoe(selectedTool)) {
-            if (world[blockX][blockY] == BLOCK_DIRT || world[blockX][blockY] == BLOCK_GRASS) {
-                world[blockX][blockY] = BLOCK_FARMLAND;
+            if (GetBlock(blockX, blockY) == BLOCK_DIRT || GetBlock(blockX, blockY) == BLOCK_GRASS) {
+                SetBlock(blockX, blockY, BLOCK_FARMLAND);
                 NetSyncBlockChange(blockX, blockY, BLOCK_FARMLAND);
                 PlaySoundPlace(BLOCK_DIRT);
                 UpdateLightAt(blockX, blockY);
@@ -1688,8 +1688,8 @@ void PlayerBlockInteraction(void)
 
         // Seeds: plant on farmland
         if (selectedTool == ITEM_WHEAT_SEEDS) {
-            if (world[blockX][blockY] == BLOCK_FARMLAND && blockY > 0 && world[blockX][blockY - 1] == BLOCK_AIR) {
-                world[blockX][blockY - 1] = BLOCK_CROPS;
+            if (GetBlock(blockX, blockY) == BLOCK_FARMLAND && blockY > 0 && GetBlock(blockX, blockY - 1) == BLOCK_AIR) {
+                SetBlock(blockX, blockY - 1, BLOCK_CROPS);
                 SetCropGrowth(blockX, blockY - 1, 0); // fresh plant starts at stage 0
                 RegisterCrop(blockX, blockY - 1);     // track for growth (see UpdateCrops)
                 NetSyncBlockChange(blockX, blockY - 1, BLOCK_CROPS);
@@ -1711,7 +1711,7 @@ void PlayerBlockInteraction(void)
         if (selectedTool >= BLOCK_COUNT || !blockInfo[selectedTool].breakable) return; // Can't place non-block items
         // Creative mode: can place from the palette even with an empty slot (infinite blocks)
         if (selectedTool != BLOCK_AIR && (player.inventoryCount[player.selectedSlot] > 0 || gameMode == GAME_CREATIVE)) {
-            if (world[blockX][blockY] == BLOCK_AIR || world[blockX][blockY] == BLOCK_WATER) {
+            if (GetBlock(blockX, blockY) == BLOCK_AIR || GetBlock(blockX, blockY) == BLOCK_WATER) {
                 float bLeft = blockX * BLOCK_SIZE;
                 float bRight = bLeft + BLOCK_SIZE;
                 float bTop = blockY * BLOCK_SIZE;
@@ -1723,9 +1723,9 @@ void PlayerBlockInteraction(void)
                 float pBottom = pTop + PLAYER_HEIGHT;
 
                 if (!(pRight > bLeft && pLeft < bRight && pBottom > bTop && pTop < bBottom)) {
-                    bool wasWater = (world[blockX][blockY] == BLOCK_WATER);
+                    bool wasWater = (GetBlock(blockX, blockY) == BLOCK_WATER);
                     if (wasWater) RemoveWaterAt(blockX, blockY);
-                    world[blockX][blockY] = selectedTool;
+                    SetBlock(blockX, blockY, selectedTool);
                     NetSyncBlockChange(blockX, blockY, selectedTool);
                     if (selectedTool == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(blockX, blockY);
                     // Creative mode: infinite blocks, don't consume
@@ -1751,12 +1751,12 @@ void PlayerBlockInteraction(void)
                     // Gravity: sand/gravel falls when placed
                     if (IsGravityBlock(selectedTool)) {
                         ClearFluidStateAt(blockX, blockY);
-                world[blockX][blockY] = BLOCK_AIR;
+                SetBlock(blockX, blockY, BLOCK_AIR);
                         NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                         int landY = blockY;
                         // Search downward for landing spot
-                        while (landY < WORLD_HEIGHT - 1 && (world[blockX][landY + 1] == BLOCK_AIR || world[blockX][landY + 1] == BLOCK_WATER)) landY++;
-                        world[blockX][landY] = selectedTool;
+                        while (landY < WORLD_HEIGHT - 1 && (GetBlock(blockX, landY + 1) == BLOCK_AIR || GetBlock(blockX, landY + 1) == BLOCK_WATER)) landY++;
+                        SetBlock(blockX, landY, selectedTool);
                         NetSyncBlockChange(blockX, landY, selectedTool);
                         InvalidateChunkAt(blockX, blockY);
                         InvalidateChunkAt(blockX, landY);
@@ -1961,7 +1961,7 @@ bool IsPlayerUnderwater(void)
     int bx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
     int by = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
-    return world[bx][by] == BLOCK_WATER;
+    return GetBlock(bx, by) == BLOCK_WATER;
 }
 
 void UpdatePlayerStatus(float dt)
@@ -2016,7 +2016,7 @@ void UpdatePlayerStatus(float dt)
     {
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
-        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_LAVA && gameMode != GAME_CREATIVE) {
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && GetBlock(pbx, pby) == BLOCK_LAVA && gameMode != GAME_CREATIVE) {
             player.lavaDamageAccum += 4.0f * dt;
             int damage = (int)player.lavaDamageAccum;
             if (damage > 0) {
@@ -2041,7 +2041,7 @@ void UpdatePlayerStatus(float dt)
         static float cactusTimer = 0.0f;
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
-        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && world[pbx][pby] == BLOCK_CACTUS && gameMode != GAME_CREATIVE) {
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && GetBlock(pbx, pby) == BLOCK_CACTUS && gameMode != GAME_CREATIVE) {
             cactusTimer += dt;
             if (cactusTimer >= 0.5f) {
                 cactusTimer = 0.0f;
@@ -2153,7 +2153,7 @@ void RespawnPlayer(void)
     bool bedValid = false;
     if (player.spawnX >= 0 && player.spawnY >= 0 &&
         player.spawnX < WORLD_WIDTH && player.spawnY + 1 < WORLD_HEIGHT &&
-        world[player.spawnX][player.spawnY + 1] == BLOCK_BED) {
+        GetBlock(player.spawnX, player.spawnY + 1) == BLOCK_BED) {
         // Check if spawn area is clear (2-block space above bed)
         bool clear = true;
         for (int bx = player.spawnX; bx < player.spawnX + 1 && clear; bx++) {

@@ -352,7 +352,7 @@ void InitGame(void)
         cauldronCount = 0;
         for (int x = 0; x < WORLD_WIDTH && cauldronCount < MAX_CAULDRONS; x++) {
             for (int y = 0; y < WORLD_HEIGHT; y++) {
-                if (world[x][y] == BLOCK_CAULDRON) {
+                if (GetBlock(x, y) == BLOCK_CAULDRON) {
                     // Only pick up the first few (topmost if stacked)
                     int idx = cauldronCount++;
                     cauldrons[idx].x = x;
@@ -1324,7 +1324,7 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
 
     // Bucket special cases
     if (item == ITEM_WATER_BUCKET) {
-        if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
+        if (GetBlock(bx, by) != BLOCK_AIR && GetBlock(bx, by) != BLOCK_WATER) return false;
         SetWaterSource(bx, by);
         if (gameMode != GAME_CREATIVE) {
             if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
@@ -1334,8 +1334,8 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
         return true;
     }
     if (item == ITEM_LAVA_BUCKET) {
-        if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
-        if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
+        if (GetBlock(bx, by) != BLOCK_AIR && GetBlock(bx, by) != BLOCK_WATER) return false;
+        if (GetBlock(bx, by) == BLOCK_WATER) RemoveWaterAt(bx, by);
         SetLavaSource(bx, by);
         if (gameMode != GAME_CREATIVE) {
             if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
@@ -1349,7 +1349,7 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
     if (IsTool((BlockType)item) || IsFood((BlockType)item) || IsArmor((BlockType)item)) return false;
     if (item >= BLOCK_COUNT) return false;
     if (!blockInfo[item].breakable) return false;
-    if (world[bx][by] != BLOCK_AIR && world[bx][by] != BLOCK_WATER) return false;
+    if (GetBlock(bx, by) != BLOCK_AIR && GetBlock(bx, by) != BLOCK_WATER) return false;
 
     // Player collision check
     float bLeft = bx * BLOCK_SIZE;
@@ -1364,9 +1364,9 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
         return false;
 
     // Place it
-    bool wasWater = (world[bx][by] == BLOCK_WATER);
+    bool wasWater = (GetBlock(bx, by) == BLOCK_WATER);
     if (wasWater) RemoveWaterAt(bx, by);
-    world[bx][by] = item;
+    SetBlock(bx, by, item);
 
     // Consume item (creative mode: infinite blocks)
     if (gameMode != GAME_CREATIVE) {
@@ -1387,12 +1387,12 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
 
     // Falling blocks
     if (IsGravityBlock(item)) {
-        world[bx][by] = BLOCK_AIR;
+        SetBlock(bx, by, BLOCK_AIR);
         int landY = by;
         while (landY < WORLD_HEIGHT - 1 &&
-               (world[bx][landY + 1] == BLOCK_AIR || world[bx][landY + 1] == BLOCK_WATER))
+               (GetBlock(bx, landY + 1) == BLOCK_AIR || GetBlock(bx, landY + 1) == BLOCK_WATER))
             landY++;
-        world[bx][landY] = item;
+        SetBlock(bx, landY, item);
         NetSyncBlockChange(bx, by, BLOCK_AIR);
         NetSyncBlockChange(bx, landY, item);
         UpdateLightAt(bx, landY);
@@ -1435,7 +1435,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
 
     // Bucket use
     if (item == ITEM_WATER_BUCKET) {
-        if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
+        if (GetBlock(bx, by) == BLOCK_AIR || GetBlock(bx, by) == BLOCK_WATER) {
             SetWaterSource(bx, by);
             if (gameMode != GAME_CREATIVE) {
                 if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
@@ -1448,8 +1448,8 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
         }
     }
     if (item == ITEM_LAVA_BUCKET) {
-        if (world[bx][by] == BLOCK_AIR || world[bx][by] == BLOCK_WATER) {
-            if (world[bx][by] == BLOCK_WATER) RemoveWaterAt(bx, by);
+        if (GetBlock(bx, by) == BLOCK_AIR || GetBlock(bx, by) == BLOCK_WATER) {
+            if (GetBlock(bx, by) == BLOCK_WATER) RemoveWaterAt(bx, by);
             SetLavaSource(bx, by);
             if (gameMode != GAME_CREATIVE) {
                 if (p->inventoryCount[slot] > 1) p->inventoryCount[slot]--;
@@ -1462,7 +1462,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
         }
     }
     if (item == ITEM_BUCKET) {
-        if (world[bx][by] == BLOCK_WATER) {
+        if (GetBlock(bx, by) == BLOCK_WATER) {
             RemoveWaterAt(bx, by);
             if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_WATER_BUCKET;
             NetSyncBlockChange(bx, by, BLOCK_AIR);
@@ -1470,7 +1470,7 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
             InvalidateChunkAt(bx, by);
             return true;
         }
-        if (world[bx][by] == BLOCK_LAVA) {
+        if (GetBlock(bx, by) == BLOCK_LAVA) {
             RemoveLavaAt(bx, by);
             if (gameMode != GAME_CREATIVE) p->inventory[slot] = ITEM_LAVA_BUCKET;
             NetSyncBlockChange(bx, by, BLOCK_AIR);
@@ -1482,8 +1482,8 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
 
     // Hoe: till dirt/grass into farmland
     if (IsHoe((BlockType)item)) {
-        if (world[bx][by] == BLOCK_DIRT || world[bx][by] == BLOCK_GRASS) {
-            world[bx][by] = BLOCK_FARMLAND;
+        if (GetBlock(bx, by) == BLOCK_DIRT || GetBlock(bx, by) == BLOCK_GRASS) {
+            SetBlock(bx, by, BLOCK_FARMLAND);
             NetSyncBlockChange(bx, by, BLOCK_FARMLAND);
             UpdateLightAt(bx, by);
             InvalidateChunkAt(bx, by);
@@ -1502,8 +1502,8 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
 
     // Seeds: plant on farmland
     if (item == ITEM_WHEAT_SEEDS) {
-        if (world[bx][by] == BLOCK_FARMLAND && by > 0 && world[bx][by - 1] == BLOCK_AIR) {
-            world[bx][by - 1] = BLOCK_CROPS;
+        if (GetBlock(bx, by) == BLOCK_FARMLAND && by > 0 && GetBlock(bx, by - 1) == BLOCK_AIR) {
+            SetBlock(bx, by - 1, BLOCK_CROPS);
             SetCropGrowth(bx, by - 1, 0);
             RegisterCrop(bx, by - 1);
             NetSyncBlockChange(bx, by - 1, BLOCK_CROPS);
@@ -1815,7 +1815,7 @@ static bool TryEnchantRemote(Player *p, int blockX, int blockY, int enchantType,
 
     // Validate enchanting table exists
     if (blockX < 0 || blockX >= WORLD_WIDTH || blockY < 0 || blockY >= WORLD_HEIGHT) return false;
-    if (world[blockX][blockY] != BLOCK_ENCHANTING_TABLE) return false;
+    if (GetBlock(blockX, blockY) != BLOCK_ENCHANTING_TABLE) return false;
 
     int slot = p->selectedSlot;
     uint8_t held = p->inventory[slot];
@@ -1910,7 +1910,7 @@ static bool TryCauldronInteractRemote(Player *p, int bx, int by)
 {
     if (p->playerDead) return false;
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
-    if (world[bx][by] != BLOCK_CAULDRON) return false;
+    if (GetBlock(bx, by) != BLOCK_CAULDRON) return false;
 
     int slot = p->selectedSlot;
     uint8_t held = p->inventory[slot];
@@ -2295,7 +2295,7 @@ static float FindSpawnSurfaceY(int bx)
     if (bx < 0) bx = 0;
     if (bx >= WORLD_WIDTH) bx = WORLD_WIDTH - 1;
     for (int y = 0; y < WORLD_HEIGHT; y++) {
-        uint8_t b = world[bx][y];
+        uint8_t b = GetBlock(bx, y);
         if (b != BLOCK_AIR && b != BLOCK_WATER) {
             return (float)(y * BLOCK_SIZE - PLAYER_HEIGHT);
         }
@@ -2946,7 +2946,7 @@ void UpdateGame(float dt)
                     if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
                         // Spawn item if block was broken (new type is AIR)
                         if (bc->blockType == BLOCK_AIR) {
-                            uint8_t oldBlock = world[bc->x][bc->y];
+                            uint8_t oldBlock = GetBlock(bc->x, bc->y);
                             if (oldBlock != BLOCK_AIR && oldBlock != BLOCK_WATER) {
                                 uint8_t dropItem = oldBlock;
                                 if (oldBlock == BLOCK_STONE) dropItem = BLOCK_COBBLESTONE;
@@ -2957,7 +2957,7 @@ void UpdateGame(float dt)
                                 SpawnItemEntity(dropItem, 1, bc->x * BLOCK_SIZE + 3, bc->y * BLOCK_SIZE + 3);
                             }
                         }
-                        world[bc->x][bc->y] = bc->blockType;
+                        SetBlock(bc->x, bc->y, bc->blockType);
                         if (bc->blockType == BLOCK_CROPS) RegisterCrop(bc->x, bc->y); // track network-planted crops
                         RecordBlockChange(bc->x, bc->y, bc->blockType);
                         UpdateLightAt(bc->x, bc->y);
@@ -3593,7 +3593,7 @@ void UpdateGame(float dt)
                     for (int j = 0; j < count; j++) {
                         const PktBlockChange *bc = (const PktBlockChange *)((const uint8_t *)data + 1 + j * sizeof(PktBlockChange));
                         if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
-                            world[bc->x][bc->y] = bc->blockType;
+                            SetBlock(bc->x, bc->y, bc->blockType);
                             if (bc->blockType == BLOCK_CROPS) RegisterCrop(bc->x, bc->y);
                             UpdateLightAt(bc->x, bc->y);
                             InvalidateChunkAt(bc->x, bc->y);
@@ -3821,9 +3821,9 @@ void UpdateGame(float dt)
             for (int dy = -1; dy <= 1 && !nearBlock; dy++) {
                 int tx = bx + dx, ty = by + dy;
                 if (tx >= 0 && tx < WORLD_WIDTH && ty >= 0 && ty < WORLD_HEIGHT) {
-                    if (craftingTableOpen && world[tx][ty] == BLOCK_CRAFTING_TABLE) nearBlock = true;
-                    if (furnaceOpen && world[tx][ty] == BLOCK_FURNACE) nearBlock = true;
-                    if (chestOpen && world[tx][ty] == BLOCK_CHEST) nearBlock = true;
+                    if (craftingTableOpen && GetBlock(tx, ty) == BLOCK_CRAFTING_TABLE) nearBlock = true;
+                    if (furnaceOpen && GetBlock(tx, ty) == BLOCK_FURNACE) nearBlock = true;
+                    if (chestOpen && GetBlock(tx, ty) == BLOCK_CHEST) nearBlock = true;
                 }
             }
         }

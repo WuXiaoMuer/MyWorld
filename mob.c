@@ -780,10 +780,10 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                             float bdy = (by - cy) * BLOCK_SIZE;
                             float explodeR = CREEPER_EXPLODE_RADIUS * BLOCK_SIZE;
                             if (bdx * bdx + bdy * bdy <= explodeR * explodeR) {
-                                BlockType bt = (BlockType)world[bx][by];
+                                BlockType bt = (BlockType)GetBlock(bx, by);
                                 if (bt != BLOCK_AIR && bt != BLOCK_BEDROCK) {
                                     SpawnBlockParticles(bx, by, bt);
-                                    world[bx][by] = BLOCK_AIR;
+                                    SetBlock(bx, by, BLOCK_AIR);
                                     NetSyncBlockChange(bx, by, BLOCK_AIR);
                                     InvalidateChunkAt(bx, by);
                                     UpdateLightAt(bx, by);
@@ -1237,7 +1237,7 @@ static void TrySpawnMobs(float dt)
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
-                if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                if ((GetBlock(bx, y) == BLOCK_GRASS || GetBlock(bx, y) == BLOCK_SNOWY_GRASS) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     uint8_t light = GetLightLevel(bx, y - 1);
                     if (light >= 8) {
                         SpawnMob(MOB_PIG, spawnX, (y - 2) * BLOCK_SIZE);
@@ -1380,8 +1380,8 @@ static void TrySpawnMobs(float dt)
         int bx = (int)(spawnX / BLOCK_SIZE);
         if (bx >= 0 && bx < WORLD_WIDTH) {
             for (int y = 0; y < WORLD_HEIGHT - 2; y++) {
-                if ((world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS ||
-                     world[bx][y] == BLOCK_MYCELIUM) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
+                if ((GetBlock(bx, y) == BLOCK_GRASS || GetBlock(bx, y) == BLOCK_SNOWY_GRASS ||
+                     GetBlock(bx, y) == BLOCK_MYCELIUM) && !IsBlockSolid(bx, y - 1) && !IsBlockSolid(bx, y - 2)) {
                     int biome = MobGetBiomeAtX(bx);
                     int roll = rand() % 100;
                     MobType spawnType;
@@ -1568,7 +1568,7 @@ void UpdateMobs(float dt)
             for (int bx = minBX; bx <= maxBX && !inLava; bx++) {
                 for (int by = minBY; by <= maxBY; by++) {
                     if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT &&
-                        world[bx][by] == BLOCK_LAVA) {
+                        GetBlock(bx, by) == BLOCK_LAVA) {
                         inLava = true;
                         break;
                     }
