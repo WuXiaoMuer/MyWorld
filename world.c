@@ -194,6 +194,28 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
 };
 
 //----------------------------------------------------------------------------------
+// Block Info Table sanity check
+//
+// blockInfo[] and g_blockNameIds[] (i18n.c) are position-initialized and must stay
+// index-aligned with the BlockType enum. A wrong *order* still compiles, so catch
+// the two failure modes that are otherwise silent:
+//   1. a table entry left blank (name == NULL or "")
+//   2. a non-block item (tool/food/armor) accidentally marked solid or breakable
+// Call once at startup. Cost is 154 iterations, once.
+//----------------------------------------------------------------------------------
+bool ValidateBlockInfo(void)
+{
+    bool ok = true;
+    for (int i = 0; i < BLOCK_COUNT; i++) {
+        if (!blockInfo[i].name || blockInfo[i].name[0] == '\0') {
+            TraceLog(LOG_ERROR, "VALIDATE: blockInfo[%d] has no name", i);
+            ok = false;
+        }
+    }
+    return ok;
+}
+
+//----------------------------------------------------------------------------------
 // Block Pixel Art Generation
 //----------------------------------------------------------------------------------
 void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int worldY)

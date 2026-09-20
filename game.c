@@ -306,6 +306,11 @@ void InitGame(void)
     srand((unsigned int)time(NULL));
     if (worldSeed == 0) worldSeed = (unsigned int)rand();
 
+    // Guard the position-initialized data tables before anything indexes them.
+    if (!ValidateBlockInfo()) {
+        TraceLog(LOG_WARNING, "BlockInfo table has invalid entries - names may display wrong");
+    }
+
     // Atlas and crafting already initialized in main()
     InitMobs();
     InitParticles();
@@ -1420,13 +1425,9 @@ static bool TryUseItemRemote(Player *p, int bx, int by, float cursorX, float cur
     // Eat food
     if (IsFood((BlockType)item) && p->hunger < MAX_HUNGER) {
         int foodVal = GetFoodValue((BlockType)item);
+        if (!ConsumeItemFromSlot(p, slot, 1)) return false;
         p->hunger += foodVal;
         if (p->hunger > MAX_HUNGER) p->hunger = MAX_HUNGER;
-        p->inventoryCount[slot]--;
-        if (p->inventoryCount[slot] <= 0) {
-            p->inventory[slot] = BLOCK_AIR;
-            p->inventoryCount[slot] = 0;
-        }
         return true;
     }
 

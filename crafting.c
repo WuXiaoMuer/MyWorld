@@ -225,18 +225,7 @@ void CraftForPlayer(Player *p, int recipeIndex)
     }
 
     // Remove input (may span multiple slots)
-    int toRemove = r->inputCount;
-    for (int i = 0; i < INVENTORY_SLOTS && toRemove > 0; i++) {
-        if (p->inventory[i] == r->input) {
-            int take = p->inventoryCount[i] < toRemove ? p->inventoryCount[i] : toRemove;
-            p->inventoryCount[i] -= take;
-            toRemove -= take;
-            if (p->inventoryCount[i] <= 0) {
-                p->inventory[i] = BLOCK_AIR;
-                p->inventoryCount[i] = 0;
-            }
-        }
-    }
+    RemoveItemFromInventory(p, (BlockType)r->input, r->inputCount);
 
     // Add output
     int remaining = r->outputCount;
@@ -469,10 +458,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             DrawTexturePro(blockAtlas, srcIn, dstIn, (Vector2){0, 0}, 0, WHITE);
         }
         {
-            int have = 0;
-            for (int s = 0; s < INVENTORY_SLOTS; s++) {
-                if (player.inventory[s] == r->input) have += player.inventoryCount[s];
-            }
+            int have = CountItemInInventory(&player, (BlockType)r->input);
             Color countColor = have >= r->inputCount ? (Color){22, 88, 28, 255} : (Color){150, 40, 45, 255};
             DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
         }
@@ -492,10 +478,7 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
 
         // Max craftable count
         if (canCraft && r->inputCount > 0) {
-            int have = 0;
-            for (int s = 0; s < INVENTORY_SLOTS; s++) {
-                if (player.inventory[s] == r->input) have += player.inventoryCount[s];
-            }
+            int have = CountItemInInventory(&player, (BlockType)r->input);
             int maxCraft = have / r->inputCount;
             if (maxCraft > 0) {
                 char buf[16];
@@ -817,11 +800,7 @@ void DrawTradeUI(void)
                      mouse.y >= ty && mouse.y <= ty + slotH;
         bool click = hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 
-        int have = 0;
-        for (int s = 0; s < INVENTORY_SLOTS; s++) {
-            if (player.inventory[s] == trades[i].giveItem) have += player.inventoryCount[s];
-        }
-        bool canAfford = have >= trades[i].giveCount;
+        bool canAfford = CountItemInInventory(&player, (BlockType)trades[i].giveItem) >= trades[i].giveCount;
 
         // Card
         Color cardBg = hover ? (canAfford ? (Color){48, 54, 42, 255} : (Color){54, 46, 50, 255})
@@ -849,9 +828,9 @@ void DrawTradeUI(void)
         DrawGameText(giveText, sx + 42, ty + 12, 13, canAfford ? (Color){245, 210, 170, 255} : (Color){200, 135, 115, 220});
 
         char haveText[32];
-        snprintf(haveText, sizeof(haveText), "(%d)", have);
+        snprintf(haveText, sizeof(haveText), "(%d)", CountItemInInventory(&player, (BlockType)trades[i].giveItem));
         Color haveColor = canAfford ? (Color){160, 200, 150, 190} : (Color){210, 115, 95, 170};
-        DrawGameText(haveText, sx + 42, ty + 30, 10, haveColor);
+        DrawGameText(haveText, sx + 42, ty + 30, 14, haveColor);
 
         // Separator
         int sepX = sx + slotW / 2 - 10;
@@ -870,18 +849,7 @@ void DrawTradeUI(void)
         DrawGameText(recvText, rx + 30, ty + 18, 14, (Color){130, 240, 130, 245});
 
         if (click && canAfford) {
-            int remaining = trades[i].giveCount;
-            for (int s = 0; s < INVENTORY_SLOTS && remaining > 0; s++) {
-                if (player.inventory[s] == trades[i].giveItem) {
-                    int take = remaining > player.inventoryCount[s] ? player.inventoryCount[s] : remaining;
-                    player.inventoryCount[s] -= take;
-                    remaining -= take;
-                    if (player.inventoryCount[s] <= 0) {
-                        player.inventory[s] = BLOCK_AIR;
-                        player.inventoryCount[s] = 0;
-                    }
-                }
-            }
+            RemoveItemFromInventory(&player, (BlockType)trades[i].giveItem, trades[i].giveCount);
             AddToInventoryCount((BlockType)trades[i].receiveItem, trades[i].receiveCount);
             PlaySoundCraft();
             ShowMessage(Sf(STR_MSG_TRADE, GetBlockName((BlockType)trades[i].giveItem), GetBlockName((BlockType)trades[i].receiveItem)), (Color){100, 255, 100, 255});

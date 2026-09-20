@@ -1649,6 +1649,7 @@ void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
 bool IsGravityBlock(uint8_t block);
 void ApplyGravityAt(int bx, int by);
+bool ValidateBlockInfo(void);
 
 // Water flow system (world.c)
 void InitWater(void);
@@ -1716,6 +1717,10 @@ Color ApplyLighting(Color base, int bx, int by);
 void InitPlayer(void);
 bool AddToInventory(BlockType item);
 int AddToInventoryCount(BlockType item, int count);
+int GetMaxStack(BlockType item);
+bool ConsumeItemFromSlot(Player *p, int slot, int count);
+int CountItemInInventory(const Player *p, BlockType item);
+int RemoveItemFromInventory(Player *p, BlockType item, int count);
 float GetToolMiningSpeed(BlockType tool, BlockType block);
 bool CanToolMineBlock(BlockType tool, BlockType block);
 bool IsTool(BlockType item);

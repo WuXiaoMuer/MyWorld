@@ -163,8 +163,9 @@ int AddToInventoryCount(BlockType item, int count)
 {
     if (count <= 0) return 0;
     int remaining = count;
-    bool nonStackable = IsTool(item) || IsArmor(item);
-    int maxStack = nonStackable ? 1 : 64;
+    int maxStack = GetMaxStack(item);
+    bool nonStackable = (maxStack <= 1);
+    if (maxStack <= 0) return 0;
     // Try to stack in existing slots (only for stackable items)
     if (!nonStackable) {
         for (int i = 0; i < INVENTORY_SLOTS && remaining > 0; i++) {
@@ -191,6 +192,74 @@ int AddToInventoryCount(BlockType item, int count)
         ShowMessage(S(STR_MSG_INVENTORY_FULL), (Color){240, 80, 80, 255});
     }
     return count - remaining; // number actually added
+}
+
+//----------------------------------------------------------------------------------
+// Stack limit for an item. Tools and armor never stack; potions will stack to 16
+// (added in a later phase); everything else stacks to 64.
+// Single source of truth - AddToInventoryCount and the crafting/trading paths all
+// used to hardcode this rule separately.
+//----------------------------------------------------------------------------------
+int GetMaxStack(BlockType item)
+{
+    if (IsTool(item) || IsArmor(item)) return 1;
+    if (item == BLOCK_AIR) return 0;
+    return 64;
+}
+
+//----------------------------------------------------------------------------------
+// Remove `count` of whatever occupies `slot`, clearing the slot when it empties.
+// Shared by eating, drinking, and every other consumable so the "decrement then
+// clear" bookkeeping lives in exactly one place.
+// Returns false (and changes nothing) if the slot does not hold enough.
+//----------------------------------------------------------------------------------
+bool ConsumeItemFromSlot(Player *p, int slot, int count)
+{
+    if (!p || slot < 0 || slot >= INVENTORY_SLOTS || count <= 0) return false;
+    if (p->inventory[slot] == BLOCK_AIR || p->inventoryCount[slot] < count) return false;
+
+    p->inventoryCount[slot] -= count;
+    if (p->inventoryCount[slot] <= 0) {
+        // Clear the slot completely, including per-slot metadata, so a stale
+        // durability/enchantment never leaks onto the next item placed here.
+        p->inventory[slot] = BLOCK_AIR;
+        p->inventoryCount[slot] = 0;
+        p->toolDurability[slot] = 0;
+        p->itemEnchantments[slot] = 0;
+    }
+    return true;
+}
+
+//----------------------------------------------------------------------------------
+// Count how many of `item` the player is carrying across all slots.
+//----------------------------------------------------------------------------------
+int CountItemInInventory(const Player *p, BlockType item)
+{
+    if (!p) return 0;
+    int total = 0;
+    for (int i = 0; i < INVENTORY_SLOTS; i++) {
+        if (p->inventory[i] == item) total += p->inventoryCount[i];
+    }
+    return total;
+}
+
+//----------------------------------------------------------------------------------
+// Remove up to `count` of `item` from anywhere in the inventory.
+// Returns how many were actually removed.
+//----------------------------------------------------------------------------------
+int RemoveItemFromInventory(Player *p, BlockType item, int count)
+{
+    if (!p || count <= 0) return 0;
+    int removed = 0;
+    for (int i = 0; i < INVENTORY_SLOTS && removed < count; i++) {
+        if (p->inventory[i] != item) continue;
+        int take = p->inventoryCount[i];
+        if (take > count - removed) take = count - removed;
+        if (take <= 0) continue;
+        ConsumeItemFromSlot(p, i, take);
+        removed += take;
+    }
+    return removed;
 }
 
 //----------------------------------------------------------------------------------
@@ -1203,12 +1272,9 @@ void PlayerBlockInteraction(void)
         // Eat food
         if (IsFood(selectedTool) && player.hunger < MAX_HUNGER) {
             int foodVal = GetFoodValue(selectedTool);
+            if (!ConsumeItemFromSlot(&player, player.selectedSlot, 1)) return;
             player.hunger += foodVal;
             if (player.hunger > MAX_HUNGER) player.hunger = MAX_HUNGER;
-            player.inventoryCount[player.selectedSlot]--;
-            if (player.inventoryCount[player.selectedSlot] <= 0) {
-                player.inventory[player.selectedSlot] = BLOCK_AIR;
-            }
             PlaySoundEat();
             ShowMessage(Sf(STR_MSG_ATE, GetBlockName(selectedTool), foodVal), (Color){80, 220, 80, 255});
             return;
