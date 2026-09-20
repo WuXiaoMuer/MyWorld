@@ -4085,32 +4085,6 @@ draw_finish:
         DrawTexturePro(logicalCanvas.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
     }
 
-    // TEMP capture hook (file driven)
-    {
-        static int inited = 0, frame = 0;
-        static char shot[128] = {0};
-        static int at = 60, worldSlot = -1, uiMode = -1;
-        if (!inited) {
-            inited = 1;
-            FILE *cf = fopen("SHOT_CFG.txt", "r");
-            if (cf) {
-                if (fscanf(cf, "%127s %d %d %d", shot, &at, &worldSlot, &uiMode) < 1) shot[0] = 0;
-                fclose(cf);
-            }
-            if (worldSlot >= 0) StartGameFromSlot(worldSlot, false);
-            if (uiMode == 0) { slotSelectMode = 0; gameState = STATE_SLOT_SELECT; }
-            if (uiMode == 1) { slotSelectMode = 1; gameState = STATE_SLOT_SELECT; }
-        }
-        if (shot[0] && ++frame == at) {
-            char path[256];
-            snprintf(path, sizeof(path), "shots/%s.png", shot);
-            Image img = LoadImageFromTexture(logicalCanvas.texture);
-            ImageFlipVertical(&img);
-            ExportImage(img, path);
-            UnloadImage(img);
-        }
-    }
-
     EndDrawing();
 }
 
