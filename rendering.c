@@ -3873,6 +3873,7 @@ void DrawMainMenu(void)
     }
 
     // Background glow aura (removed for clean modern look)
+    if (elapsed < titleTotalDur) {
 
     // Bounce-in animation
     for (int ci = 0; ci < titleLen; ci++) {
@@ -3893,6 +3894,7 @@ void DrawMainMenu(void)
         unsigned char ca = (unsigned char)(alpha * 255);
         DrawGameText(chBuf, cx + 2, cy + 3, titleSize, (Color){0, 0, 0, (unsigned char)(120 * alpha)});
         DrawGameText(chBuf, cx, cy, titleSize, (Color){235, 215, 165, ca});
+    }
     }
 
     // Final title — MC gold with a full dark outline + hard drop shadow
