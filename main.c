@@ -511,6 +511,7 @@ int main(void)
 
     gameState = STATE_MENU;
 
+
     while (!WindowShouldClose())
     {
         UpdateWin32Input();

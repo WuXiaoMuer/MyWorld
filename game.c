@@ -321,6 +321,7 @@ void InitGame(void)
     InitSmeltingRecipes();
     InitTrades();
     InitRedstone();
+    InitBlockMeta();
     InitPrimedTnt();
     InitWater();
     InitLava();
@@ -372,6 +373,7 @@ void InitGame(void)
         ShowMessage(S(STR_TUTORIAL_CONTROLS), (Color){180, 200, 220, 255});
         tutorialShown = true;
     }
+
 }
 
 static StringId GetAchString(Achievement ach) {

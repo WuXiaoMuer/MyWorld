@@ -1674,6 +1674,33 @@ bool GetFluidChange(int index, FluidChange *change);
 void ClearFluidChanges(void);
 void RemoveWaterAt(int bx, int by);
 
+//----------------------------------------------------------------------------------
+// Block metadata layer (world.c)
+//
+// Per-cell state for blocks that need more than their type id: piston facing and
+// extension, repeater delay, door open/closed, button countdown. Stored sparsely
+// because only a small fraction of cells ever carry metadata, and because the
+// alternative - a 512KB array per new state - does not scale.
+//
+// Blocks without metadata simply have no entry; GetBlockMeta returns false.
+//----------------------------------------------------------------------------------
+typedef struct {
+    uint16_t x, y;
+    uint8_t kind;   // BlockMetaKind - which block owns this entry
+    uint8_t a, b;   // kind-specific payload
+} BlockMeta;
+
+#define MAX_BLOCK_METAS 4096
+#define BLOCK_META_NONE 0
+
+void InitBlockMeta(void);
+bool SetBlockMeta(int x, int y, uint8_t kind, uint8_t a, uint8_t b);
+bool GetBlockMeta(int x, int y, uint8_t *kind, uint8_t *a, uint8_t *b);
+void ClearBlockMeta(int x, int y);
+int  GetBlockMetaCount(void);
+bool GetBlockMetaAt(int index, BlockMeta *out);
+void ClearAllBlockMeta(void);
+
 // Lava flow system (world.c)
 void InitLava(void);
 int GetLavaLevel(int bx, int by);

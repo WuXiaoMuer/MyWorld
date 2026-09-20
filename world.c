@@ -2752,6 +2752,96 @@ void RemoveWaterAt(int bx, int by)
 }
 
 //----------------------------------------------------------------------------------
+// Block Metadata Layer
+//
+// Per-cell state for blocks that need more than a type id (piston facing and
+// extension, repeater delay, door open/closed, button countdown).
+//
+// Sparse: only cells that actually carry state get an entry, so a 2000-cell
+// piston door costs 2000 entries rather than eight extra 512KB grids. Lookup is
+// linear - entries stay in the hundreds for realistic builds, and the constant
+// factor beats maintaining a reverse-index grid of the same size as the world.
+//
+// Stale entries are not cleaned up on block break; instead each entry is
+// validated against the block actually present when read, which is what the
+// crop list already does (see RebuildCropList). That keeps destruction paths
+// simple and makes an interruption harmless.
+//----------------------------------------------------------------------------------
+static BlockMeta blockMetas[MAX_BLOCK_METAS];
+static int blockMetaCount = 0;
+
+void InitBlockMeta(void)
+{
+    blockMetaCount = 0;
+}
+
+static int FindBlockMeta(int x, int y)
+{
+    for (int i = 0; i < blockMetaCount; i++) {
+        if (blockMetas[i].x == (uint16_t)x && blockMetas[i].y == (uint16_t)y) return i;
+    }
+    return -1;
+}
+
+bool SetBlockMeta(int x, int y, uint8_t kind, uint8_t a, uint8_t b)
+{
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return false;
+
+    int idx = FindBlockMeta(x, y);
+    if (idx >= 0) {
+        blockMetas[idx].kind = kind;
+        blockMetas[idx].a = a;
+        blockMetas[idx].b = b;
+        return true;
+    }
+    if (blockMetaCount >= MAX_BLOCK_METAS) {
+        // Log once per overflow rather than every frame a machine is running.
+        static bool warned = false;
+        if (!warned) {
+            TraceLog(LOG_WARNING, "BLOCKMETA: table full (%d entries), metadata dropped", MAX_BLOCK_METAS);
+            warned = true;
+        }
+        return false;
+    }
+    blockMetas[blockMetaCount++] = (BlockMeta){(uint16_t)x, (uint16_t)y, kind, a, b};
+    return true;
+}
+
+bool GetBlockMeta(int x, int y, uint8_t *kind, uint8_t *a, uint8_t *b)
+{
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return false;
+    int idx = FindBlockMeta(x, y);
+    if (idx < 0) return false;
+    if (kind) *kind = blockMetas[idx].kind;
+    if (a) *a = blockMetas[idx].a;
+    if (b) *b = blockMetas[idx].b;
+    return true;
+}
+
+void ClearBlockMeta(int x, int y)
+{
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return;
+    int idx = FindBlockMeta(x, y);
+    if (idx < 0) return;
+    // Swap-remove: order is not meaningful, and this keeps the write O(1).
+    blockMetas[idx] = blockMetas[--blockMetaCount];
+}
+
+int GetBlockMetaCount(void) { return blockMetaCount; }
+
+bool GetBlockMetaAt(int index, BlockMeta *out)
+{
+    if (!out || index < 0 || index >= blockMetaCount) return false;
+    *out = blockMetas[index];
+    return true;
+}
+
+void ClearAllBlockMeta(void)
+{
+    blockMetaCount = 0;
+}
+
+//----------------------------------------------------------------------------------
 // Redstone System
 //----------------------------------------------------------------------------------
 #define REDSTONE_MAX_POWER  15
