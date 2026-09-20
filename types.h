@@ -1630,6 +1630,7 @@ extern RainDrop rainDrops[MAX_RAIN_DROPS];
 // i18n / Font
 extern Language language;
 extern Font gameFont;
+extern Font gameFontLarge;
 extern bool useCustomFont;
 extern char customFontPath[256];
 

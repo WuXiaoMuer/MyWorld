@@ -587,7 +587,7 @@ void DrawInventoryScreen(void)
         memcpy(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch));
     }
 
-    int slotSize = 32;
+    int slotSize = 40;
 
     // --- Minecraft-style combined furnace + inventory screen ---
     if (furnaceOpen) {
@@ -1378,28 +1378,33 @@ void DrawInventoryScreen(void)
     }
 
     // --- Normal inventory screen (when furnace is NOT open) ---
-    int padding = 2;
+    int padding = 3;
     int gridW = INVENTORY_COLS * slotSize + (INVENTORY_COLS - 1) * padding;
     int gridH = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
 
     // Player preview dimensions
-    int previewW = 72;
+    int previewW = 86;
     int previewPad = 6;
 
     // Armor slots: vertical column to the left of inventory
-    int armorSlotSize = 32;
+    int armorSlotSize = 40;
     int armorPad = 3;
     int armorColW = armorSlotSize + armorPad;
 
     // Crafting panel dimensions (kept short so the panel hugs the inventory)
-    int craftSlotH = 38;
+    int craftSlotH = 44;
     int craftPad = 2;
-    int craftPanelW = 280;
-    int gridH_local = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
-    int invBlockH = 24 + gridH_local;
-    int visibleRecipes = (invBlockH - 32) / (craftSlotH + craftPad);
-    if (visibleRecipes < 3) visibleRecipes = 3;
-    if (visibleRecipes > 8) visibleRecipes = 8;
+    int craftPanelW = 360;
+    // Show as many recipes as fit the panel height budget rather than deriving it
+    // from the inventory grid: tying it to the grid left only 3 visible rows and
+    // wasted most of the crafting column.
+    int visibleRecipes = 7;
+    {
+        int maxPanelH = SCREEN_HEIGHT - 80;
+        int maxRows = (maxPanelH - 28 - 32) / (craftSlotH + craftPad);
+        if (maxRows < 4) maxRows = 4;
+        if (visibleRecipes > maxRows) visibleRecipes = maxRows;
+    }
     int craftVisibleH = visibleRecipes * (craftSlotH + craftPad);
     int craftPanelH = craftVisibleH + 32; // title + padding
 
@@ -1423,7 +1428,11 @@ void DrawInventoryScreen(void)
 
     // Inventory title
     int invX = containerX + panelPad + previewW + previewPad + armorColW;
-    int invY = containerY + panelPad;
+    // Centre the left column vertically. The panel height is driven by the recipe
+    // list, so anchoring the inventory to the top left dead space underneath it.
+    int leftContentH = 24 + gridH;
+    int invY = containerY + (totalH - leftContentH) / 2;
+    if (invY < containerY + panelPad) invY = containerY + panelPad;
     Vector2 mouse = Win32GetMousePosition();
     DrawGameText(S(STR_INVENTORY), invX, invY, 14, (Color){62, 62, 62, 255});
     invY += 24;

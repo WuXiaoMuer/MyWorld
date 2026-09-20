@@ -16,6 +16,7 @@
 Language language = LANG_ZH_CN;
 
 Font gameFont = { 0 };
+Font gameFontLarge = { 0 };   // 42px atlas for titles; body text uses gameFont
 bool useCustomFont = false;
 char customFontPath[256] = { 0 };
 
@@ -23,6 +24,7 @@ char customFontPath[256] = { 0 };
 // baking near that range keeps small text sharp instead of downscaling a large
 // atlas (which looked blurry). Large titles scale this up acceptably.
 #define FONT_ATLAS_SIZE 14
+#define FONT_ATLAS_SIZE_LARGE 42   // titles draw at ~42px, so bake a matching atlas
 
 //----------------------------------------------------------------------------------
 // String Table
@@ -2050,41 +2052,40 @@ static Font TryLoadFont(const char *path, int fontSize)
 
 void LoadGameFont(void)
 {
-    // Try bundled font first
+    // Resolve a usable font path first, then bake both atlases from it. Baking a
+    // second, larger atlas matters for titles: the body atlas is sized for ~14px
+    // text, so drawing a 42px title from it means scaling up 3x and the strokes
+    // smear. Two atlases keep both ends of the size range at (or near) 1:1.
+    const char *chosen = NULL;
+
     const char *bundled = "assets/fonts/LXGWWenKaiLite-Regular.ttf";
-    gameFont = TryLoadFont(bundled, FONT_ATLAS_SIZE);
-    if (gameFont.texture.id > 0) {
-        useCustomFont = true;
-        return;
-    }
+    if (FileExists(bundled)) chosen = bundled;
 
-    // Try custom path if set
-    if (customFontPath[0]) {
-        gameFont = TryLoadFont(customFontPath, FONT_ATLAS_SIZE);
-        if (gameFont.texture.id > 0) {
-            useCustomFont = true;
-            return;
-        }
-    }
+    if (!chosen && customFontPath[0] && FileExists(customFontPath)) chosen = customFontPath;
 
-    // Try system CJK fonts (prefer .ttf over .ttc for better raylib compatibility)
+    // System CJK fonts, plain .ttf first (more reliable in raylib than .ttc).
     const char *systemFonts[] = {
-        "C:/Windows/Fonts/simhei.ttf", // SimHei (plain TTF, most reliable)
-        "C:/Windows/Fonts/msyh.ttc",   // Microsoft YaHei
-        "C:/Windows/Fonts/simsun.ttc", // SimSun
+        "C:/Windows/Fonts/Deng.ttf",     // DengXian - cleaner vector CJK than SimHei
+        "C:/Windows/Fonts/simhei.ttf",   // SimHei
+        "C:/Windows/Fonts/msyh.ttc",     // Microsoft YaHei
+        "C:/Windows/Fonts/simsun.ttc",   // SimSun
         "C:/Windows/Fonts/msgothic.ttc", // MS Gothic (Japanese)
         NULL
     };
-    for (int i = 0; systemFonts[i]; i++) {
-        gameFont = TryLoadFont(systemFonts[i], FONT_ATLAS_SIZE);
-        if (gameFont.texture.id > 0) {
-            useCustomFont = true;
-            return;
+    if (!chosen) {
+        for (int i = 0; systemFonts[i]; i++) {
+            if (FileExists(systemFonts[i])) { chosen = systemFonts[i]; break; }
         }
     }
 
-    // Fallback: use raylib default font
-    useCustomFont = false;
+    if (!chosen) {
+        useCustomFont = false;
+        return;
+    }
+
+    gameFont      = TryLoadFont(chosen, FONT_ATLAS_SIZE);
+    gameFontLarge = TryLoadFont(chosen, FONT_ATLAS_SIZE_LARGE);
+    useCustomFont = (gameFont.texture.id > 0);
 }
 
 void UnloadGameFont(void)
@@ -2092,6 +2093,10 @@ void UnloadGameFont(void)
     if (gameFont.texture.id > 0) {
         UnloadFont(gameFont);
         gameFont = (Font){0};
+    }
+    if (gameFontLarge.texture.id > 0) {
+        UnloadFont(gameFontLarge);
+        gameFontLarge = (Font){0};
     }
     useCustomFont = false;
 }
@@ -2110,10 +2115,20 @@ bool ReloadGameFont(const char *path)
 //----------------------------------------------------------------------------------
 // Font Helper Wrappers
 //----------------------------------------------------------------------------------
+// Pick the atlas that matches the requested size. The body atlas is baked for
+// ~14px and the large one for ~42px, so a 42px title comes from the atlas that
+// actually contains 42px glyphs instead of a 3x upscale of the small one.
+static Font PickFont(int fsize)
+{
+    if (fsize >= 28 && gameFontLarge.texture.id > 0) return gameFontLarge;
+    return gameFont;
+}
+
 void DrawGameText(const char *text, int posX, int posY, int fsize, Color color)
 {
-    if (useCustomFont && gameFont.texture.id > 0) {
-        DrawTextEx(gameFont, text, (Vector2){(float)posX, (float)posY}, (float)fsize, 1.0f, color);
+    Font f = PickFont(fsize);
+    if (useCustomFont && f.texture.id > 0) {
+        DrawTextEx(f, text, (Vector2){(float)posX, (float)posY}, (float)fsize, 1.0f, color);
     } else {
         DrawText(text, posX, posY, fsize, color);
     }
@@ -2121,8 +2136,9 @@ void DrawGameText(const char *text, int posX, int posY, int fsize, Color color)
 
 Vector2 MeasureGameText(const char *text, int fsize)
 {
-    if (useCustomFont && gameFont.texture.id > 0) {
-        return MeasureTextEx(gameFont, text, (float)fsize, 1.0f);
+    Font f = PickFont(fsize);   // must match DrawGameText or text will be misaligned
+    if (useCustomFont && f.texture.id > 0) {
+        return MeasureTextEx(f, text, (float)fsize, 1.0f);
     }
     return (Vector2){ (float)MeasureText(text, fsize), (float)fsize };
 }
