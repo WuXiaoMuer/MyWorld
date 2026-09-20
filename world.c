@@ -2453,14 +2453,14 @@ void ClearFluidChanges(void)
 void QueueFluidSources(void)
 {
     for (int x = 0; x < WORLD_WIDTH; x++) for (int y = 0; y < WORLD_HEIGHT; y++) {
-        if (waterSource[x][y] && world[x][y] == BLOCK_WATER) QueueFluid(x, y, BLOCK_WATER, waterLevel[x][y]);
-        if (lavaSource[x][y] && world[x][y] == BLOCK_LAVA) QueueFluid(x, y, BLOCK_LAVA, lavaLevel[x][y]);
+        if (waterSource[x][y] && GetBlock(x, y) == BLOCK_WATER) QueueFluid(x, y, BLOCK_WATER, waterLevel[x][y]);
+        if (lavaSource[x][y] && GetBlock(x, y) == BLOCK_LAVA) QueueFluid(x, y, BLOCK_LAVA, lavaLevel[x][y]);
     }
 }
 void GetFluidState(int bx, int by, uint8_t *blockType, uint8_t *kind, uint8_t *level, bool *source)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    uint8_t block = world[bx][by];
+    uint8_t block = GetBlock(bx, by);
     if (blockType) *blockType = block;
     if (kind) *kind = block == BLOCK_LAVA ? BLOCK_LAVA : (block == BLOCK_WATER ? BLOCK_WATER : 0);
     if (level) *level = block == BLOCK_LAVA ? lavaLevel[bx][by] : (block == BLOCK_WATER ? waterLevel[bx][by] : 0);
@@ -2477,7 +2477,7 @@ void ClearFluidStateAt(int bx, int by)
 void RestoreFluidState(int bx, int by, uint8_t blockType, uint8_t kind, uint8_t level, bool source)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    world[bx][by] = blockType;
+    SetBlock(bx, by, blockType);
     waterLevel[bx][by] = lavaLevel[bx][by] = 0;
     waterSource[bx][by] = lavaSource[bx][by] = false;
     if (kind == BLOCK_WATER && blockType == BLOCK_WATER) {
@@ -2489,7 +2489,7 @@ void RestoreFluidState(int bx, int by, uint8_t blockType, uint8_t kind, uint8_t 
 int GetLavaLevel(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
-    if (world[bx][by] != BLOCK_LAVA) return 0;
+    if (GetBlock(bx, by) != BLOCK_LAVA) return 0;
     return lavaLevel[bx][by];
 }
 
@@ -2511,15 +2511,15 @@ static void ProcessFluidNode(FluidNode node)
 {
     int x = node.x, y = node.y, level = node.level;
     uint8_t fluid = node.type == BLOCK_LAVA ? BLOCK_LAVA : BLOCK_WATER;
-    if (world[x][y] != fluid || level <= 1) return;
+    if (GetBlock(x, y) != fluid || level <= 1) return;
     int down = y + 1;
     if (down < WORLD_HEIGHT) {
-        if (world[x][down] == BLOCK_AIR) {
+        if (GetBlock(x, down) == BLOCK_AIR) {
             InvalidateChunkAt(x, down);
             MarkFluidChange(x, down);
             QueueFluid(x, down, fluid, level);
-        } else if (world[x][down] == (fluid == BLOCK_LAVA ? BLOCK_WATER : BLOCK_LAVA)) {
-            world[x][down] = fluid == BLOCK_LAVA ? BLOCK_OBSIDIAN : BLOCK_COBBLESTONE;
+        } else if (GetBlock(x, down) == (fluid == BLOCK_LAVA ? BLOCK_WATER : BLOCK_LAVA)) {
+            SetBlock(x, down, fluid == BLOCK_LAVA ? BLOCK_OBSIDIAN : BLOCK_COBBLESTONE);
             waterLevel[x][down] = 0; lavaLevel[x][down] = 0;
             waterSource[x][down] = false; lavaSource[x][down] = false;
             MarkFluidChange(x, down);
@@ -2532,12 +2532,12 @@ static void ProcessFluidNode(FluidNode node)
     for (int i = 0; i < 2; i++) {
         int nx = x + dirs[i];
         if (nx < 0 || nx >= WORLD_WIDTH) continue;
-        if (world[nx][y] == BLOCK_AIR && (y + 1 >= WORLD_HEIGHT || world[nx][y + 1] != BLOCK_AIR)) {
+        if (GetBlock(nx, y) == BLOCK_AIR && (y + 1 >= WORLD_HEIGHT || GetBlock(nx, y + 1) != BLOCK_AIR)) {
             InvalidateChunkAt(nx, y);
             MarkFluidChange(nx, y);
             QueueFluid(nx, y, fluid, next);
-        } else if (world[nx][y] == (fluid == BLOCK_LAVA ? BLOCK_WATER : BLOCK_LAVA)) {
-            world[nx][y] = fluid == BLOCK_LAVA ? BLOCK_COBBLESTONE : BLOCK_OBSIDIAN;
+        } else if (GetBlock(nx, y) == (fluid == BLOCK_LAVA ? BLOCK_WATER : BLOCK_LAVA)) {
+            SetBlock(nx, y, fluid == BLOCK_LAVA ? BLOCK_COBBLESTONE : BLOCK_OBSIDIAN);
             waterLevel[nx][y] = 0; lavaLevel[nx][y] = 0;
             waterSource[nx][y] = false; lavaSource[nx][y] = false;
             MarkFluidChange(nx, y);
@@ -2588,15 +2588,15 @@ void SetLavaSource(int bx, int by)
     for (int d = 0; d < 4; d++) {
         int nx = bx + dx[d], ny = by + dy[d];
         if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
-            if (world[nx][ny] == BLOCK_WATER) {
-                world[bx][by] = BLOCK_OBSIDIAN;
+            if (GetBlock(nx, ny) == BLOCK_WATER) {
+                SetBlock(bx, by, BLOCK_OBSIDIAN);
                 waterLevel[bx][by] = 0;
                 InvalidateChunkAt(bx, by);
                 return;
             }
         }
     }
-    world[bx][by] = BLOCK_LAVA;
+    SetBlock(bx, by, BLOCK_LAVA);
     lavaLevel[bx][by] = LAVA_MAX_LEVEL;
     lavaSource[bx][by] = true;
     QueueFluid(bx, by, BLOCK_LAVA, LAVA_MAX_LEVEL);
@@ -2606,8 +2606,8 @@ void SetLavaSource(int bx, int by)
 void RemoveLavaAt(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    if (world[bx][by] != BLOCK_LAVA) return;
-    world[bx][by] = BLOCK_AIR;
+    if (GetBlock(bx, by) != BLOCK_LAVA) return;
+    SetBlock(bx, by, BLOCK_AIR);
     lavaLevel[bx][by] = 0;
     lavaSource[bx][by] = false;
     MarkFluidChange(bx, by);
@@ -2620,17 +2620,17 @@ void RemoveLavaAt(int bx, int by)
     if (minY < 0) minY = 0;
     if (maxY >= WORLD_HEIGHT) maxY = WORLD_HEIGHT - 1;
     for (int x = minX; x <= maxX; x++) for (int y = minY; y <= maxY; y++) {
-        if (world[x][y] == BLOCK_LAVA) {
+        if (GetBlock(x, y) == BLOCK_LAVA) {
             bool dynamic = lavaSource[x][y] || lavaLevel[x][y] > 0;
             lavaLevel[x][y] = 0;
             if (dynamic && !lavaSource[x][y]) {
-                world[x][y] = BLOCK_AIR;
+                SetBlock(x, y, BLOCK_AIR);
                 MarkFluidChange(x, y);
             }
         }
     }
     for (int x = minX; x <= maxX; x++) for (int y = minY; y <= maxY; y++) {
-        if (lavaSource[x][y] && world[x][y] == BLOCK_LAVA) {
+        if (lavaSource[x][y] && GetBlock(x, y) == BLOCK_LAVA) {
             lavaLevel[x][y] = LAVA_MAX_LEVEL;
             QueueFluid(x, y, BLOCK_LAVA, LAVA_MAX_LEVEL);
         }
@@ -2648,15 +2648,15 @@ bool IsGravityBlock(uint8_t block)
 void ApplyGravityAt(int bx, int by)
 {
     for (int fy = by - 1; fy >= 0; fy--) {
-        uint8_t above = world[bx][fy];
+        uint8_t above = GetBlock(bx, fy);
         if (above == BLOCK_AIR || above == BLOCK_WATER) break;
         if (!IsGravityBlock(above)) break;
-        world[bx][fy] = BLOCK_AIR;
+        SetBlock(bx, fy, BLOCK_AIR);
         int landY = fy + 1;
         // Fall through air and water
-        while (landY < WORLD_HEIGHT && (world[bx][landY] == BLOCK_AIR || world[bx][landY] == BLOCK_WATER)) landY++;
+        while (landY < WORLD_HEIGHT && (GetBlock(bx, landY) == BLOCK_AIR || GetBlock(bx, landY) == BLOCK_WATER)) landY++;
         landY--;
-        world[bx][landY] = above;
+        SetBlock(bx, landY, above);
         InvalidateChunkAt(bx, fy);
         InvalidateChunkAt(bx, landY);
         NetSyncBlockChange(bx, fy, BLOCK_AIR);
@@ -2680,14 +2680,14 @@ void InitWater(void)
 int GetWaterLevel(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return 0;
-    if (world[bx][by] != BLOCK_WATER) return 0;
+    if (GetBlock(bx, by) != BLOCK_WATER) return 0;
     return waterLevel[bx][by];
 }
 
 void SetWaterSource(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    world[bx][by] = BLOCK_WATER;
+    SetBlock(bx, by, BLOCK_WATER);
     waterLevel[bx][by] = WATER_MAX_LEVEL;
     waterSource[bx][by] = true;
     QueueFluid(bx, by, BLOCK_WATER, WATER_MAX_LEVEL);
@@ -2697,10 +2697,10 @@ void SetWaterSource(int bx, int by)
 void RemoveWaterAt(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    if (world[bx][by] != BLOCK_WATER) return;
+    if (GetBlock(bx, by) != BLOCK_WATER) return;
 
     // Clear this water block
-    world[bx][by] = BLOCK_AIR;
+    SetBlock(bx, by, BLOCK_AIR);
     waterLevel[bx][by] = 0;
     waterSource[bx][by] = false;
     MarkFluidChange(bx, by);
@@ -2717,19 +2717,19 @@ void RemoveWaterAt(int bx, int by)
 
     for (int x = minX; x <= maxX; x++) {
         for (int y = minY; y <= maxY; y++) {
-            if (world[x][y] == BLOCK_WATER) {
+            if (GetBlock(x, y) == BLOCK_WATER) {
                 bool dynamic = waterSource[x][y] || waterLevel[x][y] > 0;
                 waterLevel[x][y] = 0;
                 if (dynamic && !waterSource[x][y]) {
-                    world[x][y] = BLOCK_AIR;
+                    SetBlock(x, y, BLOCK_AIR);
                     MarkFluidChange(x, y);
                 }
             }
-            if (world[x][y] == BLOCK_LAVA) {
+            if (GetBlock(x, y) == BLOCK_LAVA) {
                 bool dynamic = lavaSource[x][y] || lavaLevel[x][y] > 0;
                 lavaLevel[x][y] = 0;
                 if (dynamic && !lavaSource[x][y]) {
-                    world[x][y] = BLOCK_AIR;
+                    SetBlock(x, y, BLOCK_AIR);
                     MarkFluidChange(x, y);
                 }
             }
@@ -2739,11 +2739,11 @@ void RemoveWaterAt(int bx, int by)
     // Re-propagate only from explicit remaining sources; descendants are queued.
     for (int x = minX; x <= maxX; x++) {
         for (int y = minY; y <= maxY; y++) {
-            if (waterSource[x][y] && world[x][y] == BLOCK_WATER) {
+            if (waterSource[x][y] && GetBlock(x, y) == BLOCK_WATER) {
                 waterLevel[x][y] = WATER_MAX_LEVEL;
                 QueueFluid(x, y, BLOCK_WATER, WATER_MAX_LEVEL);
             }
-            if (lavaSource[x][y] && world[x][y] == BLOCK_LAVA) {
+            if (lavaSource[x][y] && GetBlock(x, y) == BLOCK_LAVA) {
                 lavaLevel[x][y] = LAVA_MAX_LEVEL;
                 QueueFluid(x, y, BLOCK_LAVA, LAVA_MAX_LEVEL);
             }
@@ -2900,7 +2900,7 @@ void RebuildPressurePlateList(void)
     pressurePlateCount = 0;
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_STONE_PRESSURE_PLATE) {
+            if (GetBlock(x, y) == BLOCK_STONE_PRESSURE_PLATE) {
                 RegisterPressurePlate(x, y);
             }
         }
@@ -2929,7 +2929,7 @@ void RebuildCropList(void)
     cropCellCount = 0;
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_CROPS && cropCellCount < MAX_CROP_CELLS) {
+            if (GetBlock(x, y) == BLOCK_CROPS && cropCellCount < MAX_CROP_CELLS) {
                 cropCellsX[cropCellCount] = x;
                 cropCellsY[cropCellCount] = y;
                 cropCellCount++;
@@ -2998,7 +2998,7 @@ static void PropagateRedstoneBFS(int startX, int startY, int power)
             int ny = cy + dy[d];
             if (nx < 0 || nx >= WORLD_WIDTH || ny < 0 || ny >= WORLD_HEIGHT) continue;
 
-            uint8_t nblock = world[nx][ny];
+            uint8_t nblock = GetBlock(nx, ny);
             int newPower = cp - 1;
             if (newPower <= 0) continue;
 
@@ -3048,7 +3048,7 @@ void UpdateRedstoneAt(int bx, int by)
     // Find all power sources in the affected area and propagate
     for (int x = minX; x <= maxX; x++) {
         for (int y = minY; y <= maxY; y++) {
-            uint8_t block = world[x][y];
+            uint8_t block = GetBlock(x, y);
             if (IsRedstoneSource(block, x, y)) {
                 PropagateRedstoneBFS(x, y, REDSTONE_MAX_POWER);
             }
@@ -3058,7 +3058,7 @@ void UpdateRedstoneAt(int bx, int by)
     // Update light for lamps in the area
     for (int x = minX; x <= maxX; x++) {
         for (int y = minY; y <= maxY; y++) {
-            if (world[x][y] == BLOCK_REDSTONE_LAMP) {
+            if (GetBlock(x, y) == BLOCK_REDSTONE_LAMP) {
                 UpdateLightAt(x, y);
                 InvalidateChunkAt(x, y);
             }
@@ -3089,7 +3089,7 @@ int GetRedstonePowerAt(int bx, int by)
 bool IsRedstoneLampPowered(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
-    return world[bx][by] == BLOCK_REDSTONE_LAMP && redstonePower[bx][by] > 0;
+    return GetBlock(bx, by) == BLOCK_REDSTONE_LAMP && redstonePower[bx][by] > 0;
 }
 
 //----------------------------------------------------------------------------------
@@ -3111,7 +3111,7 @@ void UpdateCrops(float dt)
         // Lazy prune: cell is no longer a crop (broken / exploded / flooded) or
         // out of the growable range -> swap-remove and re-check the swapped entry.
         if (x < 0 || x >= WORLD_WIDTH || y < 1 || y >= WORLD_HEIGHT - 1 ||
-            world[x][y] != BLOCK_CROPS) {
+            GetBlock(x, y) != BLOCK_CROPS) {
             cropCellsX[idx] = cropCellsX[cropCellCount - 1];
             cropCellsY[idx] = cropCellsY[cropCellCount - 1];
             cropCellCount--;
@@ -3120,7 +3120,7 @@ void UpdateCrops(float dt)
         }
 
         if (cropGrowth[x][y] >= 7) continue;        // Already mature (kept in list)
-        if (world[x][y - 1] != BLOCK_FARMLAND) continue;
+        if (GetBlock(x, y - 1) != BLOCK_FARMLAND) continue;
 
         // Check for water nearby (within 4 blocks)
         bool hasWater = false;
@@ -3128,7 +3128,7 @@ void UpdateCrops(float dt)
             for (int dy = -4; dy <= 4 && !hasWater; dy++) {
                 int nx = x + dx, ny = y + dy;
                 if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT) {
-                    if (world[nx][ny] == BLOCK_WATER) hasWater = true;
+                    if (GetBlock(nx, ny) == BLOCK_WATER) hasWater = true;
                 }
             }
         }
@@ -3180,7 +3180,7 @@ void InitPrimedTnt(void)
 void PrimeTnt(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
-    if (world[bx][by] != BLOCK_TNT) return;
+    if (GetBlock(bx, by) != BLOCK_TNT) return;
     for (int i = 0; i < primedTntCount; i++)
         if (primedTntX[i] == bx && primedTntY[i] == by) return; // already counting down
     if (primedTntCount >= MAX_PRIMED_TNT) return;
@@ -3205,12 +3205,12 @@ void ExplodeAt(float worldX, float worldY, int radius)
             float ddy = (float)((by - cy) * BLOCK_SIZE);
             float rPix = (float)(radius * BLOCK_SIZE);
             if (ddx * ddx + ddy * ddy > rPix * rPix) continue;
-            BlockType bt = (BlockType)world[bx][by];
+            BlockType bt = (BlockType)GetBlock(bx, by);
             if (bt == BLOCK_AIR || bt == BLOCK_BEDROCK) continue;
             if (bt == BLOCK_TNT) { PrimeTnt(bx, by); continue; } // chain reaction
             SpawnBlockParticles(bx, by, bt);
             ClearFluidStateAt(bx, by);
-            world[bx][by] = BLOCK_AIR;
+            SetBlock(bx, by, BLOCK_AIR);
             NetSyncBlockChange(bx, by, BLOCK_AIR);
             InvalidateChunkAt(bx, by);
             UpdateLightAt(bx, by);
@@ -3273,8 +3273,8 @@ void UpdatePrimedTnt(float dt)
         if (primedTntFuse[i] > 0.0f) continue;
         int bx = primedTntX[i], by = primedTntY[i];
         // Clear the block first so the blast doesn't re-prime itself.
-        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT && world[bx][by] == BLOCK_TNT) {
-            world[bx][by] = BLOCK_AIR;
+        if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT && GetBlock(bx, by) == BLOCK_TNT) {
+            SetBlock(bx, by, BLOCK_AIR);
             NetSyncBlockChange(bx, by, BLOCK_AIR);
             InvalidateChunkAt(bx, by);
             UpdateLightAt(bx, by);
@@ -3412,26 +3412,26 @@ void GenerateWorld(unsigned int seed)
         // Fill column
         for (int y = 0; y < WORLD_HEIGHT; y++) {
             if (y < surfaceY) {
-                world[x][y] = BLOCK_AIR;
+                SetBlock(x, y, BLOCK_AIR);
             } else if (y == surfaceY) {
-                if (isStonePeak) world[x][y] = BLOCK_STONE;        // mountain peak
-                else if (biome == 1) world[x][y] = BLOCK_SAND;     // desert
-                else if (biome == 8) world[x][y] = BLOCK_RED_SAND; // mesa
-                else if (biome == 3) world[x][y] = BLOCK_SNOWY_GRASS; // tundra
-                else if (biome == 4) world[x][y] = BLOCK_MUD;      // swamp
-                else if (biome == 6) world[x][y] = BLOCK_SNOWY_GRASS; // taiga
-                else if (biome == 10) world[x][y] = BLOCK_MYCELIUM; // mushroom island
-                else world[x][y] = BLOCK_GRASS;                     // plains/forest/jungle/savanna/flower
+                if (isStonePeak) SetBlock(x, y, BLOCK_STONE);        // mountain peak
+                else if (biome == 1) SetBlock(x, y, BLOCK_SAND);     // desert
+                else if (biome == 8) SetBlock(x, y, BLOCK_RED_SAND); // mesa
+                else if (biome == 3) SetBlock(x, y, BLOCK_SNOWY_GRASS); // tundra
+                else if (biome == 4) SetBlock(x, y, BLOCK_MUD);      // swamp
+                else if (biome == 6) SetBlock(x, y, BLOCK_SNOWY_GRASS); // taiga
+                else if (biome == 10) SetBlock(x, y, BLOCK_MYCELIUM); // mushroom island
+                else SetBlock(x, y, BLOCK_GRASS);                     // plains/forest/jungle/savanna/flower
             } else if (y < surfaceY + 4) {
-                if (isStonePeak) world[x][y] = BLOCK_STONE;        // mountain subsurface
-                else if (biome == 1) world[x][y] = BLOCK_SAND;     // desert sand layers
-                else if (biome == 8) world[x][y] = BLOCK_RED_SAND; // mesa layers
-                else if (biome == 4) world[x][y] = BLOCK_MUD;      // swamp mud layers
-                else world[x][y] = BLOCK_DIRT;
+                if (isStonePeak) SetBlock(x, y, BLOCK_STONE);        // mountain subsurface
+                else if (biome == 1) SetBlock(x, y, BLOCK_SAND);     // desert sand layers
+                else if (biome == 8) SetBlock(x, y, BLOCK_RED_SAND); // mesa layers
+                else if (biome == 4) SetBlock(x, y, BLOCK_MUD);      // swamp mud layers
+                else SetBlock(x, y, BLOCK_DIRT);
             } else if (y < WORLD_HEIGHT - 1) {
-                world[x][y] = BLOCK_STONE;
+                SetBlock(x, y, BLOCK_STONE);
             } else {
-                world[x][y] = BLOCK_BEDROCK;
+                SetBlock(x, y, BLOCK_BEDROCK);
             }
         }
     }
@@ -3441,13 +3441,13 @@ void GenerateWorld(unsigned int seed)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = CAVE_START; y < CAVE_END; y++) {
-            if (world[x][y] != BLOCK_STONE) continue;
+            if (GetBlock(x, y) != BLOCK_STONE) continue;
             float c1 = fbm(x * 0.04f, y * 0.04f, 3, 0.5f, seed + 5000);
             float c2 = fbm(x * 0.08f, y * 0.08f, 2, 0.5f, seed + 7000);
             // Wider caves near y=180-220
             float depthBonus = (y > 180 && y < 220) ? 0.03f : 0.0f;
             if (c1 > (0.52f - depthBonus) && c2 > (0.45f - depthBonus)) {
-                world[x][y] = BLOCK_AIR;
+                SetBlock(x, y, BLOCK_AIR);
             }
         }
     }
@@ -3465,11 +3465,11 @@ void GenerateWorld(unsigned int seed)
                 int rx = x + dx;
                 if (rx >= WORLD_WIDTH) break;
                 for (int y = ravineTop; y < CAVE_END - 5; y++) {
-                    if (world[rx][y] == BLOCK_STONE) {
+                    if (GetBlock(rx, y) == BLOCK_STONE) {
                         // Narrow ravine: 1-2 blocks wide
                         float narrow = fbm(rx * 0.1f, y * 0.05f, 2, 0.5f, seed + 9300);
                         if (narrow > 0.3f) {
-                            world[rx][y] = BLOCK_AIR;
+                            SetBlock(rx, y, BLOCK_AIR);
                         }
                     }
                 }
@@ -3482,39 +3482,39 @@ void GenerateWorld(unsigned int seed)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = CAVE_START - 30; y < WORLD_HEIGHT - 1; y++) {
-            if (world[x][y] != BLOCK_STONE) continue;
+            if (GetBlock(x, y) != BLOCK_STONE) continue;
             // Coal: common, all depths
             float coal = fbm(x * 0.1f, y * 0.1f, 2, 0.5f, seed + 3000);
-            if (coal > 0.72f) { world[x][y] = BLOCK_COAL_ORE; continue; }
+            if (coal > 0.72f) { SetBlock(x, y, BLOCK_COAL_ORE); continue; }
             // Iron: deeper = more common
             if (y > 155) {
                 float ironThreshold = 0.76f - (y - 155) * 0.0005f;
                 float iron = fbm(x * 0.12f, y * 0.12f, 2, 0.5f, seed + 4000);
-                if (iron > ironThreshold) { world[x][y] = BLOCK_IRON_ORE; continue; }
+                if (iron > ironThreshold) { SetBlock(x, y, BLOCK_IRON_ORE); continue; }
             }
             // Gold: deep, rarer than iron
             if (y > 180) {
                 float goldThreshold = 0.78f - (y - 180) * 0.0003f;
                 float gold = fbm(x * 0.14f, y * 0.14f, 2, 0.5f, seed + 5000);
-                if (gold > goldThreshold) { world[x][y] = BLOCK_GOLD_ORE; continue; }
+                if (gold > goldThreshold) { SetBlock(x, y, BLOCK_GOLD_ORE); continue; }
             }
             // Diamond: very deep, rarest
             if (y > 210) {
                 float diamondThreshold = 0.82f - (y - 210) * 0.0002f;
                 float diamond = fbm(x * 0.16f, y * 0.16f, 2, 0.5f, seed + 6000);
-                if (diamond > diamondThreshold) { world[x][y] = BLOCK_DIAMOND_ORE; continue; }
+                if (diamond > diamondThreshold) { SetBlock(x, y, BLOCK_DIAMOND_ORE); continue; }
             }
             // Redstone: deep, similar to diamond
             if (y > 190) {
                 float redstoneThreshold = 0.80f - (y - 190) * 0.0003f;
                 float redstone = fbm(x * 0.15f, y * 0.15f, 2, 0.5f, seed + 7000);
-                if (redstone > redstoneThreshold) { world[x][y] = BLOCK_REDSTONE_ORE; continue; }
+                if (redstone > redstoneThreshold) { SetBlock(x, y, BLOCK_REDSTONE_ORE); continue; }
             }
             // Lapis: medium depth, moderate rarity
             if (y > 160) {
                 float lapisThreshold = 0.77f - (y - 160) * 0.0004f;
                 float lapis = fbm(x * 0.13f, y * 0.13f, 2, 0.5f, seed + 8000);
-                if (lapis > lapisThreshold) { world[x][y] = BLOCK_LAPIS_ORE; continue; }
+                if (lapis > lapisThreshold) { SetBlock(x, y, BLOCK_LAPIS_ORE); continue; }
             }
         }
     }
@@ -3530,8 +3530,8 @@ void GenerateWorld(unsigned int seed)
         if (isDesert || isMesa || isTundra) continue; // sand/red-sand/ice already placed
         for (int y = SEA_LEVEL - 3; y <= SEA_LEVEL + 2; y++) {
             if (y < 0 || y >= WORLD_HEIGHT) continue;
-            if (world[x][y] == BLOCK_GRASS || world[x][y] == BLOCK_DIRT) {
-                world[x][y] = BLOCK_SAND;
+            if (GetBlock(x, y) == BLOCK_GRASS || GetBlock(x, y) == BLOCK_DIRT) {
+                SetBlock(x, y, BLOCK_SAND);
             }
         }
     }
@@ -3542,19 +3542,19 @@ void GenerateWorld(unsigned int seed)
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT - 1; y++) {
             // Sandstone: all dirt/sand blocks directly under sand become sandstone
-            if (world[x][y] == BLOCK_SAND) {
+            if (GetBlock(x, y) == BLOCK_SAND) {
                 for (int dy = 1; dy <= 4 && y + dy < WORLD_HEIGHT; dy++) {
-                    if (world[x][y + dy] == BLOCK_DIRT) {
-                        world[x][y + dy] = BLOCK_SANDSTONE;
-                    } else if (world[x][y + dy] != BLOCK_SAND) {
+                    if (GetBlock(x, y + dy) == BLOCK_DIRT) {
+                        SetBlock(x, y + dy, BLOCK_SANDSTONE);
+                    } else if (GetBlock(x, y + dy) != BLOCK_SAND) {
                         break;
                     }
                 }
             }
             // Clay near water level
-            if (world[x][y] == BLOCK_DIRT && y >= SEA_LEVEL - 1 && y <= SEA_LEVEL + 1) {
+            if (GetBlock(x, y) == BLOCK_DIRT && y >= SEA_LEVEL - 1 && y <= SEA_LEVEL + 1) {
                 if (hash2D(x, y, 55) % 3 == 0) {
-                    world[x][y] = BLOCK_CLAY;
+                    SetBlock(x, y, BLOCK_CLAY);
                 }
             }
         }
@@ -3565,19 +3565,19 @@ void GenerateWorld(unsigned int seed)
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = CAVE_START; y < CAVE_END; y++) {
-            if (world[x][y] != BLOCK_AIR) continue;
+            if (GetBlock(x, y) != BLOCK_AIR) continue;
             // Gravel on cave floors: air with solid below
             if (y + 1 < WORLD_HEIGHT && IsBlockSolid(x, y + 1)) {
                 if (hash2D(x, y, seed + 7500) % 5 == 0) {
-                    world[x][y] = BLOCK_GRAVEL;
+                    SetBlock(x, y, BLOCK_GRAVEL);
                 }
             }
         }
         // Gravel patches underwater (below sea level, in sand/dirt areas)
         for (int y = SEA_LEVEL; y < SEA_LEVEL + 10 && y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_SAND || world[x][y] == BLOCK_DIRT) {
+            if (GetBlock(x, y) == BLOCK_SAND || GetBlock(x, y) == BLOCK_DIRT) {
                 if (hash2D(x, y, seed + 7600) % 7 == 0) {
-                    world[x][y] = BLOCK_GRAVEL;
+                    SetBlock(x, y, BLOCK_GRAVEL);
                 }
             }
         }
@@ -3588,12 +3588,12 @@ void GenerateWorld(unsigned int seed)
     // ============================================================
     for (int x = 2; x < WORLD_WIDTH - 2; x++) {
         for (int y = CAVE_START + 10; y < CAVE_END - 10; y++) {
-            if (world[x][y] != BLOCK_AIR) continue;
+            if (GetBlock(x, y) != BLOCK_AIR) continue;
             // Check for a small hollow: 3x2 air pocket
             bool hollow = true;
             for (int dx = -1; dx <= 1 && hollow; dx++) {
                 for (int dy = 0; dy <= 1 && hollow; dy++) {
-                    if (world[x + dx][y + dy] != BLOCK_AIR) hollow = false;
+                    if (GetBlock(x + dx, y + dy) != BLOCK_AIR) hollow = false;
                 }
             }
             // Must have solid floor
@@ -3602,8 +3602,8 @@ void GenerateWorld(unsigned int seed)
                 if (waterNoise > 0.65f) {
                     // Fill the bottom row of the pocket with water
                     for (int dx = -1; dx <= 1; dx++) {
-                        if (world[x + dx][y + 1] == BLOCK_AIR) {
-                            world[x + dx][y + 1] = BLOCK_WATER;
+                        if (GetBlock(x + dx, y + 1) == BLOCK_AIR) {
+                            SetBlock(x + dx, y + 1, BLOCK_WATER);
                         }
                     }
                 }
@@ -3631,7 +3631,7 @@ void GenerateWorld(unsigned int seed)
                 for (int ty = dy - halfH - 1; ty <= dy + halfH + 1; ty++) {
                     if (tx >= 0 && tx < WORLD_WIDTH && ty >= 0 && ty < WORLD_HEIGHT) {
                         totalCheck++;
-                        if (world[tx][ty] == BLOCK_STONE) solidCount++;
+                        if (GetBlock(tx, ty) == BLOCK_STONE) solidCount++;
                     }
                 }
             }
@@ -3643,12 +3643,12 @@ void GenerateWorld(unsigned int seed)
                 for (int ty = dy - halfH; ty <= dy + halfH; ty++) {
                     if (tx < 0 || tx >= WORLD_WIDTH || ty < 0 || ty >= WORLD_HEIGHT) continue;
                     if (tx == dx - halfW || tx == dx + halfW || ty == dy - halfH || ty == dy + halfH) {
-                        world[tx][ty] = useMossy ? BLOCK_MOSSY_COBBLESTONE : BLOCK_COBBLESTONE;
+                        SetBlock(tx, ty, useMossy ? BLOCK_MOSSY_COBBLESTONE : BLOCK_COBBLESTONE);
                     } else {
-                        world[tx][ty] = BLOCK_AIR;
+                        SetBlock(tx, ty, BLOCK_AIR);
                         // Floor decoration: some mossy cobblestone
                         if (ty == dy + halfH - 1 && hash2D(tx, ty, seed + 11350) % 5 == 0) {
-                            world[tx][ty] = BLOCK_MOSSY_COBBLESTONE;
+                            SetBlock(tx, ty, BLOCK_MOSSY_COBBLESTONE);
                         }
                     }
                 }
@@ -3664,8 +3664,8 @@ void GenerateWorld(unsigned int seed)
 
             // Clear entrance gap
             for (int i = -1; i <= 1; i++) {
-                if (side <= 1) world[dx + i][ey] = BLOCK_AIR;
-                else world[ex][dy + i] = BLOCK_AIR;
+                if (side <= 1) SetBlock(dx + i, ey, BLOCK_AIR);
+                else SetBlock(ex, dy + i, BLOCK_AIR);
             }
 
             // Dig corridor outward until we hit air or max 15 blocks
@@ -3676,20 +3676,20 @@ void GenerateWorld(unsigned int seed)
                 cx += dxDir;
                 cy += dyDir;
                 if (cx < 0 || cx >= WORLD_WIDTH || cy < 0 || cy >= WORLD_HEIGHT) break;
-                if (world[cx][cy] == BLOCK_AIR || world[cx][cy] == BLOCK_WATER) break; // Connected!
+                if (GetBlock(cx, cy) == BLOCK_AIR || GetBlock(cx, cy) == BLOCK_WATER) break; // Connected!
                 // Carve 2-wide corridor
                 for (int i = -1; i <= 1; i++) {
                     int rx = cx + (dyDir != 0 ? i : 0);
                     int ry = cy + (dxDir != 0 ? i : 0);
                     if (rx >= 0 && rx < WORLD_WIDTH && ry >= 0 && ry < WORLD_HEIGHT) {
-                        world[rx][ry] = BLOCK_AIR;
+                        SetBlock(rx, ry, BLOCK_AIR);
                     }
                 }
             }
 
             // Place chest in center
             if (chestCount < MAX_CHESTS) {
-                world[dx][dy] = BLOCK_CHEST;
+                SetBlock(dx, dy, BLOCK_CHEST);
                 ChestData *c = &chestData[chestCount];
                 c->x = dx;
                 c->y = dy;
@@ -3741,8 +3741,8 @@ void GenerateWorld(unsigned int seed)
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT; y++) {
             if (IsBlockSolid(x, y)) break;
-            if (world[x][y] == BLOCK_AIR && y >= SEA_LEVEL) {
-                world[x][y] = BLOCK_WATER;
+            if (GetBlock(x, y) == BLOCK_AIR && y >= SEA_LEVEL) {
+                SetBlock(x, y, BLOCK_WATER);
             }
         }
     }
@@ -3754,11 +3754,11 @@ void GenerateWorld(unsigned int seed)
         bool isTundra = (GetBiomeAtX(x, seed) == 3);
         if (!isTundra) continue;
         for (int y = SEA_LEVEL; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_WATER) {
+            if (GetBlock(x, y) == BLOCK_WATER) {
                 // Freeze the top surface layer
-                bool hasAirAbove = (y > 0 && world[x][y - 1] == BLOCK_AIR);
+                bool hasAirAbove = (y > 0 && GetBlock(x, y - 1) == BLOCK_AIR);
                 if (hasAirAbove) {
-                    world[x][y] = BLOCK_ICE;
+                    SetBlock(x, y, BLOCK_ICE);
                 }
             } else if (IsBlockSolid(x, y)) {
                 break;
@@ -3792,7 +3792,7 @@ void GenerateWorld(unsigned int seed)
         // Find surface - check for grass, snowy grass, or mud
         int surfaceY = -1;
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            uint8_t b = world[x][y];
+            uint8_t b = GetBlock(x, y);
             if (b == BLOCK_GRASS || b == BLOCK_SNOWY_GRASS || b == BLOCK_MUD) {
                 surfaceY = y;
                 break;
@@ -3829,7 +3829,7 @@ void GenerateWorld(unsigned int seed)
 
         // Place trunk
         for (int i = 1; i <= trunkH && surfaceY - i >= 0; i++) {
-            world[x][surfaceY - i] = trunkBlock;
+            SetBlock(x, surfaceY - i, trunkBlock);
         }
 
         int canopyTop = surfaceY - trunkH;
@@ -3841,8 +3841,8 @@ void GenerateWorld(unsigned int seed)
                     int bx = x + dx;
                     int by = canopyTop + dy;
                     if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            world[bx][by] = leafBlock;
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
                         }
                     }
                 }
@@ -3852,7 +3852,7 @@ void GenerateWorld(unsigned int seed)
                 int bx = x + dx;
                 int by = canopyTop - 2;
                 if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (world[bx][by] == BLOCK_AIR) world[bx][by] = leafBlock;
+                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
                 }
             }
             // Vines hanging from canopy edges
@@ -3861,9 +3861,9 @@ void GenerateWorld(unsigned int seed)
                 if (bx < 0 || bx >= WORLD_WIDTH) continue;
                 for (int dy = 1; dy <= 3; dy++) {
                     int by = canopyTop + dy;
-                    if (by >= 0 && by < WORLD_HEIGHT && world[bx][by] == BLOCK_AIR) {
+                    if (by >= 0 && by < WORLD_HEIGHT && GetBlock(bx, by) == BLOCK_AIR) {
                         if (hash2D(bx, by, seed + 998) % 3 == 0)
-                            world[bx][by] = BLOCK_VINE;
+                            SetBlock(bx, by, BLOCK_VINE);
                     }
                 }
             }
@@ -3875,8 +3875,8 @@ void GenerateWorld(unsigned int seed)
                     int bx = x + dx;
                     int by = canopyTop + dy;
                     if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            world[bx][by] = leafBlock;
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
                         }
                     }
                 }
@@ -3888,8 +3888,8 @@ void GenerateWorld(unsigned int seed)
                     int bx = x + dx;
                     int by = canopyTop + dy;
                     if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            world[bx][by] = leafBlock;
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
                         }
                     }
                 }
@@ -3901,19 +3901,19 @@ void GenerateWorld(unsigned int seed)
                     int bx = x + dx;
                     int by = canopyTop + dy;
                     if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            world[bx][by] = leafBlock;
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
                         }
                     }
                 }
             }
             // Moss patches under swamp trees
-            if (surfaceY + 1 < WORLD_HEIGHT && world[x][surfaceY + 1] != BLOCK_WATER) {
+            if (surfaceY + 1 < WORLD_HEIGHT && GetBlock(x, surfaceY + 1) != BLOCK_WATER) {
                 for (int dx = -2; dx <= 2; dx++) {
                     int bx = x + dx;
-                    if (bx >= 0 && bx < WORLD_WIDTH && world[bx][surfaceY] == BLOCK_MUD) {
+                    if (bx >= 0 && bx < WORLD_WIDTH && GetBlock(bx, surfaceY) == BLOCK_MUD) {
                         if (hash2D(bx, surfaceY, seed + 997) % 3 == 0)
-                            world[bx][surfaceY] = BLOCK_MOSS_BLOCK;
+                            SetBlock(bx, surfaceY, BLOCK_MOSS_BLOCK);
                     }
                 }
             }
@@ -3923,14 +3923,14 @@ void GenerateWorld(unsigned int seed)
                 int bx = x + dx;
                 int by = canopyTop;
                 if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (world[bx][by] == BLOCK_AIR) world[bx][by] = leafBlock;
+                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
                 }
             }
             for (int dx = -2; dx <= 2; dx++) {
                 int bx = x + dx;
                 int by = canopyTop - 1;
                 if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (world[bx][by] == BLOCK_AIR && dx != 0) world[bx][by] = leafBlock;
+                    if (GetBlock(bx, by) == BLOCK_AIR && dx != 0) SetBlock(bx, by, leafBlock);
                 }
             }
         } else {
@@ -3940,8 +3940,8 @@ void GenerateWorld(unsigned int seed)
                     int bx = x + dx;
                     int by = canopyTop + dy;
                     if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (world[bx][by] == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            world[bx][by] = leafBlock;
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
                         }
                     }
                 }
@@ -3950,7 +3950,7 @@ void GenerateWorld(unsigned int seed)
                 int bx = x + dx;
                 int by = canopyTop - 1;
                 if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (world[bx][by] == BLOCK_AIR) world[bx][by] = leafBlock;
+                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
                 }
             }
         }
@@ -3966,7 +3966,7 @@ void GenerateWorld(unsigned int seed)
         // Find mycelium surface
         int surfaceY = -1;
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (world[x][y] == BLOCK_MYCELIUM) { surfaceY = y; break; }
+            if (GetBlock(x, y) == BLOCK_MYCELIUM) { surfaceY = y; break; }
         }
         if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
 
@@ -3976,7 +3976,7 @@ void GenerateWorld(unsigned int seed)
 
         // Stem
         for (int i = 1; i <= stemH && surfaceY - i >= 0; i++)
-            world[x][surfaceY - i] = BLOCK_MUSHROOM_STEM;
+            SetBlock(x, surfaceY - i, BLOCK_MUSHROOM_STEM);
 
         // Rounded cap
         for (int dy = -capR; dy <= 0; dy++) {
@@ -3984,8 +3984,8 @@ void GenerateWorld(unsigned int seed)
             for (int dx = -half; dx <= half; dx++) {
                 int bx = x + dx, by = capTop + dy;
                 if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT &&
-                    world[bx][by] == BLOCK_AIR)
-                    world[bx][by] = BLOCK_MUSHROOM_BLOCK;
+                    GetBlock(bx, by) == BLOCK_AIR)
+                    SetBlock(bx, by, BLOCK_MUSHROOM_BLOCK);
             }
         }
     }
@@ -3997,62 +3997,62 @@ void GenerateWorld(unsigned int seed)
         int biome = GetBiomeAtX(x, seed);
 
         for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
-            uint8_t surface = world[x][y];
+            uint8_t surface = GetBlock(x, y);
             if (surface != BLOCK_GRASS && surface != BLOCK_SAND &&
                 surface != BLOCK_SNOWY_GRASS && surface != BLOCK_MUD &&
                 surface != BLOCK_RED_SAND && surface != BLOCK_MYCELIUM) continue;
-            if (world[x][y - 1] != BLOCK_AIR) continue;
+            if (GetBlock(x, y - 1) != BLOCK_AIR) continue;
 
             unsigned int h = hash2D(x, y, seed + 6000);
             switch (biome) {
                 case 1: // Desert: sparse tall grass, cactus
-                    if (h % 30 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-                    else if (h % 50 == 0 && world[x - 1][y] == BLOCK_SAND &&
-                             world[x + 1][y] == BLOCK_SAND && y > SEA_LEVEL + 2)
-                        world[x][y - 1] = BLOCK_CACTUS;
+                    if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 50 == 0 && GetBlock(x - 1, y) == BLOCK_SAND &&
+                             GetBlock(x + 1, y) == BLOCK_SAND && y > SEA_LEVEL + 2)
+                        SetBlock(x, y - 1, BLOCK_CACTUS);
                     break;
                 case 2: // Forest: more flowers and grass
-                    if (h % 12 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                    else if (h % 4 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    if (h % 12 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 4 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
                     break;
                 case 3: // Tundra: very sparse, some flowers
-                    if (h % 25 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                    else if (h % 15 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    if (h % 25 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 15 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
                     break;
                 case 4: // Swamp: dense grass, pumpkins
-                    if (h % 5 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-                    else if (h % 40 == 0) world[x][y - 1] = BLOCK_PUMPKIN;
+                    if (h % 5 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 40 == 0) SetBlock(x, y - 1, BLOCK_PUMPKIN);
                     break;
                 case 5: // Jungle: very dense, melons
-                    if (h % 3 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-                    else if (h % 8 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                    else if (h % 30 == 0) world[x][y - 1] = BLOCK_MELON;
+                    if (h % 3 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 8 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_MELON);
                     break;
                 case 6: // Taiga: moderate, flowers
-                    if (h % 10 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-                    else if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    if (h % 10 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 20 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
                     break;
                 case 7: // Savanna: dry tall grass, occasional flowers
-                    if (h % 6 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
-                    else if (h % 30 == 0) world[x][y - 1] = BLOCK_FLOWER;
+                    if (h % 6 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
                     break;
                 case 8: // Mesa: nearly barren, rare cactus
-                    if (h % 60 == 0 && world[x - 1][y] == BLOCK_RED_SAND &&
-                        world[x + 1][y] == BLOCK_RED_SAND && y > SEA_LEVEL + 2)
-                        world[x][y - 1] = BLOCK_CACTUS;
-                    else if (h % 40 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    if (h % 60 == 0 && GetBlock(x - 1, y) == BLOCK_RED_SAND &&
+                        GetBlock(x + 1, y) == BLOCK_RED_SAND && y > SEA_LEVEL + 2)
+                        SetBlock(x, y - 1, BLOCK_CACTUS);
+                    else if (h % 40 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
                     break;
                 case 9: // Flower field: dense flowers
-                    if (h % 3 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                    else if (h % 7 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    if (h % 3 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 7 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
                     break;
                 case 10: // Mushroom island: sparse grass; giant mushrooms placed in a later pass
                     if (surface == BLOCK_MYCELIUM && h % 9 == 0)
-                        world[x][y - 1] = BLOCK_TALL_GRASS;
+                        SetBlock(x, y - 1, BLOCK_TALL_GRASS);
                     break;
                 default: // Plains
-                    if (h % 20 == 0) world[x][y - 1] = BLOCK_FLOWER;
-                    else if (h % 8 == 0) world[x][y - 1] = BLOCK_TALL_GRASS;
+                    if (h % 20 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 8 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
                     break;
             }
         }
@@ -4067,21 +4067,21 @@ void GenerateWorld(unsigned int seed)
         if (biome == 3 || biome == 8 || biome == 10) continue; // no cane in tundra/mesa/mushroom
 
         for (int y = 1; y < SEA_LEVEL + 6 && y < WORLD_HEIGHT - 1; y++) {
-            if (world[x][y] != BLOCK_AIR) continue;
+            if (GetBlock(x, y) != BLOCK_AIR) continue;
             // Must have sand or grass below
-            uint8_t below = world[x][y - 1];
+            uint8_t below = GetBlock(x, y - 1);
             if (below != BLOCK_SAND && below != BLOCK_GRASS && below != BLOCK_MUD) continue;
             // Must have water nearby
             bool hasWater = false;
             for (int dx = -1; dx <= 1 && !hasWater; dx++)
                 for (int dy = 0; dy <= 1 && !hasWater; dy++) {
                     int nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT && world[nx][ny] == BLOCK_WATER)
+                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT && GetBlock(nx, ny) == BLOCK_WATER)
                         hasWater = true;
                 }
             if (!hasWater) continue;
             unsigned int h = hash2D(x, y, seed + 7000);
-            if (h % 12 == 0) world[x][y] = BLOCK_SUGAR_CANE;
+            if (h % 12 == 0) SetBlock(x, y, BLOCK_SUGAR_CANE);
         }
     }
 
@@ -4104,7 +4104,7 @@ void GenerateWorld(unsigned int seed)
         // Find surface at village center
         int surfaceY = -1;
         for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
-            if (world[vx][y] == BLOCK_GRASS || world[vx][y] == BLOCK_SNOWY_GRASS) {
+            if (GetBlock(vx, y) == BLOCK_GRASS || GetBlock(vx, y) == BLOCK_SNOWY_GRASS) {
                 surfaceY = y;
                 break;
             }
@@ -4117,7 +4117,7 @@ void GenerateWorld(unsigned int seed)
             int cx = vx + dx;
             if (cx < 0 || cx >= WORLD_WIDTH) { flat = false; break; }
             for (int y = surfaceY - 5; y <= surfaceY + 5; y++) {
-                if (y >= 0 && y < WORLD_HEIGHT && (world[cx][y] == BLOCK_GRASS || world[cx][y] == BLOCK_SNOWY_GRASS)) {
+                if (y >= 0 && y < WORLD_HEIGHT && (GetBlock(cx, y) == BLOCK_GRASS || GetBlock(cx, y) == BLOCK_SNOWY_GRASS)) {
                     if (abs(y - surfaceY) > 3) { flat = false; break; }
                     break;
                 }
@@ -4132,7 +4132,7 @@ void GenerateWorld(unsigned int seed)
             for (int dy = -3; dy <= 0 && !hasWater; dy++) {
                 int cx = vx + dx, cy = surfaceY + dy;
                 if (cx >= 0 && cx < WORLD_WIDTH && cy >= 0 && cy < WORLD_HEIGHT) {
-                    if (world[cx][cy] == BLOCK_WATER) hasWater = true;
+                    if (GetBlock(cx, cy) == BLOCK_WATER) hasWater = true;
                 }
             }
         }
@@ -4148,7 +4148,7 @@ void GenerateWorld(unsigned int seed)
             // Find surface at this building position
             int buildSurface = -1;
             for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
-                if (world[bx][y] == BLOCK_GRASS || world[bx][y] == BLOCK_SNOWY_GRASS) {
+                if (GetBlock(bx, y) == BLOCK_GRASS || GetBlock(bx, y) == BLOCK_SNOWY_GRASS) {
                     buildSurface = y;
                     break;
                 }
@@ -4171,13 +4171,13 @@ void GenerateWorld(unsigned int seed)
                         if (wx < 0 || wx >= WORLD_WIDTH || wy < 0 || wy >= WORLD_HEIGHT) continue;
                         if (dy == 0) {
                             // Floor
-                            world[wx][wy] = floorBlock;
+                            SetBlock(wx, wy, floorBlock);
                         } else if (dy == h - 1 || dx == 0 || dx == w - 1) {
                             // Walls and roof
-                            world[wx][wy] = wallBlock;
+                            SetBlock(wx, wy, wallBlock);
                         } else {
                             // Interior air
-                            world[wx][wy] = BLOCK_AIR;
+                            SetBlock(wx, wy, BLOCK_AIR);
                         }
                     }
                 }
@@ -4185,8 +4185,8 @@ void GenerateWorld(unsigned int seed)
                 // Door opening (2 blocks high in front wall)
                 int doorX = bx + w / 2;
                 if (doorX >= 0 && doorX < WORLD_WIDTH) {
-                    if (buildSurface - 1 >= 0) world[doorX][buildSurface - 1] = BLOCK_AIR;
-                    if (buildSurface - 2 >= 0) world[doorX][buildSurface - 2] = BLOCK_AIR;
+                    if (buildSurface - 1 >= 0) SetBlock(doorX, buildSurface - 1, BLOCK_AIR);
+                    if (buildSurface - 2 >= 0) SetBlock(doorX, buildSurface - 2, BLOCK_AIR);
                 }
 
                 // Windows (glass)
@@ -4194,8 +4194,8 @@ void GenerateWorld(unsigned int seed)
                     // Side windows
                     int winY = buildSurface - 3;
                     if (winY >= 0 && winY < WORLD_HEIGHT) {
-                        if (bx + 1 >= 0 && bx + 1 < WORLD_WIDTH) world[bx + 1][winY] = BLOCK_GLASS;
-                        if (bx + w - 2 >= 0 && bx + w - 2 < WORLD_WIDTH) world[bx + w - 2][winY] = BLOCK_GLASS;
+                        if (bx + 1 >= 0 && bx + 1 < WORLD_WIDTH) SetBlock(bx + 1, winY, BLOCK_GLASS);
+                        if (bx + w - 2 >= 0 && bx + w - 2 < WORLD_WIDTH) SetBlock(bx + w - 2, winY, BLOCK_GLASS);
                     }
                 }
 
@@ -4203,7 +4203,7 @@ void GenerateWorld(unsigned int seed)
                 int torchX = bx + w / 2;
                 int torchY = buildSurface - 4;
                 if (torchX >= 0 && torchX < WORLD_WIDTH && torchY >= 0 && torchY < WORLD_HEIGHT) {
-                    world[torchX][torchY] = BLOCK_TORCH;
+                    SetBlock(torchX, torchY, BLOCK_TORCH);
                 }
 
                 // Furnace and crafting table in blacksmith
@@ -4211,12 +4211,12 @@ void GenerateWorld(unsigned int seed)
                     int furnX = bx + 1;
                     int furnY = buildSurface - 1;
                     if (furnX >= 0 && furnX < WORLD_WIDTH && furnY >= 0 && furnY < WORLD_HEIGHT) {
-                        world[furnX][furnY] = BLOCK_FURNACE;
+                        SetBlock(furnX, furnY, BLOCK_FURNACE);
                     }
                     int craftX = bx + w - 2;
                     int craftY = buildSurface - 1;
                     if (craftX >= 0 && craftX < WORLD_WIDTH && craftY >= 0 && craftY < WORLD_HEIGHT) {
-                        world[craftX][craftY] = BLOCK_CRAFTING_TABLE;
+                        SetBlock(craftX, craftY, BLOCK_CRAFTING_TABLE);
                     }
                 }
 
@@ -4225,7 +4225,7 @@ void GenerateWorld(unsigned int seed)
                     int bedX = bx + 1;
                     int bedY = buildSurface - 1;
                     if (bedX >= 0 && bedX < WORLD_WIDTH && bedY >= 0 && bedY < WORLD_HEIGHT) {
-                        world[bedX][bedY] = BLOCK_BED;
+                        SetBlock(bedX, bedY, BLOCK_BED);
                     }
                 }
 
@@ -4234,7 +4234,7 @@ void GenerateWorld(unsigned int seed)
                     int chestX = bx + ((btype == 3) ? w - 2 : w - 2);
                     int chestY = buildSurface - 1;
                     if (chestX >= 0 && chestX < WORLD_WIDTH && chestY >= 0 && chestY < WORLD_HEIGHT) {
-                        world[chestX][chestY] = BLOCK_CHEST;
+                        SetBlock(chestX, chestY, BLOCK_CHEST);
                         ChestData *c = &chestData[chestCount];
                         c->x = chestX;
                         c->y = chestY;
@@ -4289,29 +4289,29 @@ void GenerateWorld(unsigned int seed)
                         if (dy == 0) {
                             // Bottom row: farmland with water in center
                             if (dx == fw / 2) {
-                                world[fx][fy] = BLOCK_WATER;
+                                SetBlock(fx, fy, BLOCK_WATER);
                             } else {
-                                world[fx][fy] = BLOCK_FARMLAND;
+                                SetBlock(fx, fy, BLOCK_FARMLAND);
                             }
                         } else if (dy == 1) {
                             // Crops on farmland
                             if (dx != fw / 2) {
-                                world[fx][fy] = BLOCK_CROPS;
+                                SetBlock(fx, fy, BLOCK_CROPS);
                                 // Generated village farms look established: give each
                                 // crop a deterministic initial growth (1-7) from the seed.
                                 SetCropGrowth(fx, fy, 1 + (int)(hash2D(fx, fy, seed + 20700) % 7));
                             } else {
-                                world[fx][fy] = BLOCK_AIR;
+                                SetBlock(fx, fy, BLOCK_AIR);
                             }
                         } else if (dy == fh - 1) {
                             // Fence posts (use cobblestone as fence substitute)
                             if (dx == 0 || dx == fw - 1) {
-                                world[fx][fy] = BLOCK_COBBLESTONE;
+                                SetBlock(fx, fy, BLOCK_COBBLESTONE);
                             } else {
-                                world[fx][fy] = BLOCK_AIR;
+                                SetBlock(fx, fy, BLOCK_AIR);
                             }
                         } else {
-                            world[fx][fy] = BLOCK_AIR;
+                            SetBlock(fx, fy, BLOCK_AIR);
                         }
                     }
                 }
@@ -4324,18 +4324,18 @@ void GenerateWorld(unsigned int seed)
                         int wx = bx + dx, wy = buildSurface - dy;
                         if (wx < 0 || wx >= WORLD_WIDTH || wy < 0 || wy >= WORLD_HEIGHT) continue;
                         if (dy == 0) {
-                            world[wx][wy] = BLOCK_COBBLESTONE;
+                            SetBlock(wx, wy, BLOCK_COBBLESTONE);
                         } else if (dy <= 2 && (dx == 0 || dx == ww - 1)) {
                             // Walls (2 high)
-                            world[wx][wy] = BLOCK_COBBLESTONE;
+                            SetBlock(wx, wy, BLOCK_COBBLESTONE);
                         } else if (dy == 3) {
                             // Roof edge
-                            world[wx][wy] = BLOCK_COBBLESTONE;
+                            SetBlock(wx, wy, BLOCK_COBBLESTONE);
                         } else if (dx == ww / 2 && dy == 1) {
                             // Water in center
-                            world[wx][wy] = BLOCK_WATER;
+                            SetBlock(wx, wy, BLOCK_WATER);
                         } else {
-                            world[wx][wy] = BLOCK_AIR;
+                            SetBlock(wx, wy, BLOCK_AIR);
                         }
                     }
                 }
@@ -4350,8 +4350,8 @@ void GenerateWorld(unsigned int seed)
                     if (px >= 0) {
                         // Find surface at path position
                         for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
-                            if (world[px][y] == BLOCK_GRASS || world[px][y] == BLOCK_SNOWY_GRASS) {
-                                world[px][y] = BLOCK_DIRT;
+                            if (GetBlock(px, y) == BLOCK_GRASS || GetBlock(px, y) == BLOCK_SNOWY_GRASS) {
+                                SetBlock(px, y, BLOCK_DIRT);
                                 break;
                             }
                         }
@@ -4369,7 +4369,7 @@ void GenerateWorld(unsigned int seed)
             // Scan for intact grass outside building (right side)
             int buildSurface = -1;
             for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
-                if (world[bx + w][y] == BLOCK_GRASS || world[bx + w][y] == BLOCK_SNOWY_GRASS) {
+                if (GetBlock(bx + w, y) == BLOCK_GRASS || GetBlock(bx + w, y) == BLOCK_SNOWY_GRASS) {
                     buildSurface = y;
                     break;
                 }
@@ -4377,7 +4377,7 @@ void GenerateWorld(unsigned int seed)
             if (buildSurface < 5) {
                 // Fallback: scan left side
                 for (int y = 0; y < WORLD_HEIGHT - 10; y++) {
-                    if (bx > 0 && (world[bx - 1][y] == BLOCK_GRASS || world[bx - 1][y] == BLOCK_SNOWY_GRASS)) {
+                    if (bx > 0 && (GetBlock(bx - 1, y) == BLOCK_GRASS || GetBlock(bx - 1, y) == BLOCK_SNOWY_GRASS)) {
                         buildSurface = y;
                         break;
                     }
@@ -4473,7 +4473,7 @@ static void BuildWaterCache(Chunk *chunk)
         chunk->waterTopY[bx] = -1;
         if (wx < 0 || wx >= WORLD_WIDTH) continue;
         for (int by = 0; by < WORLD_HEIGHT; by++) {
-            if (world[wx][by] == BLOCK_WATER) {
+            if (GetBlock(wx, by) == BLOCK_WATER) {
                 chunk->waterTopY[bx] = by;
                 break;
             }
@@ -4492,7 +4492,7 @@ void GenerateChunkTexture(Chunk *chunk)
         int wx = startX + bx;
         if (wx < 0 || wx >= WORLD_WIDTH) continue;
         for (int by = 0; by < WORLD_HEIGHT; by++) {
-            BlockType bt = (BlockType)world[wx][by];
+            BlockType bt = (BlockType)GetBlock(wx, by);
             if (bt == BLOCK_AIR || bt == BLOCK_WATER) continue;
             DrawBlockPattern(&img, bx * BLOCK_SIZE, by * BLOCK_SIZE, bt, wx, by);
         }
@@ -4554,8 +4554,34 @@ void UpdateChunks(void)
     }
 }
 
+//----------------------------------------------------------------------------------
+// Block Access Layer
+//
+// Every read/write of a block goes through these two functions. Today they index
+// the single overworld grid, which is why the change is inert; the point is that
+// the 285 direct GetBlock(x, y) sites are gone, so adding a second dimension later
+// means teaching these two functions about a dimension index instead of editing
+// every call site in the codebase.
+//
+// GetBlock returns BLOCK_AIR outside the world. That matches how callers already
+// behave (most guard with their own bounds check) and keeps read paths branch-free
+// in the common case; IsBlockSolid keeps its own out-of-bounds = solid rule
+// because physics depends on it.
+//----------------------------------------------------------------------------------
+uint8_t GetBlock(int x, int y)
+{
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return BLOCK_AIR;
+    return GetBlock(x, y);
+}
+
+void SetBlock(int x, int y, uint8_t type)
+{
+    if (x < 0 || x >= WORLD_WIDTH || y < 0 || y >= WORLD_HEIGHT) return;
+    SetBlock(x, y, type);
+}
+
 bool IsBlockSolid(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return true;
-    return blockInfo[world[bx][by]].solid;
+    return blockInfo[GetBlock(bx, by)].solid;
 }

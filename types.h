@@ -1651,6 +1651,11 @@ void InvalidateChunkAt(int worldBlockX, int worldBlockY);
 void InitChunkTable(void);
 void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
+
+// Block access layer (world.c). All block reads/writes should go through these;
+// they are the single place a dimension index would be threaded through.
+uint8_t GetBlock(int x, int y);
+void SetBlock(int x, int y, uint8_t type);
 bool IsGravityBlock(uint8_t block);
 void ApplyGravityAt(int bx, int by);
 bool ValidateBlockInfo(void);
