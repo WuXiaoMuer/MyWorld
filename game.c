@@ -599,29 +599,34 @@ static void UpdateSlotSelect(float dt)
         return; // Block other input while dialog is open
     }
 
-    // Seed input (only in new game mode) - handle before navigation
-    if (slotSelectMode == 0) {
+    // Seed input, new-game screen only, and only while the field is focused.
+    // Without the focus check every keystroke was swallowed here before the
+    // menu navigation could see it, so Enter/arrows did nothing on this screen.
+    if (slotSelectMode == 0 && seedFieldFocused) {
         int key = Win32GetCharPressed();
         while (key > 0) {
             if (seedInputLen < 20 && key >= 32 && key < 127) {
                 seedInputBuf[seedInputLen++] = (char)key;
-                seedInputBuf[seedInputLen] = '\0';
+                seedInputBuf[seedInputLen] = (char)0;
             }
             key = Win32GetCharPressed();
         }
         if (Win32IsKeyPressed(KEY_BACKSPACE) && seedInputLen > 0) {
             seedInputLen--;
-            seedInputBuf[seedInputLen] = '\0';
+            seedInputBuf[seedInputLen] = (char)0;
+        }
+        if (Win32IsKeyPressed(KEY_ESCAPE) || Win32IsKeyPressed(KEY_ENTER)) {
+            seedFieldFocused = false;
         }
     }
 
     // Game mode toggle (new game only): Survival / Creative (same row as seed box)
     if (slotSelectMode == 0) {
-        int seedBoxW = 240;
+        int seedBoxW = 200;
         int seedBoxX = (SCREEN_WIDTH - seedBoxW) / 2;
-        int modeX = seedBoxX + seedBoxW + 20;
-        Rectangle survBtn = { (float)(modeX + 50), 126.0f, 88.0f, 22.0f };
-        Rectangle creatBtn = { (float)(modeX + 50 + 88 + 6), 126.0f, 88.0f, 22.0f };
+        int modeX = seedBoxX + seedBoxW + 6 + 56 + 16;
+        Rectangle survBtn = { (float)(modeX + 40), 126.0f, 72.0f, 22.0f };
+        Rectangle creatBtn = { (float)(modeX + 40 + 72 + 6), 126.0f, 72.0f, 22.0f };
         Vector2 mmouse = Win32GetMousePosition();
         if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (CheckCollisionPointRec(mmouse, survBtn)) {
@@ -4078,6 +4083,32 @@ draw_finish:
         Rectangle source = { 0, 0, (float)logicalCanvas.texture.width, -(float)logicalCanvas.texture.height };
         Rectangle dest = logicalViewport;
         DrawTexturePro(logicalCanvas.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
+    }
+
+    // TEMP capture hook (file driven)
+    {
+        static int inited = 0, frame = 0;
+        static char shot[128] = {0};
+        static int at = 60, worldSlot = -1, uiMode = -1;
+        if (!inited) {
+            inited = 1;
+            FILE *cf = fopen("SHOT_CFG.txt", "r");
+            if (cf) {
+                if (fscanf(cf, "%127s %d %d %d", shot, &at, &worldSlot, &uiMode) < 1) shot[0] = 0;
+                fclose(cf);
+            }
+            if (worldSlot >= 0) StartGameFromSlot(worldSlot, false);
+            if (uiMode == 0) { slotSelectMode = 0; gameState = STATE_SLOT_SELECT; }
+            if (uiMode == 1) { slotSelectMode = 1; gameState = STATE_SLOT_SELECT; }
+        }
+        if (shot[0] && ++frame == at) {
+            char path[256];
+            snprintf(path, sizeof(path), "shots/%s.png", shot);
+            Image img = LoadImageFromTexture(logicalCanvas.texture);
+            ImageFlipVertical(&img);
+            ExportImage(img, path);
+            UnloadImage(img);
+        }
     }
 
     EndDrawing();

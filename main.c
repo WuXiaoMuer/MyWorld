@@ -410,6 +410,7 @@ Rectangle logicalViewport = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
 float logicalScale = 1.0f;
 char seedInputBuf[32] = { 0 };
 int seedInputLen = 0;
+bool seedFieldFocused = false;   // true while the seed text field owns keyboard input
 
 // Crafting search
 char craftSearchBuf[32] = { 0 };

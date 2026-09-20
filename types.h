@@ -1519,6 +1519,7 @@ void UpdateLogicalViewport(void);
 Vector2 Win32GetLogicalMousePosition(void);
 extern char seedInputBuf[32];
 extern int seedInputLen;
+extern bool seedFieldFocused;
 
 // Confirmation dialog
 extern bool confirmDialogActive;

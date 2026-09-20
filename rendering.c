@@ -4182,28 +4182,58 @@ void DrawSlotSelectScreen(void)
 
     // Seed input + game mode (new game mode only)
     if (isNew) {
-        int seedBoxW = 200;
+        int seedBoxW = 200;   // matches the hit box in the input handler
         int seedBoxH = 24;
         int seedBoxX = contentX;
         int seedBoxY = cursorY;
         Rectangle seedBox = { (float)seedBoxX, (float)seedBoxY, (float)seedBoxW, (float)seedBoxH };
-        bool seedFocused = CheckCollisionPointRec(mouse, seedBox);
+        bool seedHover = CheckCollisionPointRec(mouse, seedBox);
 
         DrawGameText(S(STR_SEED), seedBoxX, seedBoxY - 16, 14, (Color){90, 90, 90, 220});
         // Recessed MC text field
         DrawRectangle(seedBoxX, seedBoxY, seedBoxW, seedBoxH, (Color){60, 60, 60, 255});
         DrawRectangle(seedBoxX, seedBoxY, seedBoxW, 1, (Color){30, 30, 30, 255});
         DrawRectangle(seedBoxX, seedBoxY, 1, seedBoxH, (Color){30, 30, 30, 255});
-        DrawRectangleLinesEx(seedBox, 1, seedFocused ? (Color){255, 255, 255, 255} : (Color){120, 120, 120, 255});
-        if (seedInputLen > 0) {
-            DrawGameText(seedInputBuf, seedBoxX + 6, seedBoxY + 5, 14, (Color){255, 255, 255, 255});
-        } else {
-            DrawGameText(S(STR_RANDOM), seedBoxX + 6, seedBoxY + 5, 14, (Color){150, 150, 150, 255});
+        DrawRectangleLinesEx(seedBox, 1, seedFieldFocused ? (Color){255, 255, 255, 255} : (Color){120, 120, 120, 255});
+        // Click to focus, click away to release. Focus is what routes typing
+        // to this field (see the input handler); without it the field looked
+        // interactive but was not.
+        if (seedHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            PlaySoundUIClick();
+            seedFieldFocused = true;
+        } else if (!seedHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            seedFieldFocused = false;
         }
 
+        if (seedInputLen > 0) {
+            DrawGameText(seedInputBuf, seedBoxX + 6, seedBoxY + 5, 14, (Color){255, 255, 255, 255});
+            // Blinking caret after the last character
+            if (seedFieldFocused && fmodf((float)GetTime(), 1.0f) < 0.5f) {
+                int caretX = seedBoxX + 6 + MeasureGameTextWidth(seedInputBuf, 14) + 1;
+                DrawRectangle(caretX, seedBoxY + 5, 2, 14, (Color){235, 235, 235, 255});
+            }
+        } else {
+            DrawGameText(S(STR_RANDOM), seedBoxX + 6, seedBoxY + 5, 14, (Color){150, 150, 150, 255});
+            if (seedFieldFocused && fmodf((float)GetTime(), 1.0f) < 0.5f) {
+                DrawRectangle(seedBoxX + 6, seedBoxY + 5, 2, 14, (Color){235, 235, 235, 255});
+            }
+        }
         // Game mode toggle to the right of the seed box
-        int lblW = 50, survW = 84, creatW = 84, gap = 6;
-        int modeX = seedBoxX + seedBoxW + 24;
+        int lblW = 40, survW = 72, creatW = 72, gap = 6;
+        int modeX = seedBoxX + seedBoxW + 6 + 56 + 16;   // clear of the random button
+        // Random-seed button sits just right of the field
+        int rndBtnW = 56;
+        int rndBtnX = seedBoxX + seedBoxW + 6;
+        Rectangle rndBtn = { (float)rndBtnX, (float)seedBoxY, (float)rndBtnW, (float)seedBoxH };
+        bool rndHover = CheckCollisionPointRec(mouse, rndBtn);
+        DrawUiButton(rndBtn.x, rndBtn.y, rndBtn.width, rndBtn.height, S(STR_RANDOM), 13, rndHover, false, true, 1.0f);
+        if (rndHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            PlaySoundUIClick();
+            unsigned int rs = (unsigned int)(GetTime() * 100000.0) ^ (unsigned int)rand();
+            if (rs == 0) rs = 1;
+            snprintf(seedInputBuf, sizeof(seedInputBuf), "%u", rs);
+            seedInputLen = (int)strlen(seedInputBuf);
+        }
         DrawGameText(S(STR_GAMEMODE), modeX, seedBoxY + 6, 14, (Color){90, 90, 90, 220});
         Rectangle survRect = { (float)(modeX + lblW), (float)seedBoxY, (float)survW, (float)seedBoxH };
         Rectangle creatRect = { (float)(modeX + lblW + survW + gap), (float)seedBoxY, (float)creatW, (float)seedBoxH };
