@@ -138,7 +138,11 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        16
+#define SAVE_VERSION        17
+
+// Number of world dimensions. Only the overworld exists today; the save format
+// and block-access layer are already dimension-aware so this can grow later.
+#define CURRENT_DIMENSION_COUNT 1
 #define MAX_SAVE_SLOTS      8
 #define SLOT_VISIBLE        4
 #define SAVE_DIR            "saves"

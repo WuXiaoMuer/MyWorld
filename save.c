@@ -27,6 +27,10 @@ __declspec(dllimport) int __stdcall MoveFileExA(const char*, const char*, unsign
 //   Cauldrons:   count + per-cauldron x,y,fillLevel (v11+)
 //   Crops:       uint32 count + per-crop (uint16 x, uint16 y, uint8 growth) (v12+)
 //   Fluids:      uint32 count + (uint16 x,y, uint8 block, kind, level, source) (v16+)
+//   Dimensions:  uint8 dimensionCount                                        (v17+)
+//                Currently always 1. Reserved so adding a second dimension later
+//                does not require another save-version bump; readers that predate
+//                it simply stop before this field.
 //   Trailer:     uint32 SAVE_TRAILER_MAGIC
 // NOTE: Cauldrons/Crops/Fluids are written AFTER World+Modified; LoadWorld reads them before the trailer.
 //----------------------------------------------------------------------------------
@@ -308,6 +312,14 @@ bool SaveWorld(const char *path)
             ok = ok && fwrite(&src, sizeof(src), 1, f) == 1;
         }
     }
+
+    // Dimensions (v17+) - reserved. Always 1 today; a second dimension would be
+    // written here without another version bump.
+    if (ok) {
+        uint8_t dimensionCount = CURRENT_DIMENSION_COUNT;
+        ok = ok && fwrite(&dimensionCount, sizeof(dimensionCount), 1, f) == 1;
+    }
+
 
     fclose(f);
 
@@ -714,6 +726,17 @@ bool LoadWorld(const char *path)
             RestoreFluidState((int)x, (int)y, bt, kind, level, src != 0);
         }
         QueueFluidSources();
+    }
+
+    // Dimensions (v17+). Older saves have no such field and imply 1.
+    if (version >= 17) {
+        uint8_t dimensionCount = 0;
+        if (fread(&dimensionCount, sizeof(dimensionCount), 1, f) != 1) { fclose(f); return false; }
+        if (dimensionCount != CURRENT_DIMENSION_COUNT) {
+            // A save from a build that had a different number of dimensions.
+            TraceLog(LOG_WARNING, "SAVE: file has %u dimensions, this build supports %u",
+                     (unsigned)dimensionCount, (unsigned)CURRENT_DIMENSION_COUNT);
+        }
     }
 
     {
