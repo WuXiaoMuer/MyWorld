@@ -3916,6 +3916,60 @@ void DrawLargeMap(void)
 //----------------------------------------------------------------------------------
 // Main Menu — Redesigned: deep night, gold accent, premium card buttons
 //----------------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------------
+// World loading screen.
+//
+// Generating a world is a single blocking call, so without this the window just
+// froze on whatever was last drawn. This paints a progress screen first, which
+// the main loop flushes to the screen before it starts the expensive work.
+//
+// progress is 0..1; the caller drives it (the generator itself is not split
+// into steps, so it currently sits at a fixed early value and completes when
+// the world is ready).
+//----------------------------------------------------------------------------------
+void DrawLoadingScreen(const char *message, float progress)
+{
+    if (progress < 0.0f) progress = 0.0f;
+    if (progress > 1.0f) progress = 1.0f;
+
+    // Backdrop matching the menu dusk gradient, so the transition is not jarring
+    const Color top = { 24,  32,  56, 255};
+    const Color bot = { 48,  60,  86, 255};
+    int h = SCREEN_HEIGHT;
+    for (int y = 0; y < h; y++) {
+        float t = (float)y / (float)h;
+        DrawRectangle(0, y, SCREEN_WIDTH, 1, (Color){
+            (unsigned char)(top.r + (bot.r - top.r) * t),
+            (unsigned char)(top.g + (bot.g - top.g) * t),
+            (unsigned char)(top.b + (bot.b - top.b) * t), 255});
+    }
+
+    // Panel
+    int pw = 420, ph = 116;
+    int px = (SCREEN_WIDTH - pw) / 2;
+    int py = (SCREEN_HEIGHT - ph) / 2;
+    DrawUiPanel(px, py, pw, ph, 255);
+
+    // Message
+    int mw = MeasureGameTextWidth(message, 28);
+    DrawGameText(message, px + (pw - mw) / 2, py + 22, 28, UI_TEXT_ON_LT);
+
+    // Progress bar: recessed groove with a filled portion
+    int bx = px + 30, by = py + 62, bw = pw - 60, bh = 18;
+    DrawRectangle(bx, by, bw, bh, (Color){70, 70, 70, 255});
+    DrawRectangle(bx, by, bw, 1, (Color){40, 40, 40, 255});
+    DrawRectangle(bx, by, 1, bh, (Color){40, 40, 40, 255});
+    int fill = (int)(progress * (bw - 4));
+    if (fill > 0) DrawRectangle(bx + 2, by + 2, fill, bh - 4, (Color){96, 168, 86, 255});
+    DrawRectangleLinesEx((Rectangle){(float)bx, (float)by, (float)bw, (float)bh}, 1, (Color){140, 140, 140, 255});
+
+    // Percentage
+    char pct[16];
+    snprintf(pct, sizeof(pct), "%d%%", (int)(progress * 100));
+    int pctW = MeasureGameTextWidth(pct, 14);
+    DrawGameText(pct, px + (pw - pctW) / 2, by + bh + 6, 14, UI_TEXT_ON_LT);
+}
 void DrawMainMenu(void)
 {
     float time = (float)GetTime();

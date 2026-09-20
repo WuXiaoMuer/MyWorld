@@ -172,6 +172,8 @@ static float inputTickTimer = 0.0f;
 
 // Host mode flag - when true, slot select starts hosting after InitGame
 static bool pendingHostMode = false;
+static bool g_worldLoadRequested = false;   // set when the world must be generated/loaded next frame
+static bool g_worldLoadShown = false;       // true once the loading screen has been presented
 
 //----------------------------------------------------------------------------------
 // Screen Transition System
@@ -497,19 +499,12 @@ static void StartGameFromSlot(int slot, bool isNew)
         }
         // If seedInputLen == 0, InitGame will generate a random seed
     }
-    InitGame();
-
-    if (pendingHostMode) {
-        pendingHostMode = false;
-        if (NetHostStart(NET_PORT)) {
-            localPlayerId = 0;
-            StartTransition(STATE_HOST_WAITING);
-        } else {
-            StartTransition(STATE_MENU);
-        }
-    } else {
-        StartTransition(STATE_PLAYING);
-    }
+    // Do not build the world here: generating it blocks for a noticeable time,
+    // so the main loop shows a loading screen first and then calls the real
+    // start. See the STATE_LOADING branch in UpdateDrawFrame.
+    g_worldLoadRequested = true;
+    g_worldLoadShown = false;
+    gameState = STATE_LOADING;
 }
 
 // Try to start a new game on slot; show confirm dialog if slot has data
@@ -3862,6 +3857,11 @@ void DrawGame(void)
     }
     ClearBackground(GetSkyColor());
 
+    if (gameState == STATE_LOADING) {
+        DrawLoadingScreen(S(STR_GENERATING_WORLD), g_worldLoadShown ? 0.85f : 0.15f);
+        goto draw_finish;
+    }
+
     if (gameState == STATE_MENU) {
         DrawMainMenu();
         if (showDebug) DrawFPS(SCREEN_WIDTH - 80, 10);
@@ -4203,4 +4203,27 @@ void UpdateDrawFrame(void)
     UpdateTransition(dt);
     UpdateGame(dt);
     DrawGame();
+
+    // World load handshake. The loading screen has just been presented for this
+    // frame, so the second pass through here runs the blocking generation while
+    // that screen stays on the display, then hands off to the game.
+    if (g_worldLoadRequested) {
+        if (!g_worldLoadShown) {
+            g_worldLoadShown = true;   // next frame draws the fuller progress bar
+        } else {
+            g_worldLoadRequested = false;
+            InitGame();
+            if (pendingHostMode) {
+                pendingHostMode = false;
+                if (NetHostStart(NET_PORT)) {
+                    localPlayerId = 0;
+                    StartTransition(STATE_HOST_WAITING);
+                } else {
+                    StartTransition(STATE_MENU);
+                }
+            } else {
+                StartTransition(STATE_PLAYING);
+            }
+        }
+    }
 }

@@ -512,6 +512,7 @@ typedef enum {
     STR_LOAD_GAME_SUB,
     STR_SEED,
     STR_RANDOM,
+    STR_GENERATING_WORLD,
     STR_SLOT,
     STR_SEED_DISPLAY,
     STR_HOST_WAITING,
@@ -1303,6 +1304,7 @@ typedef enum {
     STATE_SETTINGS,
     STATE_SLOT_SELECT,
     STATE_HOST_WAITING,
+    STATE_LOADING,   // world generation / load in progress (draws a progress screen)
     STATE_JOIN_GAME
 } GameState;
 
@@ -1820,6 +1822,7 @@ void DrawDeathScreen(float dt);
 float GetDeathFadeTimer(void);
 void SetDeathCause(StringId cause);
 void DrawMainMenu(void);
+void DrawLoadingScreen(const char *message, float progress);
 void DrawSlotSelectScreen(void);
 void DrawConfirmDialog(void);
 void DrawBackground(void);
