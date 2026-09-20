@@ -284,13 +284,13 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 // Natural color variation
                 if (h % 13 == 0) c = (Color){140, 140, 140, 255};
                 else if (h % 17 == 0) c = (Color){115, 115, 115, 255};
-                // Crack lines (horizontal and diagonal)
-                if (y == 4 || y == 11) { c = detail; }
+                if ((y == 4 || y == 11) && (h % 5) < 2) c = detail;   // broken up so stacked blocks do not band
+                // Diagonal cracks
                 if ((x + y) % 9 == 0 && h % 3 == 0) c = detail;
-                // Shadow at bottom for depth
-                if (y > 13) c = (Color){(unsigned char)(base.r - 15), (unsigned char)(base.g - 15), (unsigned char)(base.b - 15), 255};
+                // Depth: shade the bottom rows (unevenly, so stacks do not band)
+                if (y > 13 && (h % 3) != 0) c = (Color){(unsigned char)(base.r - 15), (unsigned char)(base.g - 15), (unsigned char)(base.b - 15), 255};
                 // Highlight at top
-                if (y < 2 && h % 4 == 0) c = (Color){145, 145, 145, 255};
+                if (y < 2 && h % 7 == 0) c = (Color){145, 145, 145, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -500,7 +500,7 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 Color c = base;
                 // Plank dividers
                 if (y % 4 == 0) c = detail;
-                if (x == 8) c = detail;
+                if (x == 8 && ((worldX + worldY) % 3) != 0) c = detail;   // staggered joint
                 // Wood grain
                 unsigned int h = hash2D(x + worldX * 16, y + worldY * 16, 9);
                 if (h % 10 == 0) c = (Color){170, 130, 70, 255};
