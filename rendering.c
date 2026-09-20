@@ -118,6 +118,124 @@ static void DrawDirtBackground(unsigned char overlayAlpha)
 }
 
 //----------------------------------------------------------------------------------
+// Main-menu background - a parallax dusk scene.
+//
+// The menu previously sat on the same tiled dirt as the in-game pause screen,
+// which read as flat and unfinished. This paints a sky instead: a vertical
+// gradient, two layers of hills scrolling at different rates, slow clouds, and
+// a warm horizon glow, so the title has something to sit against.
+//
+// Parallax uses a slow time value rather than the camera (there is none here);
+// each layer gets a different speed so the scene has depth.
+//----------------------------------------------------------------------------------
+static void DrawMenuBackground(float time)
+{
+    // --- Sky gradient: deep blue up top easing into warm dusk at the horizon ---
+    const Color skyTop    = { 38,  52,  92, 255};
+    const Color skyMid    = { 92, 106, 148, 255};
+    const Color skyLow    = {196, 150, 118, 255};
+    const Color skyHorizon= {226, 172, 120, 255};
+    const int horizonY = SCREEN_HEIGHT - 150;
+
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        float t = (float)y / (float)horizonY;
+        if (t > 1.0f) t = 1.0f;
+        Color c;
+        if (t < 0.62f) {
+            float u = t / 0.62f;
+            c = (Color){
+                (unsigned char)(skyTop.r + (skyMid.r - skyTop.r) * u),
+                (unsigned char)(skyTop.g + (skyMid.g - skyTop.g) * u),
+                (unsigned char)(skyTop.b + (skyMid.b - skyTop.b) * u), 255};
+        } else {
+            float u = (t - 0.62f) / 0.38f;
+            if (u > 1.0f) u = 1.0f;
+            if (u < 0.5f) {
+                float v = u / 0.5f;
+                c = (Color){
+                    (unsigned char)(skyMid.r + (skyLow.r - skyMid.r) * v),
+                    (unsigned char)(skyMid.g + (skyLow.g - skyMid.g) * v),
+                    (unsigned char)(skyMid.b + (skyLow.b - skyMid.b) * v), 255};
+            } else {
+                float v = (u - 0.5f) / 0.5f;
+                c = (Color){
+                    (unsigned char)(skyLow.r + (skyHorizon.r - skyLow.r) * v),
+                    (unsigned char)(skyLow.g + (skyHorizon.g - skyLow.g) * v),
+                    (unsigned char)(skyLow.b + (skyHorizon.b - skyLow.b) * v), 255};
+            }
+        }
+        DrawRectangle(0, y, SCREEN_WIDTH, 1, c);
+    }
+
+    // --- Stars in the upper sky, fading toward the horizon ---
+    for (int i = 0; i < 70; i++) {
+        unsigned int h = (unsigned int)(i * 2654435761u);
+        int sx = (int)(h % SCREEN_WIDTH);
+        int sy = (int)((h >> 9) % (unsigned)(horizonY - 120));
+        float tw = sinf(time * 1.4f + (float)i) * 0.5f + 0.5f;
+        float fade = 1.0f - (float)sy / (float)(horizonY - 120);
+        unsigned char a = (unsigned char)(tw * fade * 190.0f);
+        DrawRectangle(sx, sy, 1, 1, (Color){255, 255, 240, a});
+    }
+
+    // --- Sun low on the horizon with a soft halo ---
+    {
+        int sunX = SCREEN_WIDTH / 2 + 220;
+        int sunY = horizonY - 34;
+        for (int r = 90; r > 0; r -= 6) {
+            unsigned char a = (unsigned char)(10 + (90 - r) * 0.5f);
+            DrawCircle(sunX, sunY, (float)r, (Color){255, 214, 150, a});
+        }
+        DrawCircle(sunX, sunY, 22.0f, (Color){255, 238, 200, 255});
+        DrawCircle(sunX, sunY, 18.0f, (Color){255, 248, 224, 255});
+    }
+
+    // --- Clouds: chunky MC-style slabs drifting at two speeds ---
+    for (int layer = 0; layer < 2; layer++) {
+        float speed = (layer == 0) ? 5.0f : 11.0f;
+        int baseY = (layer == 0) ? 66 : 128;
+        unsigned char calpha = (layer == 0) ? 190 : 150;
+        Color cloud = (Color){238, 236, 244, calpha};
+        for (int i = 0; i < 4; i++) {
+            unsigned int h = (unsigned int)((i + layer * 7) * 40503u);
+            float w = 90.0f + (float)(h % 130);
+            float span = SCREEN_WIDTH + 260.0f;
+            float cx = fmodf((float)(h % 1000) + time * speed, span) - 130.0f;
+            int cy = baseY + (int)(h % 40);
+            DrawRectangle((int)cx, cy, (int)w, 13, cloud);
+            DrawRectangle((int)(cx + 22), cy - 9, (int)(w * 0.55f), 12, cloud);
+            DrawRectangle((int)(cx + 46), cy - 15, (int)(w * 0.28f), 10, cloud);
+        }
+    }
+
+    // --- Hills: two silhouettes, the far one lighter and slower ---
+    {
+        const Color farHill  = { 78, 96, 120, 255};
+        const Color nearHill = { 52, 70,  86, 255};
+        for (int layer = 0; layer < 2; layer++) {
+            Color c = (layer == 0) ? farHill : nearHill;
+            float speed = (layer == 0) ? 3.0f : 7.0f;
+            float amp   = (layer == 0) ? 42.0f : 64.0f;
+            float base  = (layer == 0) ? horizonY - 6.0f : horizonY + 16.0f;
+            float off   = time * speed;
+            for (int x = 0; x < SCREEN_WIDTH; x += 2) {
+                float u = (float)x + off;
+                float y = base
+                        - sinf(u * 0.0042f) * amp
+                        - sinf(u * 0.0113f + 1.7f) * amp * 0.35f;
+                DrawRectangle(x, (int)y, 2, SCREEN_HEIGHT - (int)y, c);
+            }
+        }
+    }
+
+    // --- Horizon glow: warm wash where the sky meets the hills ---
+    for (int i = 0; i < 26; i++) {
+        unsigned char a = (unsigned char)(16 - i * 0.6f);
+        DrawRectangle(0, horizonY - 30 + i, SCREEN_WIDTH, 1, (Color){255, 198, 140, a});
+    }
+}
+
+//----------------------------------------------------------------------------------
 // Smooth hover animation system
 //----------------------------------------------------------------------------------
 #define MAX_HOVER_SLOTS 768
@@ -3818,34 +3936,12 @@ void DrawMainMenu(void)
     float elapsed = time - menuEnterTime;
 
     // ================================================================
-    // Background: vanilla-style tiled dirt with a dark overlay
+    // Background: parallax dusk scene (sky, hills, clouds, sun)
     // ================================================================
-    DrawDirtBackground(70);
+    DrawMenuBackground(time);
 
-
-
-    // ================================================================
-    // Terrain strip — a slice of the game world (grass / dirt / stone)
-    // ================================================================
-    {
-        int terrY = SCREEN_HEIGHT - 60;
-        // Grass band with subtle wobble
-        DrawRectangle(0, terrY, SCREEN_WIDTH, 10, (Color){82, 148, 66, 255});
-        DrawRectangle(0, terrY + 2, SCREEN_WIDTH, 2, (Color){98, 172, 76, 255});
-        // Dirt band
-        DrawRectangle(0, terrY + 10, SCREEN_WIDTH, 16, (Color){126, 96, 62, 255});
-        DrawRectangle(0, terrY + 14, SCREEN_WIDTH, 1, (Color){110, 84, 54, 255});
-        // Stone band
-        DrawRectangle(0, terrY + 26, SCREEN_WIDTH, 60 - 26, (Color){94, 94, 102, 255});
-        // Grass tufts
-        for (int x = 6; x < SCREEN_WIDTH; x += 26) {
-            int tuft = ((x / 26) + (int)(time * 0.8f)) % 4;
-            if (tuft == 0) continue;
-            DrawRectangle(x, terrY - 3, 2, 3, (Color){108, 182, 82, 255});
-        }
-        // Soft dark veil behind bottom hints for readability
-        DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 12, 18, 210});
-    }
+    // Soft veil behind the bottom hints so they stay readable on the hills
+    DrawRectangle(0, SCREEN_HEIGHT - 40, SCREEN_WIDTH, 40, (Color){10, 12, 18, 150});
 
     // Focused menu card: keeps the title and actions readable over the animated sky.
     // The menu keeps the sky open; the controls themselves provide the focus.
