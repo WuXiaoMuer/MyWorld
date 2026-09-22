@@ -423,7 +423,9 @@ int confirmDialogMode = 0; // 0=overwrite, 1=delete
 
 // Furnace UI state
 bool furnaceOpen = false;
+bool brewingOpen = false;
 int furnaceBlockX = -1, furnaceBlockY = -1;
+int brewingBlockX = -1, brewingBlockY = -1;
 uint8_t furnaceFuel = 0;
 int furnaceFuelCount = 0;
 uint8_t furnaceInput = 0;
@@ -438,6 +440,17 @@ float furnaceFuelBurnMax = 0.0f;
 FurnaceData furnaces[MAX_FURNACES];
 int furnaceCount = 0;
 int activeFurnace = -1;
+// Brewing stand mirrors (same pattern as the furnace)
+BrewingData brewingStands[MAX_BREWING_STANDS];
+int brewingCount = 0;
+uint8_t brewBottle = 0;
+int brewBottleCount = 0;
+uint8_t brewIngredient = 0;
+int brewIngredientCount = 0;
+uint8_t brewOutput = 0;
+int brewOutputCount = 0;
+float brewProgress = 0.0f;
+int activeBrewing = -1;
 
 // Crafting table state
 bool craftingTableOpen = false;

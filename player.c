@@ -1092,7 +1092,8 @@ void PlayerBlockInteraction(void)
                 SetBlock(blockX, blockY, BLOCK_AIR);
                 NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                 if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
-                if (bt == BLOCK_STONE_BUTTON || bt == BLOCK_REDSTONE_REPEATER || bt == BLOCK_PISTON || bt == BLOCK_IRON_DOOR)
+                if (bt == BLOCK_BREWING_STAND) DestroyBrewing(blockX, blockY);
+                                if (bt == BLOCK_STONE_BUTTON || bt == BLOCK_REDSTONE_REPEATER || bt == BLOCK_PISTON || bt == BLOCK_IRON_DOOR)
                     UnregisterRedstoneDevice(blockX, blockY);
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Ore drop special cases (only if tool tier is sufficient)
@@ -1293,6 +1294,11 @@ void PlayerBlockInteraction(void)
                 AddToInventoryCount(ITEM_POTION_WATER, 1);
                 PlaySoundSplash();
                 ShowMessage(S(STR_MSG_BOTTLE_FILLED), (Color){120, 180, 255, 255});
+                return;
+            }
+            // Brewing stand: open the brewing UI
+            if (GetBlock(blockX, blockY) == BLOCK_BREWING_STAND) {
+                RequestOpenBrewing(blockX, blockY);
                 return;
             }
             // Ignite TNT (right-click lights the fuse)
@@ -1872,6 +1878,7 @@ void PlayerBlockInteraction(void)
                     SetBlock(blockX, blockY, selectedTool);
                     NetSyncBlockChange(blockX, blockY, selectedTool);
                     if (selectedTool == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(blockX, blockY);
+                    if (selectedTool == BLOCK_BREWING_STAND) GetOrCreateBrewing(blockX, blockY);
                     // Redstone devices register with a facing derived from the player:
                     // the device points away from whoever placed it.
                     {

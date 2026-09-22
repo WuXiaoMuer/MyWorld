@@ -138,6 +138,7 @@ void InitCraftingRecipes(void)
     ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_COAL, 1, ITEM_POTION_FIRE_RESISTANCE, 1, STR_RECIPE_POTION_FIRE_RESISTANCE, true);
     ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_LAPIS, 1, ITEM_POTION_WATER_BREATHING, 1, STR_RECIPE_POTION_WATER_BREATHING, true);
     ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_SLIMEBALL, 1, ITEM_POTION_POISON, 1, STR_RECIPE_POTION_POISON, true);
+    ADD_RECIPE2(BLOCK_COBBLESTONE, 3, ITEM_IRON_INGOT, 1, BLOCK_BREWING_STAND, 1, STR_RECIPE_BREWING_STAND, true);
     ADD_RECIPE(ITEM_REDSTONE, 5, BLOCK_TNT, 1, STR_RECIPE_TNT, true);
 
     // Slimeball recipes
@@ -178,6 +179,20 @@ void InitSmeltingRecipes(void)
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_MUTTON, ITEM_COOKED_MUTTON, STR_SMELT_MUTTON};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_CHICKEN, ITEM_COOKED_CHICKEN, STR_SMELT_CHICKEN};
     smeltRecipes[smeltRecipeCount++] = (SmeltRecipe){ITEM_RAW_FISH, ITEM_COOKED_FISH, STR_SMELT_FISH};
+}
+
+// Water bottle + this ingredient -> potion. Air = not a brewing ingredient.
+BlockType FindBrewOutput(BlockType ingredient)
+{
+    switch (ingredient) {
+        case ITEM_SUGAR:     return ITEM_POTION_SPEED;
+        case ITEM_REDSTONE:  return ITEM_POTION_STRENGTH;
+        case ITEM_GOLD_INGOT:return ITEM_POTION_REGEN;
+        case ITEM_COAL:      return ITEM_POTION_FIRE_RESISTANCE;
+        case ITEM_LAPIS:     return ITEM_POTION_WATER_BREATHING;
+        case ITEM_SLIMEBALL: return ITEM_POTION_POISON;
+        default:             return BLOCK_AIR;
+    }
 }
 
 int FindSmeltRecipe(BlockType input)

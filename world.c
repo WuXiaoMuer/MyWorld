@@ -204,6 +204,7 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Fire Resist Potion",     {240,160,60,255}, {210,130,40,255}, false, false, false},
     {"Water Breathing Potion",  {80,170,220,255}, {55,140,195,255}, false, false, false},
     {"Poison Potion",          {110,180,70,255}, {85,150,50,255}, false, false, false},
+    {"Brewing Stand",          {130,130,135,255}, {95,95,100,255}, true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -1956,6 +1957,25 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                     if (x == 12 || y == 13) c = (Color){235, 235, 235, 255};
                 }
                 if ((x == 1 || x == 14) && (y % 5 == 1)) c = (Color){120, 120, 120, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    case BLOCK_BREWING_STAND:
+        // Stone base with a metal rod and a small flask silhouette
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (y >= 12) {
+                    c = base;   // base slab
+                    unsigned int h = hash2D(x, y, 94);
+                    if (h % 8 == 0) c = detail;
+                    if (y == 12) c = (Color){160, 160, 165, 255};
+                }
+                if (x >= 7 && x <= 8 && y >= 4 && y <= 11) c = (Color){120, 120, 128, 255};   // rod
+                if (x >= 5 && x <= 10 && y >= 2 && y <= 5) {
+                    c = (Color){200, 215, 225, 220};   // flask
+                    if (y >= 4) c = (Color){200, 90, 60, 255};   // glow
+                }
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;

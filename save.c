@@ -312,6 +312,25 @@ bool SaveWorld(const char *path)
             ok = ok && fwrite(&src, sizeof(src), 1, f) == 1;
         }
     }
+    // Brewing stands (v19+): per-stand slot contents and progress
+    if (ok) {
+        if (brewingOpen && activeBrewing >= 0 && activeBrewing < brewingCount) SyncActiveToBrewing(activeBrewing);
+        uint32_t bcount = (uint32_t)brewingCount;
+        ok = ok && fwrite(&bcount, sizeof(bcount), 1, f) == 1;
+        for (int i = 0; ok && i < brewingCount; i++) {
+            BrewingData *b = &brewingStands[i];
+            ok = ok && fwrite(&b->x, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&b->y, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&b->bottle, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&b->bottleCount, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&b->ingredient, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&b->ingredientCount, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&b->output, sizeof(uint8_t), 1, f) == 1;
+            ok = ok && fwrite(&b->outputCount, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&b->progress, sizeof(float), 1, f) == 1;
+        }
+    }
+
 
     // Levers (v18+): sparse x,y list of levers currently ON. leverState used to
     // be unsaved entirely, so every reload reset every lever to off.
@@ -742,6 +761,28 @@ bool LoadWorld(const char *path)
         }
         QueueFluidSources();
     }
+    // Brewing stands (v19+). Older saves have none.
+    brewingCount = 0;
+    if (version >= 19) {
+        uint32_t bcount = 0;
+        if (fread(&bcount, sizeof(bcount), 1, f) != 1) { fclose(f); return false; }
+        if (bcount > MAX_BREWING_STANDS) { fclose(f); return false; }
+        brewingCount = (int)bcount;
+        for (uint32_t bi = 0; bi < bcount; bi++) {
+            BrewingData *b = &brewingStands[bi];
+            memset(b, 0, sizeof(BrewingData));
+            if (fread(&b->x, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->y, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->bottle, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->bottleCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->ingredient, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->ingredientCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->output, sizeof(uint8_t), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->outputCount, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&b->progress, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+        }
+    }
+
 
     // Levers (v18+). Older saves have no such section; levers stay off, which
     // matches what those builds did anyway.

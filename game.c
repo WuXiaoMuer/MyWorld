@@ -365,6 +365,9 @@ void InitGame(void)
     gamePaused = false;
     inventoryOpen = false;
     furnaceOpen = false;
+    brewingOpen = false;
+    brewingCount = 0;
+    activeBrewing = -1;
     craftingTableOpen = false;
     chestOpen = false;
     srand((unsigned int)time(NULL));
@@ -1241,6 +1244,148 @@ static void ApplyFurnaceSync(const PktFurnaceSync *pkt)
     if (activeFurnace == idx) SyncFurnaceToActive(idx);
 }
 
+int FindBrewing(int x, int y)
+{
+    for (int i = 0; i < brewingCount; i++)
+        if (brewingStands[i].x == x && brewingStands[i].y == y) return i;
+    return -1;
+}
+int GetOrCreateBrewing(int x, int y)
+{
+    int idx = FindBrewing(x, y);
+    if (idx >= 0) return idx;
+    if (brewingCount >= MAX_BREWING_STANDS) return -1;
+    idx = brewingCount++;
+    memset(&brewingStands[idx], 0, sizeof(BrewingData));
+    brewingStands[idx].x = x;
+    brewingStands[idx].y = y;
+    return idx;
+}
+void RemoveBrewing(int x, int y)
+{
+    for (int i = 0; i < brewingCount; i++) {
+        if (brewingStands[i].x == x && brewingStands[i].y == y) {
+            brewingStands[i] = brewingStands[brewingCount - 1];
+            brewingCount--;
+            if (activeBrewing == i) { activeBrewing = -1; brewingOpen = false; }
+            return;
+        }
+    }
+}
+void SyncBrewingToActive(int idx)
+{
+    if (idx < 0 || idx >= brewingCount) return;
+    BrewingData *b = &brewingStands[idx];
+    brewBottle = b->bottle;         brewBottleCount = b->bottleCount;
+    brewIngredient = b->ingredient; brewIngredientCount = b->ingredientCount;
+    brewOutput = b->output;         brewOutputCount = b->outputCount;
+    brewProgress = b->progress;
+}
+void SyncActiveToBrewing(int idx)
+{
+    if (idx < 0 || idx >= brewingCount) return;
+    BrewingData *b = &brewingStands[idx];
+    b->bottle = brewBottle;         b->bottleCount = brewBottleCount;
+    b->ingredient = brewIngredient; b->ingredientCount = brewIngredientCount;
+    b->output = brewOutput;         b->outputCount = brewOutputCount;
+    b->progress = brewProgress;
+}
+
+void RequestOpenBrewing(int bx, int by)
+{
+    brewingBlockX = bx; brewingBlockY = by;
+    // Stand contents are per-machine, so restrict to host/local to avoid item
+    // duplication in multiplayer. Clients keep using the crafting recipes.
+    if (NetIsClient()) {
+        ShowMessage(S(STR_MSG_HOST_ONLY), (Color){240, 200, 120, 255});
+        return;
+    }
+    activeBrewing = GetOrCreateBrewing(bx, by);
+    if (activeBrewing >= 0) SyncBrewingToActive(activeBrewing);
+    brewingOpen = true; inventoryOpen = true; gamePaused = false;
+    PlaySoundCraft();
+}
+void ReturnBrewingItems(void)
+{
+    if (brewBottle != BLOCK_AIR) {
+        int added = AddToInventoryCount((BlockType)brewBottle, brewBottleCount);
+        if (added < brewBottleCount)
+            SpawnItemEntity(brewBottle, brewBottleCount - added, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+        brewBottle = BLOCK_AIR; brewBottleCount = 0;
+    }
+    if (brewIngredient != BLOCK_AIR) {
+        int added = AddToInventoryCount((BlockType)brewIngredient, brewIngredientCount);
+        if (added < brewIngredientCount)
+            SpawnItemEntity(brewIngredient, brewIngredientCount - added, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+        brewIngredient = BLOCK_AIR; brewIngredientCount = 0;
+    }
+    if (brewOutput != BLOCK_AIR) {
+        int added = AddToInventoryCount((BlockType)brewOutput, brewOutputCount);
+        if (added < brewOutputCount)
+            SpawnItemEntity(brewOutput, brewOutputCount - added, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+        brewOutput = BLOCK_AIR; brewOutputCount = 0;
+    }
+}
+// Break a stand: hand its contents back, then forget it
+void DestroyBrewing(int x, int y)
+{
+    int idx = FindBrewing(x, y);
+    if (idx < 0) return;
+    BrewingData *b = &brewingStands[idx];
+    if (b->bottle != BLOCK_AIR) {
+        int added = AddToInventoryCount((BlockType)b->bottle, b->bottleCount);
+        if (added < b->bottleCount)
+            SpawnItemEntity(b->bottle, b->bottleCount - added, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+    }
+    if (b->ingredient != BLOCK_AIR) {
+        int added = AddToInventoryCount((BlockType)b->ingredient, b->ingredientCount);
+        if (added < b->ingredientCount)
+            SpawnItemEntity(b->ingredient, b->ingredientCount - added, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+    }
+    if (b->output != BLOCK_AIR) {
+        int added = AddToInventoryCount((BlockType)b->output, b->outputCount);
+        if (added < b->outputCount)
+            SpawnItemEntity(b->output, b->outputCount - added, player.position.x + PLAYER_WIDTH / 2, player.position.y);
+    }
+    RemoveBrewing(x, y);
+}
+
+// Brew one potion per 8s wherever the ingredients match; runs for every placed
+// stand, not just the open one.
+void UpdateBrewingTick(float dt)
+{
+    for (int i = 0; i < brewingCount; i++) {
+        BrewingData *b = &brewingStands[i];
+        BlockType out = BLOCK_AIR;
+        bool canBrew = (b->bottle == ITEM_POTION_WATER && b->bottleCount > 0 &&
+                        b->ingredient != BLOCK_AIR);
+        if (canBrew) out = FindBrewOutput((BlockType)b->ingredient);
+        bool fits = (out != BLOCK_AIR) &&
+                    (b->output == BLOCK_AIR || (b->output == (uint8_t)out && b->outputCount < 64));
+        if (canBrew && fits) {
+            b->progress += dt / 8.0f;
+            if (b->progress >= 1.0f) {
+                b->progress = 0.0f;
+                b->bottleCount--; if (b->bottleCount <= 0) b->bottle = BLOCK_AIR;
+                b->ingredientCount--; if (b->ingredientCount <= 0) b->ingredient = BLOCK_AIR;
+                if (b->output == BLOCK_AIR) { b->output = (uint8_t)out; b->outputCount = 1; }
+                else b->outputCount++;
+            }
+        } else {
+            b->progress = 0.0f;
+        }
+        if (brewingOpen && activeBrewing == i) SyncBrewingToActive(i);
+    }
+}
+
+void CloseBrewingUI(void)
+{
+    SyncActiveToBrewing(activeBrewing);
+    ReturnBrewingItems();
+    brewingOpen = false;
+    activeBrewing = -1;
+}
+
 void RequestOpenFurnace(int bx, int by)
 {
     furnaceBlockX = bx; furnaceBlockY = by;
@@ -1450,6 +1595,7 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
         else if (item == BLOCK_IRON_DOOR) devKind = RSD_DOOR;
         if (devKind != 255) RegisterRedstoneDevice(bx, by, devKind, 0);
     }
+    if (item == BLOCK_BREWING_STAND) GetOrCreateBrewing(bx, by);
     UpdateLightAt(bx, by);
     InvalidateChunkAt(bx, by);
     if (bx % CHUNK_SIZE == 0) InvalidateChunkAt(bx - 1, by);
@@ -2694,7 +2840,13 @@ void UpdateGame(float dt)
             ReturnHeldItem();
             craftSearchLen = 0;
             craftSearchBuf[0] = '\0';
-        } else if (chestOpen) {
+
+        } else if (brewingOpen) {
+            // Close brewing stand
+            CloseBrewingUI();
+            inventoryOpen = false;
+            ReturnHeldItem();
+            craftSearchLen = 0;        } else if (chestOpen) {
             // Close chest
             CloseChestNetwork();
             chestOpen = false;
@@ -3902,6 +4054,7 @@ void UpdateGame(float dt)
     if (!gamePaused) {
         UpdatePlayerStatus(dt);
         UpdateFurnaceTick(dt);
+        UpdateBrewingTick(dt);
     }
     UpdateChunks();
     if (!chatOpen) UpdateHotbar();
@@ -3930,6 +4083,11 @@ void UpdateGame(float dt)
                 CloseFurnaceNetwork();
                 ReturnFurnaceItems();
                 furnaceOpen = false;
+            }
+            if (brewingOpen) {
+                CloseBrewingUI();
+                inventoryOpen = false;
+                ReturnHeldItem();
             }
             if (chestOpen) CloseChestNetwork();
             chestOpen = false;

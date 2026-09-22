@@ -138,7 +138,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        18
+#define SAVE_VERSION        19
 #define MAX_SAVED_LEVERS    1024   // cap on levers persisted per save (sparse x,y list)
 
 // Number of world dimensions. Only the overworld exists today; the save format
@@ -465,6 +465,7 @@ typedef enum {
     ITEM_POTION_FIRE_RESISTANCE,
     ITEM_POTION_WATER_BREATHING,
     ITEM_POTION_POISON,
+    BLOCK_BREWING_STAND,    // brews potions from a water bottle + ingredient
     BLOCK_COUNT
 } BlockType;
 
@@ -508,6 +509,13 @@ typedef struct {
     float fuelBurn;
     float fuelBurnMax;
 } FurnaceData;
+typedef struct {
+    int x, y;
+    uint8_t bottle; int bottleCount;
+    uint8_t ingredient; int ingredientCount;
+    uint8_t output; int outputCount;
+    float progress;
+} BrewingData;
 
 //----------------------------------------------------------------------------------
 // Language & i18n
@@ -925,6 +933,11 @@ typedef enum {
     STR_ITEM_POTION_POISON,
     STR_MSG_DRANK_POTION,
     STR_MSG_BOTTLE_FILLED,
+    STR_BLOCK_BREWING_STAND,
+    STR_BREWING,
+    STR_BOTTLE,
+    STR_MSG_BREWING,
+    STR_RECIPE_BREWING_STAND,
     STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
@@ -1607,6 +1620,7 @@ extern int craftRecipeCount;
 // Furnace UI state
 extern bool furnaceOpen;
 extern int furnaceBlockX, furnaceBlockY;
+extern int brewingBlockX, brewingBlockY;
 extern uint8_t furnaceFuel;
 extern int furnaceFuelCount;
 extern uint8_t furnaceInput;
@@ -1619,6 +1633,15 @@ extern float furnaceFuelBurnMax;
 
 // Multi-furnace support
 extern FurnaceData furnaces[MAX_FURNACES];
+#define MAX_BREWING_STANDS 64
+extern BrewingData brewingStands[MAX_BREWING_STANDS];
+extern int brewingCount;
+extern bool brewingOpen;
+extern int activeBrewing;
+extern uint8_t brewBottle; extern int brewBottleCount;
+extern uint8_t brewIngredient; extern int brewIngredientCount;
+extern uint8_t brewOutput; extern int brewOutputCount;
+extern float brewProgress;
 extern int furnaceCount;
 extern int activeFurnace;
 int FindFurnace(int x, int y);
@@ -1626,6 +1649,16 @@ int GetOrCreateFurnace(int x, int y);
 void SyncFurnaceToActive(int idx);
 void SyncActiveToFurnace(int idx);
 void RequestOpenFurnace(int bx, int by);
+void RequestOpenBrewing(int bx, int by);
+void SyncBrewingToActive(int idx);
+void SyncActiveToBrewing(int idx);
+void UpdateBrewingTick(float dt);
+void RemoveBrewing(int x, int y);
+void ReturnBrewingItems(void);
+void CloseBrewingUI(void);
+void DestroyBrewing(int x, int y);
+int FindBrewing(int x, int y);
+int GetOrCreateBrewing(int x, int y);
 void SyncFurnaceToHost(void);
 void SyncFurnaceToAll(void);
 void CloseFurnaceNetwork(void);
@@ -1941,6 +1974,7 @@ void CraftForPlayer(Player *p, int recipeIndex);
 void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int slotH, int pad, bool showAdvanced);
 void InitSmeltingRecipes(void);
 int FindSmeltRecipe(BlockType input);
+BlockType FindBrewOutput(BlockType ingredient);
 void InitTrades(void);
 void DrawTradeUI(void);
 void DrawEnchantingTableUI(void);
