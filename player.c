@@ -1287,6 +1287,14 @@ void PlayerBlockInteraction(void)
                 ShowMessage(S(STR_MSG_IRON_DOOR_HINT), (Color){200, 200, 210, 255});
                 return;
             }
+            // Glass bottle: fill from a water block
+            if (selectedTool == ITEM_GLASS_BOTTLE && GetBlock(blockX, blockY) == BLOCK_WATER) {
+                if (!ConsumeItemFromSlot(&player, player.selectedSlot, 1)) return;
+                AddToInventoryCount(ITEM_POTION_WATER, 1);
+                PlaySoundSplash();
+                ShowMessage(S(STR_MSG_BOTTLE_FILLED), (Color){120, 180, 255, 255});
+                return;
+            }
             // Ignite TNT (right-click lights the fuse)
             if (GetBlock(blockX, blockY) == BLOCK_TNT) {
                 PrimeTnt(blockX, blockY);
@@ -1382,6 +1390,29 @@ void PlayerBlockInteraction(void)
             }
         }
 
+        // Drink a potion: apply the effect, return the empty bottle
+        {
+            EffectType fx;
+            float dur;
+            bool isPotion = true;
+            switch (selectedTool) {
+                case ITEM_POTION_SPEED:           fx = EFFECT_SPEED;           dur = 90.0f; break;
+                case ITEM_POTION_STRENGTH:        fx = EFFECT_STRENGTH;        dur = 90.0f; break;
+                case ITEM_POTION_REGEN:           fx = EFFECT_REGEN;           dur = 45.0f; break;
+                case ITEM_POTION_FIRE_RESISTANCE: fx = EFFECT_FIRE_RESISTANCE; dur = 120.0f; break;
+                case ITEM_POTION_WATER_BREATHING: fx = EFFECT_WATER_BREATHING; dur = 180.0f; break;
+                case ITEM_POTION_POISON:          fx = EFFECT_POISON;          dur = 30.0f; break;
+                default: isPotion = false; fx = EFFECT_SPEED; dur = 0; break;
+            }
+            if (isPotion) {
+                if (!ConsumeItemFromSlot(&player, player.selectedSlot, 1)) return;
+                ApplyEffect(&player, fx, 1, dur);
+                AddToInventoryCount(ITEM_GLASS_BOTTLE, 1);
+                PlaySoundEat();
+                ShowMessage(S(STR_MSG_DRANK_POTION), (Color){170, 120, 220, 255});
+                return;
+            }
+        }
         // Eat food
         if (IsFood(selectedTool) && player.hunger < MAX_HUNGER) {
             int foodVal = GetFoodValue(selectedTool);

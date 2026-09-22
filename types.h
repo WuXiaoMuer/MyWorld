@@ -456,6 +456,15 @@ typedef enum {
     BLOCK_REDSTONE_REPEATER,// refreshes signal strength, adds delay
     BLOCK_PISTON,           // pushes the block in front when powered
     BLOCK_IRON_DOOR,        // opens while powered
+    // Potions & bottles
+    ITEM_GLASS_BOTTLE,
+    ITEM_POTION_WATER,
+    ITEM_POTION_SPEED,
+    ITEM_POTION_STRENGTH,
+    ITEM_POTION_REGEN,
+    ITEM_POTION_FIRE_RESISTANCE,
+    ITEM_POTION_WATER_BREATHING,
+    ITEM_POTION_POISON,
     BLOCK_COUNT
 } BlockType;
 
@@ -906,6 +915,16 @@ typedef enum {
     STR_BLOCK_REDSTONE_REPEATER,
     STR_BLOCK_PISTON,
     STR_BLOCK_IRON_DOOR,
+    STR_ITEM_GLASS_BOTTLE,
+    STR_ITEM_POTION_WATER,
+    STR_ITEM_POTION_SPEED,
+    STR_ITEM_POTION_STRENGTH,
+    STR_ITEM_POTION_REGEN,
+    STR_ITEM_POTION_FIRE_RESISTANCE,
+    STR_ITEM_POTION_WATER_BREATHING,
+    STR_ITEM_POTION_POISON,
+    STR_MSG_DRANK_POTION,
+    STR_MSG_BOTTLE_FILLED,
     STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
@@ -983,6 +1002,13 @@ typedef enum {
     STR_RECIPE_REDSTONE_REPEATER,
     STR_RECIPE_PISTON,
     STR_RECIPE_IRON_DOOR,
+    STR_RECIPE_GLASS_BOTTLE,
+    STR_RECIPE_POTION_SPEED,
+    STR_RECIPE_POTION_STRENGTH,
+    STR_RECIPE_POTION_REGEN,
+    STR_RECIPE_POTION_FIRE_RESISTANCE,
+    STR_RECIPE_POTION_WATER_BREATHING,
+    STR_RECIPE_POTION_POISON,
     STR_RECIPE_PRESSURE_PLATE,
     // Combat message
     STR_MSG_CRIT_HIT,
@@ -1133,6 +1159,8 @@ typedef enum {
 typedef struct {
     BlockType input;
     int inputCount;
+    BlockType input2;       // optional second ingredient (BLOCK_AIR = none)
+    int input2Count;
     BlockType output;
     int outputCount;
     StringId nameId;

@@ -18,7 +18,12 @@ void InitCraftingRecipes(void)
 
     #define ADD_RECIPE(in, inC, out, outC, nid, adv) do { \
         if (craftRecipeCount < MAX_CRAFT_RECIPES) \
-            craftRecipes[craftRecipeCount++] = (CraftingRecipe){in, inC, out, outC, nid, adv}; \
+            craftRecipes[craftRecipeCount++] = (CraftingRecipe){in, inC, BLOCK_AIR, 0, out, outC, nid, adv}; \
+    } while(0)
+
+    #define ADD_RECIPE2(in, inC, in2, in2C, out, outC, nid, adv) do { \
+        if (craftRecipeCount < MAX_CRAFT_RECIPES) \
+            craftRecipes[craftRecipeCount++] = (CraftingRecipe){in, inC, in2, in2C, out, outC, nid, adv}; \
     } while(0)
 
     // --- Basic materials ---
@@ -125,6 +130,14 @@ void InitCraftingRecipes(void)
     ADD_RECIPE(ITEM_REDSTONE, 1, BLOCK_REDSTONE_REPEATER, 1, STR_RECIPE_REDSTONE_REPEATER, true);
     ADD_RECIPE(BLOCK_STONE, 4, BLOCK_PISTON, 1, STR_RECIPE_PISTON, true);
     ADD_RECIPE(ITEM_IRON_INGOT, 3, BLOCK_IRON_DOOR, 1, STR_RECIPE_IRON_DOOR, true);
+    // --- Potions & bottles ---
+    ADD_RECIPE(BLOCK_GLASS, 3, ITEM_GLASS_BOTTLE, 3, STR_RECIPE_GLASS_BOTTLE, false);
+    ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_SUGAR, 1, ITEM_POTION_SPEED, 1, STR_RECIPE_POTION_SPEED, true);
+    ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_REDSTONE, 1, ITEM_POTION_STRENGTH, 1, STR_RECIPE_POTION_STRENGTH, true);
+    ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_GOLD_INGOT, 1, ITEM_POTION_REGEN, 1, STR_RECIPE_POTION_REGEN, true);
+    ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_COAL, 1, ITEM_POTION_FIRE_RESISTANCE, 1, STR_RECIPE_POTION_FIRE_RESISTANCE, true);
+    ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_LAPIS, 1, ITEM_POTION_WATER_BREATHING, 1, STR_RECIPE_POTION_WATER_BREATHING, true);
+    ADD_RECIPE2(ITEM_GLASS_BOTTLE, 1, ITEM_SLIMEBALL, 1, ITEM_POTION_POISON, 1, STR_RECIPE_POTION_POISON, true);
     ADD_RECIPE(ITEM_REDSTONE, 5, BLOCK_TNT, 1, STR_RECIPE_TNT, true);
 
     // Slimeball recipes
@@ -199,7 +212,15 @@ bool CanCraftForPlayer(Player *p, int recipeIndex)
             total += p->inventoryCount[i];
         }
     }
-    return total >= r->inputCount;
+    if (total < r->inputCount) return false;
+    // Optional second ingredient (BLOCK_AIR = none)
+    if (r->input2 != BLOCK_AIR && r->input2Count > 0) {
+        int total2 = 0;
+        for (int i = 0; i < INVENTORY_SLOTS; i++)
+            if (p->inventory[i] == r->input2) total2 += p->inventoryCount[i];
+        if (total2 < r->input2Count) return false;
+    }
+    return true;
 }
 
 bool CanCraft(int recipeIndex)
@@ -230,6 +251,8 @@ void CraftForPlayer(Player *p, int recipeIndex)
 
     // Remove input (may span multiple slots)
     RemoveItemFromInventory(p, (BlockType)r->input, r->inputCount);
+    if (r->input2 != BLOCK_AIR && r->input2Count > 0)
+        RemoveItemFromInventory(p, (BlockType)r->input2, r->input2Count);
 
     // Add output
     int remaining = r->outputCount;
@@ -465,6 +488,12 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
             int have = CountItemInInventory(&player, (BlockType)r->input);
             Color countColor = have >= r->inputCount ? (Color){22, 88, 28, 255} : (Color){150, 40, 45, 255};
             DrawGameText(TextFormat("%d/%d", have, r->inputCount), x + iconSize + 5, textY, 11, countColor);
+            if (r->input2 != BLOCK_AIR && r->input2Count > 0) {
+                int have2 = CountItemInInventory(&player, (BlockType)r->input2);
+                Color c2 = have2 >= r->input2Count ? (Color){22, 88, 28, 255} : (Color){150, 40, 45, 255};
+                DrawGameText(TextFormat("+%d/%d %s", have2, r->input2Count, GetBlockName((BlockType)r->input2)),
+                             x + iconSize + 5 + MeasureGameTextWidth(TextFormat("%d/%d", have, r->inputCount), 11) + 8, textY, 11, c2);
+            }
         }
 
         DrawGameText(">", x + iconSize + 35, textY, 14, (Color){62, 62, 62, 240});
@@ -484,6 +513,11 @@ void DrawCraftingPanel(int panelX, int panelY, int panelW, int visibleCount, int
         if (canCraft && r->inputCount > 0) {
             int have = CountItemInInventory(&player, (BlockType)r->input);
             int maxCraft = have / r->inputCount;
+            if (r->input2 != BLOCK_AIR && r->input2Count > 0) {
+                int have2 = CountItemInInventory(&player, (BlockType)r->input2);
+                int m2 = have2 / r->input2Count;
+                if (m2 < maxCraft) maxCraft = m2;
+            }
             if (maxCraft > 0) {
                 char buf[16];
                 snprintf(buf, sizeof(buf), "x%d", maxCraft);

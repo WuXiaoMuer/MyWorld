@@ -196,6 +196,14 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Redstone Repeater",    {115,115,115,255}, {200,60,60,255},  true,  false, true},
     {"Piston",               {150,150,145,255}, {105,105,105,255},true,  false, true},
     {"Iron Door",            {216,216,216,255}, {150,150,150,255},true,  false, true},
+    {"Glass Bottle",           {190,205,215,255}, {150,170,185,255}, false, false, false},
+    {"Water Bottle",           {90,140,220,255}, {60,100,190,255}, false, false, false},
+    {"Speed Potion",           {120,190,250,255}, {80,150,220,255}, false, false, false},
+    {"Strength Potion",        {215,100,90,255}, {180,70,60,255}, false, false, false},
+    {"Regen Potion",           {235,130,170,255}, {200,95,140,255}, false, false, false},
+    {"Fire Resist Potion",     {240,160,60,255}, {210,130,40,255}, false, false, false},
+    {"Water Breathing Potion",  {80,170,220,255}, {55,140,195,255}, false, false, false},
+    {"Poison Potion",          {110,180,70,255}, {85,150,50,255}, false, false, false},
 };
 
 //----------------------------------------------------------------------------------
@@ -1951,6 +1959,40 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
+
+    case ITEM_GLASS_BOTTLE:
+    case ITEM_POTION_WATER:
+    case ITEM_POTION_SPEED:
+    case ITEM_POTION_STRENGTH:
+    case ITEM_POTION_REGEN:
+    case ITEM_POTION_FIRE_RESISTANCE:
+    case ITEM_POTION_WATER_BREATHING:
+    case ITEM_POTION_POISON: {
+        // Flask: narrow neck, round body, cork; liquid colour per potion
+        Color liquid = base;
+        if (bt == ITEM_GLASS_BOTTLE) liquid = (Color){0, 0, 0, 0};
+        else if (bt == ITEM_POTION_WATER) liquid = (Color){70, 120, 210, 255};
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                bool body  = (x >= 4 && x <= 11 && y >= 8 && y <= 14);
+                bool neck  = (x >= 6 && x <= 9 && y >= 3 && y <= 7);
+                bool cork  = (x >= 6 && x <= 9 && y >= 1 && y <= 2);
+                if (body || neck) {
+                    c = detail;   // glass edge
+                    bool inner = (x >= 5 && x <= 10 && y >= 9 && y <= 13);
+                    if (inner) {
+                        c = liquid;
+                        // Glass shine on the upper-left of the body
+                        if (bt != ITEM_GLASS_BOTTLE && (x == 5 || x == 6) && (y == 9 || y == 10))
+                            c = (Color){240, 240, 250, 180};
+                        if (bt == ITEM_GLASS_BOTTLE) c = (Color){210, 225, 235, 120};
+                    }
+                }
+                if (cork) c = (Color){150, 110, 70, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;}
 
     // Farming blocks
     case BLOCK_FARMLAND:
