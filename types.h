@@ -473,6 +473,7 @@ typedef enum {
     BLOCK_ABYSS_CRYSTAL_ORE,
     BLOCK_GLOWSHROOM,       // light-emitting cave plant
     ITEM_ABYSS_CRYSTAL,     // deep-tier material (boss altar later)
+    BLOCK_ABYSS_ALTAR,      // summon the Abyss Warden (abyss layer only)
     BLOCK_COUNT
 } BlockType;
 
@@ -948,7 +949,15 @@ typedef enum {
     STR_BLOCK_ABYSS_CRYSTAL_ORE,
     STR_BLOCK_GLOWSHROOM,
     STR_ITEM_ABYSS_CRYSTAL,
-    STR_ACH_ABYSS,    STR_RECIPE_BREWING_STAND,
+    STR_ACH_ABYSS,
+    STR_MOB_ABYSS_WARDEN,
+    STR_DEATH_MOB_ABYSS_WARDEN,
+    STR_ACH_WARDEN,
+    STR_MSG_WARDEN_SUMMONED,
+    STR_MSG_ALTAR_DEEP_ONLY,
+    STR_MSG_WARDEN_ALREADY,
+    STR_BLOCK_ABYSS_ALTAR,
+    STR_RECIPE_ABYSS_ALTAR,    STR_RECIPE_BREWING_STAND,
     STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
@@ -1228,6 +1237,7 @@ typedef enum {
     MOB_WOLF,       // neutral: wanders, retaliates when hit
     MOB_WITCH,      // hostile ranged caster
     MOB_BAT,        // ambient flyer
+    MOB_ABYSS_WARDEN,   // endgame boss: summoned at abyss altars
     MOB_TYPE_COUNT
 } MobType;
 
@@ -1416,6 +1426,7 @@ typedef enum {
     ACH_BREEDER,            // Breed two animals into a baby
     ACH_ENCHANTER,          // Enchant an item
     ACH_DEMOLITION,         // Detonate TNT
+    ACH_WARDEN,             // Defeat the Abyss Warden (appended: save-file index)
     ACH_COUNT
 } Achievement;
 
@@ -1554,6 +1565,7 @@ extern float messageSlide;
 extern Color messageColor;
 
 extern Mob mobs[MAX_MOBS];
+extern int bossMobIndex;            // index of the active Abyss Warden, -1 = none
 extern Projectile projectiles[MAX_PROJECTILES];
 extern int pendingProjectileHitCount;
 extern int pendingProjectileHitIndex[MAX_PROJECTILES];
@@ -1846,6 +1858,7 @@ void ApplyEffect(Player *p, EffectType type, int level, float duration);
 bool HasEffect(const Player *p, EffectType type);
 int GetEffectLevel(const Player *p, EffectType type);
 void UpdatePlayerEffects(Player *p, float dt);
+bool TrySummonWarden(int blockX, int blockY);
 void ClearEffects(Player *p);
 bool IsIronDoorOpen(int bx, int by);
 void NotifyLeverToggled(int x, int y);   // game.c: record + broadcast after a local toggle

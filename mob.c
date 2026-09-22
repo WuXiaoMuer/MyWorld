@@ -8,12 +8,16 @@
 // Mob globals defined in main.c
 
 // Mob properties per type
-// NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER, SLIME, ENDERMAN, COW, SHEEP, CHICKEN, VILLAGER, HORSE, WOLF, WITCH, BAT
-static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16, 8, 40, 10, 8, 4, 20, 24, 12, 26, 6 };
-static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f, 35.0f, 60.0f, 30.0f, 25.0f, 35.0f, 20.0f, 55.0f, 45.0f, 30.0f, 70.0f };
-static const int mobWidth[] = { 0, 16, 12, 12, 12, 20, 16, 10, 20, 16, 8, 12, 24, 18, 12, 12 };
-static const int mobHeight[] = { 0, 12, 28, 24, 24, 16, 12, 32, 16, 14, 10, 28, 20, 14, 28, 10 };
-static const int mobDamage[] = { 0, 0, 4, 2, 0, 3, 2, 5, 0, 0, 0, 0, 0, 3, 6, 0 };
+// Stat tables get one entry per type; WARDEN is the last row (see the comment).
+// NONE, PIG, ZOMBIE, SKELETON, CREEPER, SPIDER, SLIME, ENDERMAN, COW, SHEEP, CHICKEN, VILLAGER, HORSE, WOLF, WITCH, BAT, WARDEN
+static const int mobMaxHealth[] = { 0, 10, 20, 15, 20, 16, 8, 40, 10, 8, 4, 20, 24, 12, 26, 6, 300 };
+static const float mobSpeed[] = { 0, 40.0f, 30.0f, 40.0f, 25.0f, 50.0f, 35.0f, 60.0f, 30.0f, 25.0f, 35.0f, 20.0f, 55.0f, 45.0f, 30.0f, 70.0f, 55.0f };
+static const int mobWidth[] = { 0, 16, 12, 12, 12, 20, 16, 10, 20, 16, 8, 12, 24, 18, 12, 12, 28 };
+static const int mobHeight[] = { 0, 12, 28, 24, 24, 16, 12, 32, 16, 14, 10, 28, 20, 14, 28, 10, 44 };
+static const int mobDamage[] = { 0, 0, 4, 2, 0, 3, 2, 5, 0, 0, 0, 0, 0, 3, 6, 0, 8 };
+
+// Index of the active boss in mobs[], or -1. Set by the altar summon.
+int bossMobIndex = -1;
 
 int GetMobWidth(MobType type) { return mobWidth[type]; }
 int GetMobHeight(MobType type) { return mobHeight[type]; }
@@ -565,6 +569,69 @@ static void UpdateWolfAI(Mob *mob, float dt)
 
 // Witch: hostile ranged caster. Holds distance and lobs a splash-like projectile
 // (reuses the skeleton projectile path but with slower cadence).
+// Abyss Warden: endgame boss. Phase 1 (>50% HP) is a fast chase with heavy
+// contact damage. Phase 2 (<=50%) speeds up and fires a 3-shot projectile
+// spread every 2.5s. Summons are handled by the altar (game.c).
+static void UpdateWardenAI(Mob *mob, float dt)
+{
+    float dx = player.position.x - mob->position.x;
+    float dist = fabsf(dx);
+    bool phase2 = mob->health <= mob->maxHealth / 2;
+    float speed = mobSpeed[MOB_ABYSS_WARDEN] * (phase2 ? 1.25f : 1.0f);
+
+    if (CanMobSeePlayer(mob) && dist < 500.0f) {
+        mob->aiState = 1;
+        mob->velocity.x = (dx > 0 ? 1 : -1) * speed;
+        mob->facingRight = dx > 0;
+        // Phase 2: projectile spread
+        if (phase2) {
+            mob->attackTimer -= dt;
+            if (mob->attackTimer <= 0) {
+                mob->attackTimer = 2.5f;
+                float px = mob->position.x + mobWidth[MOB_ABYSS_WARDEN] / 2.0f;
+                float py = mob->position.y + mobHeight[MOB_ABYSS_WARDEN] / 3.0f;
+                float tx = player.position.x + PLAYER_WIDTH / 2.0f;
+                float ty = player.position.y + PLAYER_HEIGHT / 2.0f;
+                float adx = tx - px, ady = ty - py;
+                float adist = sqrtf(adx * adx + ady * ady);
+                if (adist > 1.0f) {
+                    float speedP = PROJECTILE_SPEED * 0.75f;
+                    for (int spread = -1; spread <= 1; spread++) {
+                        float ang = atan2f(ady, adx) + spread * 0.22f;
+                        float vx = cosf(ang) * speedP;
+                        float vy = sinf(ang) * speedP;
+                        SpawnProjectile(px, py, vx, vy, false);
+                    }
+                    if (NetIsHost()) {
+                        uint8_t buf[64];
+                        PktProjectileSpawn ps;
+                        ps.x = px; ps.y = py;
+                        ps.vx = (adx / adist) * speedP; ps.vy = (ady / adist) * speedP;
+                        ps.fromPlayer = false; ps.playerId = 0;
+                        ps.isFishing = false;
+                        buf[0] = PKT_PROJECTILE_SPAWN;
+                        memcpy(buf + 1, &ps, sizeof(PktProjectileSpawn));
+                        NetSendToAll(buf, 1 + sizeof(PktProjectileSpawn), false);
+                    }
+                    PlaySoundBowFire();
+                }
+            }
+        }
+    } else {
+        // Slow wander when the player is out of sight
+        mob->aiTimer -= dt;
+        if (mob->aiTimer <= 0) {
+            mob->aiTimer = MOB_AI_INTERVAL + (float)(rand() % 100) / 100.0f;
+            mob->aiState = rand() % 3;
+        }
+        switch (mob->aiState) {
+            case 0: mob->velocity.x = 0; break;
+            case 1: mob->velocity.x = -speed * 0.4f; mob->facingRight = false; break;
+            case 2: mob->velocity.x = speed * 0.4f; mob->facingRight = true; break;
+        }
+    }
+}
+
 static void UpdateWitchAI(Mob *mob, float dt)
 {
     float dx = player.position.x - mob->position.x;
@@ -815,6 +882,7 @@ static void UpdateCreeperAI(Mob *mob, float dt)
                 // Kill the creeper
                 mob->health = 0;
                 mob->deathTimer = MOB_DEATH_TIME;
+        if (mob->type == MOB_ABYSS_WARDEN) bossMobIndex = -1;
                 mob->velocity.x = 0;
                 PlaySoundDeath();
                 SpawnXpOrb(mob->position.x + mobWidth[MOB_CREEPER] / 2, mob->position.y, 3);
@@ -1025,6 +1093,7 @@ static void UpdateMobContactDamage(Mob *mob, float dt)
                     case MOB_WOLF: SetDeathCause(STR_DEATH_MOB_WOLF); break;
                     case MOB_WITCH: SetDeathCause(STR_DEATH_MOB_WITCH); break;
                     case MOB_BAT: SetDeathCause(STR_DEATH_MOB_BAT); break;
+                    case MOB_ABYSS_WARDEN: SetDeathCause(STR_DEATH_MOB_ABYSS_WARDEN); break;
                     default: SetDeathCause(STR_DEATH_MOB_ZOMBIE); break;
                 }
             }
@@ -1081,6 +1150,7 @@ void DamageMob(Mob *mob, int damage)
             case MOB_WOLF: deathColor = (Color){180, 180, 190, 255}; break;
             case MOB_WITCH: deathColor = (Color){90, 60, 130, 255}; break;
             case MOB_BAT: deathColor = (Color){70, 60, 70, 255}; break;
+            case MOB_ABYSS_WARDEN: deathColor = (Color){140, 90, 220, 255}; break;
             default: deathColor = (Color){180, 30, 30, 255}; break;
         }
         SpawnDamageParticles(mob->position.x + GetMobW(mob) / 2.0f,
@@ -1090,7 +1160,16 @@ void DamageMob(Mob *mob, int damage)
         // Drop items with staggered positions
         float baseDropX = mob->position.x + GetMobW(mob) / 2;
         float baseDropY = mob->position.y;
-        if (mob->type == MOB_PIG) {
+        if (mob->type == MOB_ABYSS_WARDEN) {
+            // Boss haul: crystals, diamonds and a burst of XP
+            SpawnItemEntity(ITEM_ABYSS_CRYSTAL, 5 + rand() % 4, baseDropX + (rand() % 20 - 10), baseDropY);
+            SpawnItemEntity(ITEM_DIAMOND, 2 + rand() % 2, baseDropX + (rand() % 20 - 10), baseDropY);
+            SpawnItemEntity(ITEM_GOLD_INGOT, 2 + rand() % 3, baseDropX + (rand() % 20 - 10), baseDropY);
+            SpawnXpOrb(baseDropX, baseDropY, 7);
+            SpawnXpOrb(baseDropX + 8, baseDropY, 7);
+            SpawnXpOrb(baseDropX - 8, baseDropY, 7);
+            UnlockAchievement(ACH_WARDEN);
+        } else if (mob->type == MOB_PIG) {
             SpawnItemEntity(FOOD_RAW_PORK, 1, baseDropX + (rand() % 10 - 5), baseDropY);
         } else if (mob->type == MOB_ZOMBIE) {
             if (rand() % 4 == 0) SpawnItemEntity(FOOD_APPLE, 1, baseDropX + (rand() % 10 - 5), baseDropY);
@@ -1502,6 +1581,7 @@ void UpdateMobs(float dt)
                 mob->despawnTimer -= dt;
                 if (mob->despawnTimer <= 0.0f) {
                     mob->active = false;
+                    if (mob->type == MOB_ABYSS_WARDEN) bossMobIndex = -1;
                     continue;
                 }
             }
@@ -1553,6 +1633,7 @@ void UpdateMobs(float dt)
             mob->deathTimer -= dt;
             if (mob->deathTimer <= 0) {
                 mob->active = false;
+                if (mob->type == MOB_ABYSS_WARDEN) bossMobIndex = -1;
             }
             continue;
         }
@@ -1601,6 +1682,7 @@ void UpdateMobs(float dt)
         else if (mob->type == MOB_WOLF) UpdateWolfAI(mob, dt);
         else if (mob->type == MOB_WITCH) UpdateWitchAI(mob, dt);
         else if (mob->type == MOB_BAT) UpdateBatAI(mob, dt);
+        else if (mob->type == MOB_ABYSS_WARDEN) UpdateWardenAI(mob, dt);
 
         // Love timer countdown
         if (mob->loveTimer > 0) mob->loveTimer -= dt;
@@ -2097,6 +2179,40 @@ static void DrawWolfSprite(Mob *mob)
     DrawRectangle(SRECT(mob, x + (dir > 0 ? 0 : 16), y + 3, 2, 5), (Color){150, 150, 160, alpha});
 }
 
+static void DrawWardenSprite(Mob *mob)
+{
+    // Big armored abyss figure: dark purple body, glowing teal core and eyes.
+    // Phase 2 (half health) makes the core burn brighter.
+    int w = mobWidth[MOB_ABYSS_WARDEN];
+    int h = mobHeight[MOB_ABYSS_WARDEN];
+    int x = (int)mob->position.x;
+    int y = (int)mob->position.y;
+    bool phase2 = mob->health <= mob->maxHealth / 2;
+    Color body  = {52, 38, 78, 255};
+    Color armor = {88, 70, 130, 255};
+    Color core  = phase2 ? (Color){120, 255, 230, 255} : (Color){80, 200, 190, 255};
+    int bob = (mob->aiState == 1) ? (int)(sinf(mob->aiTimer * 8.0f) * 2.0f) : 0;
+
+    // Legs
+    DrawRectangle(x + 3, y + h - 12, 7, 12, body);
+    DrawRectangle(x + w - 10, y + h - 12, 7, 12, body);
+    // Torso
+    DrawRectangle(x + 1, y + 14 + bob, w - 2, h - 26, body);
+    // Shoulder plates
+    DrawRectangle(x - 1, y + 14 + bob, 6, 10, armor);
+    DrawRectangle(x + w - 5, y + 14 + bob, 6, 10, armor);
+    // Core (glows)
+    DrawRectangle(x + w / 2 - 4, y + 22 + bob, 8, 8, core);
+    // Head + horned crown
+    DrawRectangle(x + 6, y + 2 + bob, w - 12, 14, body);
+    DrawRectangle(x + 4, y + bob, 4, 6, armor);
+    DrawRectangle(x + w - 8, y + bob, 4, 6, armor);
+    // Eyes (face the player)
+    int ex = mob->facingRight ? w - 12 : 4;
+    DrawRectangle(x + ex, y + 6 + bob, 3, 3, core);
+    DrawRectangle(x + ex + (mob->facingRight ? 5 : -5), y + 6 + bob, 3, 3, core);
+}
+
 static void DrawWitchSprite(Mob *mob)
 {
     float x = mob->position.x;
@@ -2176,6 +2292,7 @@ void DrawMobs(void)
             case MOB_WOLF: DrawWolfSprite(mob); break;
             case MOB_WITCH: DrawWitchSprite(mob); break;
             case MOB_BAT: DrawBatSprite(mob); break;
+            case MOB_ABYSS_WARDEN: DrawWardenSprite(mob); break;
             default: break;
         }
 

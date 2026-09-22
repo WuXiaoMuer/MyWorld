@@ -109,6 +109,30 @@ void InitPlayer(void)
     }
 }
 
+// Awaken the Abyss Warden from its altar. Returns true if the boss spawned.
+// The altar only resonates in the abyss layer, and only one Warden may exist.
+bool TrySummonWarden(int blockX, int blockY)
+{
+    if (blockY < ABYSS_START) {
+        ShowMessage(S(STR_MSG_ALTAR_DEEP_ONLY), (Color){170, 140, 255, 255});
+        return false;
+    }
+    if (bossMobIndex != -1 && mobs[bossMobIndex].active) {
+        ShowMessage(S(STR_MSG_WARDEN_ALREADY), (Color){255, 150, 100, 255});
+        return false;
+    }
+    // Mob simulation is host-authoritative; clients wait for replication.
+    if (NetIsClient()) return false;
+    Mob *warden = SpawnMob(MOB_ABYSS_WARDEN,
+                           blockX * BLOCK_SIZE - 6.0f,
+                           (blockY - 2) * BLOCK_SIZE);
+    if (!warden) return false;
+    bossMobIndex = (int)(warden - mobs);
+    PlaySoundThunder();
+    ShowMessage(S(STR_MSG_WARDEN_SUMMONED), (Color){200, 130, 255, 255});
+    return true;
+}
+
 //----------------------------------------------------------------------------------
 // Inventory
 //----------------------------------------------------------------------------------
@@ -1308,6 +1332,11 @@ void PlayerBlockInteraction(void)
             if (GetBlock(blockX, blockY) == BLOCK_TNT) {
                 PrimeTnt(blockX, blockY);
                 ShowMessage(S(STR_BLOCK_TNT), (Color){255, 120, 80, 255});
+                return;
+            }
+            // Abyss altar: awaken the Abyss Warden (deep layer only)
+            if (GetBlock(blockX, blockY) == BLOCK_ABYSS_ALTAR) {
+                TrySummonWarden(blockX, blockY);
                 return;
             }
             // Enchanting table interaction

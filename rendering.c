@@ -29,6 +29,7 @@ static void DrawCollectibleIcon(int x, int y, int size, int variant, unsigned ch
 #define HUD_XP_LABEL_Y    (HUD_XP_BAR_Y + HUD_XP_BAR_H + 2)             // 662
 #define HUD_SEL_NAME_Y    (HUD_XP_BAR_Y - 34)                           // 622 name box 620-652 (enchant)
 #define HUD_STATUS_Y      (HUD_SEL_NAME_Y - 34)                         // 588 status icons
+#define HUD_BOSS_BAR_Y    (HUD_STATUS_Y - 30)                           // 558 boss health band
 
 //----------------------------------------------------------------------------------
 // Minecraft-style UI palette — authentic colors from the vanilla GUI.
@@ -434,16 +435,6 @@ static void DrawUiBox(int x, int y, int w, int h, float radius, Color color)
     (void)radius;
     if (w <= 0 || h <= 0) return;
     DrawRectangle(x, y, w, h, color);
-}
-
-// Draw a soft glow circle
-static void DrawGlowCircle(int cx, int cy, int radius, Color color, float intensity)
-{
-    for (int layer = radius; layer >= 1; layer--) {
-        float fade = 1.0f - (float)layer / (float)radius;
-        unsigned char a = (unsigned char)(color.a * fade * intensity);
-        DrawCircle(cx, cy, layer, (Color){color.r, color.g, color.b, a});
-    }
 }
 
 void ClearHeldItem(void)
@@ -3290,6 +3281,35 @@ void DrawHotbar(void)
     int totalW = HOTBAR_SLOTS * slotSize + (HOTBAR_SLOTS - 1) * padding;
     int startX = (SCREEN_WIDTH - totalW) / 2;
     int startY = HUD_HOTBAR_Y;
+
+    // --- Boss bar (Abyss Warden): MC dragon-style bar above the status band ---
+    // Scanned (not via bossMobIndex) so it also works on network clients whose
+    // mob list is a host-replicated mirror.
+    for (int i = 0; i < MAX_MOBS; i++) {
+        if (!mobs[i].active || mobs[i].type != MOB_ABYSS_WARDEN) continue;
+        const Mob *boss = &mobs[i];
+        int barW = totalW;
+        int barH = 8;
+        int barX = startX;
+        int barY = HUD_BOSS_BAR_Y;
+        float pct = (boss->maxHealth > 0) ? (float)boss->health / boss->maxHealth : 0.0f;
+        if (pct < 0.0f) pct = 0.0f;
+        if (pct > 1.0f) pct = 1.0f;
+        // Boss name centered above the bar, hard black shadow like MC
+        const char *bossName = S(STR_MOB_ABYSS_WARDEN);
+        int nameW = MeasureGameTextWidth(bossName, 14);
+        DrawGameText(bossName, barX + barW / 2 - nameW / 2 + 1, barY - 15, 14, (Color){0, 0, 0, 210});
+        DrawGameText(bossName, barX + barW / 2 - nameW / 2, barY - 16, 14, (Color){205, 140, 255, 255});
+        // Backing and purple fill with a bright top edge
+        DrawRectangle(barX - 1, barY - 1, barW + 2, barH + 2, (Color){0, 0, 0, 160});
+        DrawRectangle(barX, barY, barW, barH, (Color){25, 18, 35, 230});
+        int fillW = (int)(barW * pct);
+        if (fillW > 0) {
+            DrawRectangle(barX, barY, fillW, barH, (Color){170, 60, 220, 255});
+            DrawRectangle(barX, barY, fillW, 2, (Color){215, 125, 255, 220});
+        }
+        break;
+    }
 
     // --- XP Bar above hotbar (the single XP bar; status bar no longer draws one) ---
     int xpBarW = totalW;

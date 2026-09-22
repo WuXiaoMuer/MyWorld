@@ -457,6 +457,7 @@ static StringId GetAchString(Achievement ach) {
         case ACH_BREEDER: return STR_ACH_BREEDER;
         case ACH_ENCHANTER: return STR_ACH_ENCHANTER;
         case ACH_DEMOLITION: return STR_ACH_DEMOLITION;
+        case ACH_WARDEN: return STR_ACH_WARDEN;
         default: return STR_NONE;
     }
 }

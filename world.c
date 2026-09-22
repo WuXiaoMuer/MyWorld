@@ -205,6 +205,11 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Water Breathing Potion",  {80,170,220,255}, {55,140,195,255}, false, false, false},
     {"Poison Potion",          {110,180,70,255}, {85,150,50,255}, false, false, false},
     {"Brewing Stand",          {130,130,135,255}, {95,95,100,255}, true,  false, true},
+    {"Abyss Stone",            {58, 58, 74,255},  {44, 44, 58,255}, true,  false, true},
+    {"Abyss Crystal Ore",      {58, 58, 74,255},  {110,235,225,255},true,  false, true},
+    {"Glowshroom",             {120,240,200,255}, {80,200,160,255}, false, true,  true},
+    {"Abyss Crystal",          {110,235,225,255}, {80,200,190,255}, false, false, false},
+    {"Abyss Altar",            {70, 60, 96,255},  {140,120,200,255},true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -2014,6 +2019,28 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 if (y == 5 && x >= 5 && x <= 10) c = (Color){170, 255, 230, 255};
                 if (y == 8 && x >= 4 && x <= 11) c = detail;
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_ABYSS_ALTAR:
+        // Dark rune-carved stone slab: solid body, glowing rune band, crystal top
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 131);
+                if (h % 7 == 0) c = detail;
+                // Rune band glows across the middle
+                if (y == 8 || y == 9) {
+                    if (h % 3 != 0) c = (Color){120, 255, 230, 255};
+                }
+                // Crystal spike on top center
+                if (y <= 3 && y >= 1 && x >= 6 && x <= 9) {
+                    int half = 3 - y;
+                    if (x >= 8 - half && x <= 7 + half) c = (Color){160, 250, 240, 255};
+                }
+                // Solid rim at the bottom
+                if (y >= 14) c = (Color){40, 34, 56, 255};
+                ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
 

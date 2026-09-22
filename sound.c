@@ -884,6 +884,7 @@ void PlaySoundMob(MobType type) {
     else if (type == MOB_WOLF) { SetSoundVolume(sndWolf, sfxVolume * 0.6f); PlaySound(sndWolf); }
     else if (type == MOB_WITCH) { SetSoundVolume(sndWitch, sfxVolume * 0.6f); PlaySound(sndWitch); }
     else if (type == MOB_BAT) { SetSoundVolume(sndBat, sfxVolume * 0.4f); PlaySound(sndBat); }
+    else if (type == MOB_ABYSS_WARDEN) { SetSoundVolume(sndEnderman, sfxVolume * 0.8f); PlaySound(sndEnderman); }
 }
 
 void PlaySoundSplash(void) {
