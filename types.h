@@ -138,7 +138,8 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        17
+#define SAVE_VERSION        18
+#define MAX_SAVED_LEVERS    1024   // cap on levers persisted per save (sparse x,y list)
 
 // Number of world dimensions. Only the overworld exists today; the save format
 // and block-access layer are already dimension-aware so this can grow later.
@@ -1497,8 +1498,12 @@ extern int totalBlocksPlaced;
 // Modified block tracking for multiplayer world sync
 #define MAX_MODIFIED_BLOCKS 16384
 typedef struct { uint16_t x, y; uint8_t blockType; } ModifiedBlock;
+typedef struct { uint16_t x, y; uint8_t on; } ModifiedLever;
 extern ModifiedBlock modifiedBlocks[];
 extern int modifiedBlockCount;
+#define MAX_MODIFIED_LEVERS 512
+extern ModifiedLever modifiedLevers[];
+extern int modifiedLeverCount;
 
 // Crafting search
 extern char craftSearchBuf[32];
@@ -1719,7 +1724,11 @@ void RemoveLavaAt(int bx, int by);
 // Redstone system (world.c)
 void InitRedstone(void);
 bool IsLeverOn(int bx, int by);
+int CollectLeversOn(uint16_t *out, int maxPairs);
+void ApplyLeverStates(const uint16_t *pairs, int count);
+void SetLeverState(int bx, int by, bool on);
 void ToggleLever(int bx, int by);
+void NotifyLeverToggled(int x, int y);   // game.c: record + broadcast after a local toggle
 void UpdateRedstoneAt(int bx, int by);
 void UpdateRedstoneTick(void);
 void UpdateCrops(float dt);

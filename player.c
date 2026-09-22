@@ -1171,6 +1171,7 @@ void PlayerBlockInteraction(void)
             // Toggle lever
             if (GetBlock(blockX, blockY) == BLOCK_LEVER) {
                 ToggleLever(blockX, blockY);
+                NotifyLeverToggled(blockX, blockY);   // record + broadcast
                 PlaySoundUIClick();
                 return;
             }

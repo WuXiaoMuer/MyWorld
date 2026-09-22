@@ -226,7 +226,67 @@ bool IsTransitioning(void)
 // Modified block tracking for world sync
 ModifiedBlock modifiedBlocks[MAX_MODIFIED_BLOCKS];
 int modifiedBlockCount = 0;
+ModifiedLever modifiedLevers[MAX_MODIFIED_LEVERS];
+int modifiedLeverCount = 0;
 
+static void RecordLeverChange(int x, int y, bool on)
+{
+    // Dedup by coordinate so a lever flicked many times stays one entry
+    for (int i = 0; i < modifiedLeverCount; i++) {
+        if (modifiedLevers[i].x == x && modifiedLevers[i].y == y) {
+            modifiedLevers[i].on = on;
+            return;
+        }
+    }
+    if (modifiedLeverCount < MAX_MODIFIED_LEVERS) {
+        modifiedLevers[modifiedLeverCount].x = (uint16_t)x;
+        modifiedLevers[modifiedLeverCount].y = (uint16_t)y;
+        modifiedLevers[modifiedLeverCount].on = on;
+        modifiedLeverCount++;
+    }
+}
+
+// Called after a local lever toggle: records the state for late-join sync and
+// broadcasts the new state. ToggleLever itself stays network-free.
+void NotifyLeverToggled(int x, int y)
+{
+    bool on = IsLeverOn(x, y);
+    RecordLeverChange(x, y, on);
+    if (!NetIsConnected()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    PktLeverToggle lt;
+    lt.x = (uint16_t)x;
+    lt.y = (uint16_t)y;
+    lt.on = on;
+    buf[0] = PKT_LEVER_TOGGLE;
+    memcpy(buf + 1, &lt, sizeof(lt));
+    if (NetIsHost()) NetSendToAll(buf, 1 + sizeof(lt), true);
+    else NetSendToServer(buf, 1 + sizeof(lt), true);
+}
+
+// Send current lever states to a newly joined client
+static void NetSendLeversToClient(int clientId)
+{
+    if (modifiedLeverCount == 0) return;
+    uint8_t buf[NET_PACKET_MAX];
+    int offset = 0;
+    for (int i = 0; i < modifiedLeverCount; i++) {
+        PktLeverToggle *lt = (PktLeverToggle *)(buf + 1 + offset * sizeof(PktLeverToggle));
+        lt->x = modifiedLevers[i].x;
+        lt->y = modifiedLevers[i].y;
+        lt->on = modifiedLevers[i].on;
+        offset++;
+        if (offset >= 32) {
+            buf[0] = PKT_LEVER_TOGGLE;
+            NetSendTo(clientId, buf, 1 + offset * sizeof(PktLeverToggle), true);
+            offset = 0;
+        }
+    }
+    if (offset > 0) {
+        buf[0] = PKT_LEVER_TOGGLE;
+        NetSendTo(clientId, buf, 1 + offset * sizeof(PktLeverToggle), true);
+    }
+}
 static void RecordBlockChange(int x, int y, uint8_t blockType)
 {
     // Update existing entry if this block was modified before
@@ -2382,6 +2442,7 @@ void UpdateGame(float dt)
                 }
                 // Send modified blocks to new client
                 NetSendWorldToClient(fromId);
+                    NetSendLeversToClient(fromId);
                 fluidSnapshotId[fromId]++;
                 fluidSnapshotNext[fromId] = 0;
                 fluidSnapshotActive[fromId] = false;
@@ -2810,6 +2871,7 @@ void UpdateGame(float dt)
                     }
                     // Send modified blocks to new client
                     NetSendWorldToClient(fromId);
+                    NetSendLeversToClient(fromId);
                 fluidSnapshotId[fromId]++;
                 fluidSnapshotNext[fromId] = 0;
                 fluidSnapshotActive[fromId] = false;
@@ -2972,7 +3034,22 @@ void UpdateGame(float dt)
                             }
                         }
                     }
-                } else if (type == PKT_DAMAGE_MOB && size >= 1 + (int)sizeof(PktDamageMob)) {
+                } else if (type == PKT_LEVER_TOGGLE && size >= 1 + (int)sizeof(PktLeverToggle)) {
+                    const PktLeverToggle *lt = (const PktLeverToggle *)((const uint8_t *)data + 1);
+                    if (lt->x < WORLD_WIDTH && lt->y < WORLD_HEIGHT) {
+                        SetLeverState(lt->x, lt->y, lt->on != 0);
+                        RecordLeverChange(lt->x, lt->y, lt->on != 0);
+                        // Relay so the other clients see the same state
+                        uint8_t relayBuf[NET_PACKET_MAX];
+                        relayBuf[0] = PKT_LEVER_TOGGLE;
+                        memcpy(relayBuf + 1, lt, sizeof(PktLeverToggle));
+                        for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                            if (r != fromId && players[r].netControlled) {
+                                NetSendTo(r, relayBuf, 1 + sizeof(PktLeverToggle), true);
+                            }
+                        }
+                    }
+                                    } else if (type == PKT_DAMAGE_MOB && size >= 1 + (int)sizeof(PktDamageMob)) {
                     const PktDamageMob *dm = (const PktDamageMob *)((const uint8_t *)data + 1);
                     if (dm->mobIndex < MAX_MOBS && mobs[dm->mobIndex].active && fromId > 0 && fromId < MAX_NET_PLAYERS) {
                         Player *rp = &players[fromId];
@@ -3599,7 +3676,17 @@ void UpdateGame(float dt)
                             InvalidateChunkAt(bc->x, bc->y);
                         }
                     }
-                } else if (type == PKT_ENTITY_SPAWN && size >= 1 + (int)sizeof(PktEntitySpawn)) {
+                } else if (type == PKT_LEVER_TOGGLE && size >= 1 + (int)sizeof(PktLeverToggle)) {
+                    // Single or batched lever state from the host
+                    int lcount = (size - 1) / (int)sizeof(PktLeverToggle);
+                    for (int li = 0; li < lcount; li++) {
+                        const PktLeverToggle *lt = (const PktLeverToggle *)((const uint8_t *)data + 1 + li * sizeof(PktLeverToggle));
+                        if (lt->x < WORLD_WIDTH && lt->y < WORLD_HEIGHT) {
+                            SetLeverState(lt->x, lt->y, lt->on != 0);
+                            RecordLeverChange(lt->x, lt->y, lt->on != 0);
+                        }
+                    }
+                                    } else if (type == PKT_ENTITY_SPAWN && size >= 1 + (int)sizeof(PktEntitySpawn)) {
                     const PktEntitySpawn *es = (const PktEntitySpawn *)((const uint8_t *)data + 1);
                     // Dedup: skip if an entity of same type already exists nearby (can happen when client
                     // already spawned the item from PKT_BLOCK_CHANGE processing)
@@ -4165,6 +4252,7 @@ void LoadSettings(void)
 
 void UpdateDrawFrame(void)
 {
+
     float dt = GetFrameTime();
     if (dt > 0.05f) dt = 0.05f;
     simulationAccumulator += dt;

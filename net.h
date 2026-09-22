@@ -52,6 +52,7 @@ typedef enum {
     PKT_FURNACE_OPEN,       // Client -> Server: request furnace contents
     PKT_FURNACE_SYNC,       // Bidirectional: full furnace slot data
     PKT_FURNACE_CLOSE,      // Client -> Server: closed furnace UI
+    PKT_LEVER_TOGGLE,       // Bidirectional: lever switched on/off
     PKT_DISCONNECT,         // Bidirectional: disconnect notice
     PKT_PING,               // Bidirectional: keepalive
     PKT_GAMEMODE_SYNC,      // Server -> Client: game mode changed
@@ -166,7 +167,12 @@ typedef struct {
     uint16_t x;
     uint16_t y;
     uint8_t blockType;
-} PktBlockChange;
+} PktBlockChange;// PKT_LEVER_TOGGLE
+typedef struct {
+    uint16_t x;
+    uint16_t y;
+    uint8_t on;
+} PktLeverToggle;
 
 // PKT_ENTITY_SPAWN
 typedef struct {

@@ -2949,7 +2949,45 @@ void ToggleLever(int bx, int by)
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
     leverState[bx][by] = !leverState[bx][by];
     UpdateRedstoneAt(bx, by);
+}// Lever persistence / network helpers.
+// leverState is a full-world array, but the number of placed levers is tiny, so
+// saves and network sync carry a sparse x,y list of the ones that are ON.
+int CollectLeversOn(uint16_t *out, int maxPairs)
+{
+    int n = 0;
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (world[x][y] == BLOCK_LEVER && leverState[x][y]) {
+                if (n < maxPairs) {
+                    out[n * 2] = (uint16_t)x;
+                    out[n * 2 + 1] = (uint16_t)y;
+                }
+                n++;
+            }
+        }
+    }
+    return n;
 }
+
+void ApplyLeverStates(const uint16_t *pairs, int count)
+{
+    memset(leverState, 0, sizeof(leverState));
+    for (int i = 0; i < count; i++) {
+        int x = pairs[i * 2], y = pairs[i * 2 + 1];
+        if (x >= 0 && x < WORLD_WIDTH && y >= 0 && y < WORLD_HEIGHT) leverState[x][y] = true;
+    }
+}
+
+// Network entry point: force a lever to a given state (idempotent).
+void SetLeverState(int bx, int by, bool on)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    if (GetBlock(bx, by) != BLOCK_LEVER) return;
+    if (leverState[bx][by] == on) return;   // nothing changed, no re-propagation
+    leverState[bx][by] = on;
+    UpdateRedstoneAt(bx, by);
+}
+
 
 
 static bool IsRedstoneSource(uint8_t block, int bx, int by)
@@ -2970,25 +3008,31 @@ static bool IsRedstoneSource(uint8_t block, int bx, int by)
     return false;
 }
 
+#define RS_QCAP (WORLD_WIDTH * 4)
+
 static void PropagateRedstoneBFS(int startX, int startY, int power)
 {
-    // BFS queue
-    static int qx[WORLD_WIDTH * 4];
-    static int qy[WORLD_WIDTH * 4];
-    static uint8_t qp[WORLD_WIDTH * 4];
-    int head = 0, tail = 0;
+    // BFS queue, explicit count so head/tail can never desync. The old form
+    // compared a wrapped head against an unbounded tail, which stops being
+    // meaningful once tail passes the capacity; a full queue now drops the
+    // excess instead of overwriting unread entries.
+    static int qx[RS_QCAP];
+    static int qy[RS_QCAP];
+    static uint8_t qp[RS_QCAP];
+    int head = 0, count = 0;
 
     redstonePower[startX][startY] = power;
-    qx[tail] = startX;
-    qy[tail] = startY;
-    qp[tail] = power;
-    tail++;
+    qx[count] = startX;
+    qy[count] = startY;
+    qp[count] = (uint8_t)power;
+    count++;
 
-    while (head != tail) {
+    while (count > 0) {
         int cx = qx[head];
         int cy = qy[head];
         int cp = qp[head];
-        head = (head + 1) % (WORLD_WIDTH * 4);
+        head = (head + 1) % RS_QCAP;
+        count--;
 
         // Spread to adjacent blocks
         static const int dx[] = {1, -1, 0, 0};
@@ -3006,11 +3050,13 @@ static void PropagateRedstoneBFS(int startX, int startY, int power)
             if (nblock == BLOCK_REDSTONE_WIRE) {
                 if (newPower > redstonePower[nx][ny]) {
                     redstonePower[nx][ny] = (uint8_t)newPower;
-                    int next = tail % (WORLD_WIDTH * 4);
-                    qx[next] = nx;
-                    qy[next] = ny;
-                    qp[next] = (uint8_t)newPower;
-                    tail++;
+                    if (count < RS_QCAP) {
+                        int next = (head + count) % RS_QCAP;
+                        qx[next] = nx;
+                        qy[next] = ny;
+                        qp[next] = (uint8_t)newPower;
+                        count++;
+                    }
                 }
             }
             // Lamp receives signal

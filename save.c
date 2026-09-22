@@ -313,6 +313,21 @@ bool SaveWorld(const char *path)
         }
     }
 
+    // Levers (v18+): sparse x,y list of levers currently ON. leverState used to
+    // be unsaved entirely, so every reload reset every lever to off.
+    if (ok) {
+        uint16_t leverPairs[MAX_SAVED_LEVERS * 2];
+        int leverTotal = CollectLeversOn(leverPairs, MAX_SAVED_LEVERS);
+        uint32_t leverCount = (uint32_t)leverTotal;
+        ok = ok && fwrite(&leverCount, sizeof(leverCount), 1, f) == 1;
+        int toWrite = (leverTotal > MAX_SAVED_LEVERS) ? MAX_SAVED_LEVERS : leverTotal;
+        if (leverTotal > MAX_SAVED_LEVERS)
+            TraceLog(LOG_WARNING, "SAVE: %d levers on, only %d stored", leverTotal, MAX_SAVED_LEVERS);
+        for (int i = 0; ok && i < toWrite; i++) {
+            ok = ok && fwrite(&leverPairs[i * 2], sizeof(uint16_t), 2, f) == 2;
+        }
+    }
+
     // Dimensions (v17+) - reserved. Always 1 today; a second dimension would be
     // written here without another version bump.
     if (ok) {
@@ -726,6 +741,25 @@ bool LoadWorld(const char *path)
             RestoreFluidState((int)x, (int)y, bt, kind, level, src != 0);
         }
         QueueFluidSources();
+    }
+
+    // Levers (v18+). Older saves have no such section; levers stay off, which
+    // matches what those builds did anyway.
+    if (version >= 18) {
+        uint32_t leverCount = 0;
+        if (fread(&leverCount, sizeof(leverCount), 1, f) != 1) { fclose(f); return false; }
+        if (leverCount > MAX_SAVED_LEVERS) {
+            TraceLog(LOG_WARNING, "SAVE: %u levers on file exceeds %d, ignoring the rest",
+                     (unsigned)leverCount, MAX_SAVED_LEVERS);
+        }
+        uint16_t leverPairs[MAX_SAVED_LEVERS * 2];
+        uint32_t toRead = (leverCount > MAX_SAVED_LEVERS) ? MAX_SAVED_LEVERS : leverCount;
+        bool leverOk = true;
+        for (uint32_t i = 0; i < toRead; i++) {
+            if (fread(&leverPairs[i * 2], sizeof(uint16_t), 2, f) != 2) { leverOk = false; break; }
+        }
+        if (!leverOk) { fclose(f); return false; }
+        ApplyLeverStates(leverPairs, (int)toRead);
     }
 
     // Dimensions (v17+). Older saves have no such field and imply 1.
