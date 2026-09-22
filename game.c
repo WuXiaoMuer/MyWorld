@@ -250,7 +250,9 @@ static void RecordLeverChange(int x, int y, bool on)
 // broadcasts the new state. ToggleLever itself stays network-free.
 void NotifyLeverToggled(int x, int y)
 {
-    bool on = IsLeverOn(x, y);
+    // "on" is the state being broadcast: levers report theirs, a button press
+    // is always a pulse-on event.
+    bool on = (GetBlock(x, y) == BLOCK_STONE_BUTTON) ? true : IsLeverOn(x, y);
     RecordLeverChange(x, y, on);
     if (!NetIsConnected()) return;
     uint8_t buf[NET_PACKET_MAX];
@@ -402,6 +404,7 @@ void InitGame(void)
     }
 
     RebuildPressurePlateList();
+    RebuildRedstoneDevices();
     RebuildCropList();
     RecalculateAllLight();
     InitCameraSystem();
@@ -1439,6 +1442,14 @@ static bool TryPlaceBlockRemote(Player *p, int bx, int by)
 
     // Side effects
     if (item == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(bx, by);
+    {
+        uint8_t devKind = 255;
+        if (item == BLOCK_STONE_BUTTON) devKind = RSD_BUTTON;
+        else if (item == BLOCK_REDSTONE_REPEATER) devKind = RSD_REPEATER;
+        else if (item == BLOCK_PISTON) devKind = RSD_PISTON;
+        else if (item == BLOCK_IRON_DOOR) devKind = RSD_DOOR;
+        if (devKind != 255) RegisterRedstoneDevice(bx, by, devKind, 0);
+    }
     UpdateLightAt(bx, by);
     InvalidateChunkAt(bx, by);
     if (bx % CHUNK_SIZE == 0) InvalidateChunkAt(bx - 1, by);
@@ -3037,7 +3048,7 @@ void UpdateGame(float dt)
                 } else if (type == PKT_LEVER_TOGGLE && size >= 1 + (int)sizeof(PktLeverToggle)) {
                     const PktLeverToggle *lt = (const PktLeverToggle *)((const uint8_t *)data + 1);
                     if (lt->x < WORLD_WIDTH && lt->y < WORLD_HEIGHT) {
-                        SetLeverState(lt->x, lt->y, lt->on != 0);
+                        SetRedstoneDeviceState(lt->x, lt->y, lt->on != 0);
                         RecordLeverChange(lt->x, lt->y, lt->on != 0);
                         // Relay so the other clients see the same state
                         uint8_t relayBuf[NET_PACKET_MAX];
@@ -3682,7 +3693,7 @@ void UpdateGame(float dt)
                     for (int li = 0; li < lcount; li++) {
                         const PktLeverToggle *lt = (const PktLeverToggle *)((const uint8_t *)data + 1 + li * sizeof(PktLeverToggle));
                         if (lt->x < WORLD_WIDTH && lt->y < WORLD_HEIGHT) {
-                            SetLeverState(lt->x, lt->y, lt->on != 0);
+                            SetRedstoneDeviceState(lt->x, lt->y, lt->on != 0);
                             RecordLeverChange(lt->x, lt->y, lt->on != 0);
                         }
                     }

@@ -994,6 +994,8 @@ void PlayerBlockInteraction(void)
                 SetBlock(blockX, blockY, BLOCK_AIR);
                 NetSyncBlockChange(blockX, blockY, BLOCK_AIR);
                 if (bt == BLOCK_STONE_PRESSURE_PLATE) UnregisterPressurePlate(blockX, blockY);
+                if (bt == BLOCK_STONE_BUTTON || bt == BLOCK_REDSTONE_REPEATER || bt == BLOCK_PISTON || bt == BLOCK_IRON_DOOR)
+                    UnregisterRedstoneDevice(blockX, blockY);
                 SpawnBlockParticles(blockX, blockY, bt);
                 // Ore drop special cases (only if tool tier is sufficient)
                 // Creative mode: no item drops (infinite inventory)
@@ -1173,6 +1175,18 @@ void PlayerBlockInteraction(void)
                 ToggleLever(blockX, blockY);
                 NotifyLeverToggled(blockX, blockY);   // record + broadcast
                 PlaySoundUIClick();
+                return;
+            }
+            // Stone button: momentary pulse
+            if (GetBlock(blockX, blockY) == BLOCK_STONE_BUTTON) {
+                PressStoneButton(blockX, blockY);
+                NotifyLeverToggled(blockX, blockY);   // broadcast the pulse
+                PlaySoundUIClick();
+                return;
+            }
+            // Iron door: redstone only (like MC)
+            if (GetBlock(blockX, blockY) == BLOCK_IRON_DOOR) {
+                ShowMessage(S(STR_MSG_IRON_DOOR_HINT), (Color){200, 200, 210, 255});
                 return;
             }
             // Ignite TNT (right-click lights the fuse)
@@ -1729,6 +1743,17 @@ void PlayerBlockInteraction(void)
                     SetBlock(blockX, blockY, selectedTool);
                     NetSyncBlockChange(blockX, blockY, selectedTool);
                     if (selectedTool == BLOCK_STONE_PRESSURE_PLATE) RegisterPressurePlate(blockX, blockY);
+                    // Redstone devices register with a facing derived from the player:
+                    // the device points away from whoever placed it.
+                    {
+                        uint8_t devKind = 255;
+                        if (selectedTool == BLOCK_STONE_BUTTON) devKind = RSD_BUTTON;
+                        else if (selectedTool == BLOCK_REDSTONE_REPEATER) devKind = RSD_REPEATER;
+                        else if (selectedTool == BLOCK_PISTON) devKind = RSD_PISTON;
+                        else if (selectedTool == BLOCK_IRON_DOOR) devKind = RSD_DOOR;
+                        if (devKind != 255)
+                            RegisterRedstoneDevice(blockX, blockY, devKind, player.facingRight ? 0 : 1);
+                    }
                     // Creative mode: infinite blocks, don't consume
                     if (gameMode != GAME_CREATIVE) {
                         player.inventoryCount[player.selectedSlot]--;

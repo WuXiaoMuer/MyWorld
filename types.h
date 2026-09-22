@@ -451,6 +451,11 @@ typedef enum {
     BLOCK_MYCELIUM,
     BLOCK_MUSHROOM_BLOCK,   // giant mushroom cap (red with white spots)
     BLOCK_MUSHROOM_STEM,    // giant mushroom stalk
+    // Redstone additions
+    BLOCK_STONE_BUTTON,     // momentary pulse source
+    BLOCK_REDSTONE_REPEATER,// refreshes signal strength, adds delay
+    BLOCK_PISTON,           // pushes the block in front when powered
+    BLOCK_IRON_DOOR,        // opens while powered
     BLOCK_COUNT
 } BlockType;
 
@@ -883,6 +888,11 @@ typedef enum {
     STR_BLOCK_REDSTONE_WIRE,
     STR_BLOCK_REDSTONE_LAMP,
     STR_BLOCK_STONE_PRESSURE_PLATE,
+    STR_BLOCK_STONE_BUTTON,
+    STR_BLOCK_REDSTONE_REPEATER,
+    STR_BLOCK_PISTON,
+    STR_BLOCK_IRON_DOOR,
+    STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
     STR_RECIPE_WOOD_PLANKS,
@@ -955,6 +965,10 @@ typedef enum {
     STR_RECIPE_REDSTONE_WIRE,
     STR_RECIPE_LEVER,
     STR_RECIPE_REDSTONE_LAMP,
+    STR_RECIPE_STONE_BUTTON,
+    STR_RECIPE_REDSTONE_REPEATER,
+    STR_RECIPE_PISTON,
+    STR_RECIPE_IRON_DOOR,
     STR_RECIPE_PRESSURE_PLATE,
     // Combat message
     STR_MSG_CRIT_HIT,
@@ -1728,6 +1742,18 @@ int CollectLeversOn(uint16_t *out, int maxPairs);
 void ApplyLeverStates(const uint16_t *pairs, int count);
 void SetLeverState(int bx, int by, bool on);
 void ToggleLever(int bx, int by);
+// Redstone device kinds (see world.c)
+#define RSD_BUTTON    0
+#define RSD_REPEATER  1
+#define RSD_PISTON    2
+#define RSD_DOOR      3
+void RegisterRedstoneDevice(int bx, int by, uint8_t kind, uint8_t dir);
+void UnregisterRedstoneDevice(int bx, int by);
+void RebuildRedstoneDevices(void);
+void PressStoneButton(int bx, int by);
+bool IsButtonPressedAt(int bx, int by);
+void SetRedstoneDeviceState(int bx, int by, bool on);
+bool IsIronDoorOpen(int bx, int by);
 void NotifyLeverToggled(int x, int y);   // game.c: record + broadcast after a local toggle
 void UpdateRedstoneAt(int bx, int by);
 void UpdateRedstoneTick(void);

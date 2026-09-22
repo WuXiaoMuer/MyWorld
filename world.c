@@ -191,6 +191,11 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Mycelium",               {150,130,160,255}, {120,100,135,255}, true,  false, true},
     {"Mushroom Block",         {200,60,60,255},   {235,225,215,255}, true,  false, true},
     {"Mushroom Stem",          {225,220,205,255}, {200,195,180,255}, true,  false, true},
+    // Redstone additions
+    {"Stone Button",         {125,125,125,255}, {95,95,95,255},   false, true,  true},
+    {"Redstone Repeater",    {115,115,115,255}, {200,60,60,255},  true,  false, true},
+    {"Piston",               {150,150,145,255}, {105,105,105,255},true,  false, true},
+    {"Iron Door",            {216,216,216,255}, {150,150,150,255},true,  false, true},
 };
 
 //----------------------------------------------------------------------------------
@@ -1888,6 +1893,65 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
             }
         break;
 
+    case BLOCK_STONE_BUTTON:
+        // Small stone knob centred on the tile
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (x >= 5 && x <= 10 && y >= 6 && y <= 11) {
+                    c = base;
+                    if (y == 6) c = (Color){165, 165, 165, 255};
+                    if (y == 11) c = (Color){80, 80, 80, 255};
+                    if (x == 5) c = (Color){150, 150, 150, 255};
+                    if (x == 10) c = (Color){90, 90, 90, 255};
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    case BLOCK_REDSTONE_REPEATER:
+        // Stone slab with two torch dots and a centre strip
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 91);
+                if (h % 9 == 0) c = detail;
+                if (y == 0 || y == 15) c = (Color){90, 90, 90, 255};
+                if (y >= 6 && y <= 9 && ((x >= 2 && x <= 4) || (x >= 11 && x <= 13)))
+                    c = (Color){220, 60, 50, 255};
+                if (x == 7 || x == 8) c = (Color){130, 130, 130, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    case BLOCK_PISTON:
+        // Wooden face plate over a stone body
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 92);
+                if (h % 8 == 0) c = detail;
+                if (y <= 4) c = (Color){168, 132, 84, 255};
+                if (y == 5) c = (Color){120, 92, 58, 255};
+                if ((x == 2 || x == 13) && y == 2) c = (Color){90, 90, 90, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    case BLOCK_IRON_DOOR:
+        // Heavy iron slab with a recessed panel
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 93);
+                if (h % 10 == 0) c = detail;
+                if (x >= 3 && x <= 12 && y >= 2 && y <= 13) {
+                    c = (Color){198, 198, 198, 255};
+                    if (x == 3 || y == 2) c = (Color){170, 170, 170, 255};
+                    if (x == 12 || y == 13) c = (Color){235, 235, 235, 255};
+                }
+                if ((x == 1 || x == 14) && (y % 5 == 1)) c = (Color){120, 120, 120, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
     // Farming blocks
     case BLOCK_FARMLAND:
         for (int y = 0; y < 16; y++)
@@ -2851,6 +2915,23 @@ static uint8_t redstonePower[WORLD_WIDTH][WORLD_HEIGHT];
 static bool leverState[WORLD_WIDTH][WORLD_HEIGHT];
 static uint8_t cropGrowth[WORLD_WIDTH][WORLD_HEIGHT]; // 0-7 growth stage for crops
 
+//----------------------------------------------------------------------------------
+// Redstone devices: button, repeater, piston, iron door
+//
+// One registry serves all four (they are few, and every consumer iterates the
+// list rather than indexing randomly). Repeater facing is the exception: the
+// BFS reads it for every repeater cell it touches, so it gets its own O(1)
+// array instead of a list scan. Door openness needs O(1) in IsBlockSolid, so
+// it is a byte array too.
+//----------------------------------------------------------------------------------
+#define MAX_REDSTONE_DEVICES 512
+typedef struct { uint16_t x, y; uint8_t kind, dir, state; float timer; } RsDevice;
+static RsDevice rsDevices[MAX_REDSTONE_DEVICES];
+static int rsDeviceCount;
+static uint8_t repeaterDir[WORLD_WIDTH][WORLD_HEIGHT];   // 0:+x 1:-x 2:+y 3:-y
+static uint8_t doorOpen[WORLD_WIDTH][WORLD_HEIGHT];
+static const int rsDirX[4] = { 1, -1, 0, 0 };
+static const int rsDirY[4] = { 0, 0, 1, -1 };
 // Pressure plate tracking 鈥?avoids O(524K) scan in UpdateRedstoneTick
 #define MAX_PRESSURE_PLATES 256
 static int pressurePlatesX[MAX_PRESSURE_PLATES];
@@ -2868,6 +2949,8 @@ void InitRedstone(void)
     memset(leverState, 0, sizeof(leverState));
     memset(cropGrowth, 0, sizeof(cropGrowth));
     pressurePlateCount = 0;
+    rsDeviceCount = 0;
+    memset(doorOpen, 0, sizeof(doorOpen));
     cropCellCount = 0;
 }
 
@@ -2904,6 +2987,131 @@ void RebuildPressurePlateList(void)
                 RegisterPressurePlate(x, y);
             }
         }
+    }
+}
+
+
+void RegisterRedstoneDevice(int bx, int by, uint8_t kind, uint8_t dir)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    for (int i = 0; i < rsDeviceCount; i++)
+        if (rsDevices[i].x == bx && rsDevices[i].y == by) return;
+    if (rsDeviceCount >= MAX_REDSTONE_DEVICES) return;
+    rsDevices[rsDeviceCount].x = (uint16_t)bx;
+    rsDevices[rsDeviceCount].y = (uint16_t)by;
+    rsDevices[rsDeviceCount].kind = kind;
+    rsDevices[rsDeviceCount].dir = dir;
+    rsDevices[rsDeviceCount].state = 0;
+    rsDevices[rsDeviceCount].timer = 0.0f;
+    rsDeviceCount++;
+    if (kind == RSD_REPEATER) repeaterDir[bx][by] = dir;
+}
+
+void UnregisterRedstoneDevice(int bx, int by)
+{
+    for (int i = 0; i < rsDeviceCount; i++) {
+        if (rsDevices[i].x == bx && rsDevices[i].y == by) {
+            rsDevices[i] = rsDevices[rsDeviceCount - 1];
+            rsDeviceCount--;
+            return;
+        }
+    }
+    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT)
+        repeaterDir[bx][by] = 0;
+}
+
+void RebuildRedstoneDevices(void)
+{
+    rsDeviceCount = 0;
+    memset(repeaterDir, 0, sizeof(repeaterDir));
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            uint8_t b = GetBlock(x, y);
+            if (b == BLOCK_STONE_BUTTON)      RegisterRedstoneDevice(x, y, RSD_BUTTON, 0);
+            else if (b == BLOCK_REDSTONE_REPEATER) RegisterRedstoneDevice(x, y, RSD_REPEATER, repeaterDir[x][y]);
+            else if (b == BLOCK_PISTON)       RegisterRedstoneDevice(x, y, RSD_PISTON, repeaterDir[x][y]);
+            else if (b == BLOCK_IRON_DOOR)    RegisterRedstoneDevice(x, y, RSD_DOOR, 0);
+        }
+    }
+}
+
+bool IsButtonPressedAt(int bx, int by)
+{
+    for (int i = 0; i < rsDeviceCount; i++)
+        if (rsDevices[i].kind == RSD_BUTTON && rsDevices[i].x == bx && rsDevices[i].y == by)
+            return rsDevices[i].state != 0;
+    return false;
+}
+
+// Right-click: press for a short pulse, then the tick expires it.
+void PressStoneButton(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return;
+    if (GetBlock(bx, by) != BLOCK_STONE_BUTTON) return;
+    for (int i = 0; i < rsDeviceCount; i++) {
+        if (rsDevices[i].kind == RSD_BUTTON && rsDevices[i].x == bx && rsDevices[i].y == by) {
+            if (rsDevices[i].state == 0) {
+                rsDevices[i].state = 1;
+                rsDevices[i].timer = 1.5f;
+                UpdateRedstoneAt(bx, by);
+            } else {
+                rsDevices[i].timer = 1.5f;   // re-press extends the pulse
+            }
+            return;
+        }
+    }
+    // Not registered yet (e.g. placed before the registry existed)
+    RegisterRedstoneDevice(bx, by, RSD_BUTTON, 0);
+    PressStoneButton(bx, by);
+}
+
+// Simplified piston: on the powered transition it pushes the single block in
+// front one cell further, if the destination is air. Tiles with behaviour
+// (chests, other redstone parts, fluids) are refused. Retraction pulls nothing.
+static bool IsPistonPushable(uint8_t b)
+{
+    return b != BLOCK_CHEST && b != BLOCK_FURNACE && b != BLOCK_LEVER
+        && b != BLOCK_IRON_DOOR && b != BLOCK_STONE_BUTTON
+        && b != BLOCK_REDSTONE_REPEATER && b != BLOCK_PISTON
+        && b != BLOCK_STONE_PRESSURE_PLATE && b != BLOCK_REDSTONE_WIRE
+        && b != BLOCK_AIR;
+}
+
+static void PistonActuate(RsDevice *d, bool extend)
+{
+    int fx = d->x + rsDirX[d->dir];
+    int fy = d->y + rsDirY[d->dir];
+    if (fx < 0 || fx >= WORLD_WIDTH || fy < 0 || fy >= WORLD_HEIGHT) return;
+    if (!extend) return;   // retraction leaves the pushed block where it landed
+
+    uint8_t front = GetBlock(fx, fy);
+    if (front == BLOCK_AIR) return;                 // nothing to push
+    if (!IsPistonPushable(front)) return;
+    int bx2 = fx + rsDirX[d->dir];
+    int by2 = fy + rsDirY[d->dir];
+    if (bx2 < 0 || bx2 >= WORLD_WIDTH || by2 < 0 || by2 >= WORLD_HEIGHT) return;
+    if (GetBlock(bx2, by2) != BLOCK_AIR) return;    // no room
+
+    SetBlock(bx2, by2, front);
+    SetBlock(fx, fy, BLOCK_AIR);
+    UpdateLightAt(bx2, by2);  UpdateLightAt(fx, fy);
+    InvalidateChunkAt(bx2, by2);  InvalidateChunkAt(fx, fy);
+}
+
+bool IsIronDoorOpen(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+    return doorOpen[bx][by] != 0;
+}
+
+// Remote (network) state application: lever on/off or a button pulse.
+void SetRedstoneDeviceState(int bx, int by, bool on)
+{
+    uint8_t b = GetBlock(bx, by);
+    if (b == BLOCK_LEVER) {
+        SetLeverState(bx, by, on);
+    } else if (b == BLOCK_STONE_BUTTON) {
+        if (on) PressStoneButton(bx, by);
     }
 }
 
@@ -2993,6 +3201,7 @@ void SetLeverState(int bx, int by, bool on)
 static bool IsRedstoneSource(uint8_t block, int bx, int by)
 {
     if (block == BLOCK_LEVER) return leverState[bx][by];
+    if (block == BLOCK_STONE_BUTTON) return IsButtonPressedAt(bx, by);
     if (block == BLOCK_STONE_PRESSURE_PLATE) {
         // Check if player is standing on it
         float px = player.position.x;
@@ -3071,6 +3280,35 @@ static void PropagateRedstoneBFS(int startX, int startY, int power)
                 redstonePower[nx][ny] = (uint8_t)newPower;
                 PrimeTnt(nx, ny);
             }
+            // Doors and pistons read their own cell's power in the tick, so they
+            // are terminals too: record the power but do not spread from them.
+            else if (nblock == BLOCK_IRON_DOOR || nblock == BLOCK_PISTON) {
+                if (newPower > redstonePower[nx][ny]) redstonePower[nx][ny] = (uint8_t)newPower;
+            }
+            // Repeater: a signal that arrives travelling in the device's facing
+            // direction re-emits full strength out the front. Chained repeaters
+            // therefore only pass signal forward, and sideways feeds are ignored.
+            else if (nblock == BLOCK_REDSTONE_REPEATER) {
+                uint8_t rdir = repeaterDir[nx][ny];
+                if (dx[d] == rsDirX[rdir] && dy[d] == rsDirY[rdir]) {
+                    int fx2 = nx + rsDirX[rdir];
+                    int fy2 = ny + rsDirY[rdir];
+                    if (fx2 >= 0 && fx2 < WORLD_WIDTH && fy2 >= 0 && fy2 < WORLD_HEIGHT
+                        && redstonePower[fx2][fy2] < REDSTONE_MAX_POWER) {
+                        redstonePower[fx2][fy2] = REDSTONE_MAX_POWER;
+                        uint8_t fb = GetBlock(fx2, fy2);
+                        if ((fb == BLOCK_REDSTONE_WIRE || fb == BLOCK_REDSTONE_REPEATER) && count < RS_QCAP) {
+                            int slot2 = (head + count) % RS_QCAP;
+                            qx[slot2] = fx2;
+                            qy[slot2] = fy2;
+                            qp[slot2] = REDSTONE_MAX_POWER;
+                            count++;
+                        } else if (fb == BLOCK_TNT) {
+                            PrimeTnt(fx2, fy2);
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -3122,6 +3360,30 @@ void UpdateRedstoneTick(void)
         bool nowPowered = IsRedstoneSource(BLOCK_STONE_PRESSURE_PLATE, x, y);
         if (wasPowered != nowPowered) {
             UpdateRedstoneAt(x, y);
+        }
+    }
+
+    // Buttons expire, pistons react to power transitions, doors follow power.
+    float dt = GetFrameTime();
+    for (int i = 0; i < rsDeviceCount; i++) {
+        RsDevice *d = &rsDevices[i];
+        if (d->kind == RSD_BUTTON) {
+            if (d->state) {
+                d->timer -= dt;
+                if (d->timer <= 0.0f) {
+                    d->state = 0;
+                    UpdateRedstoneAt(d->x, d->y);   // pulse over
+                }
+            }
+        } else if (d->kind == RSD_PISTON) {
+            bool now = redstonePower[d->x][d->y] > 0;
+            if ((d->state != 0) != now) {
+                d->state = now;
+                PistonActuate(d, now);
+            }
+        } else if (d->kind == RSD_DOOR) {
+            bool now = redstonePower[d->x][d->y] > 0;
+            doorOpen[d->x][d->y] = now;
         }
     }
 }
@@ -4629,5 +4891,7 @@ void SetBlock(int x, int y, uint8_t type)
 bool IsBlockSolid(int bx, int by)
 {
     if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return true;
-    return blockInfo[GetBlock(bx, by)].solid;
+    uint8_t b = GetBlock(bx, by);
+    if (b == BLOCK_IRON_DOOR) return doorOpen[bx][by] == 0;   // open doors do not block
+    return blockInfo[b].solid;
 }
