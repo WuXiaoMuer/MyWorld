@@ -2835,6 +2835,44 @@ void DrawPlayerSprite(void)
 //----------------------------------------------------------------------------------
 // Hotbar
 //----------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------
+// Active status-effect readout, right of the hotbar. MC shows icons top-right;
+// here the right edge of the hotbar is free and keeps the info near survival UI.
+// Each entry: colour chip + abbreviation + seconds left.
+//----------------------------------------------------------------------------------
+void DrawActiveEffects(void)
+{
+    int x = (SCREEN_WIDTH + HOTBAR_SLOTS * HUD_SLOT_SIZE + (HOTBAR_SLOTS - 1) * HUD_SLOT_PAD) / 2 + 12;
+    int y = HUD_HOTBAR_Y + 2;
+    int shown = 0;
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++) {
+        if (player.effects[i].time <= 0.0f) continue;
+        EffectType type = (EffectType)player.effects[i].type;
+        Color chip;
+        const char *label;
+        switch (type) {
+            case EFFECT_SPEED:           chip = (Color){120, 190, 250, 255}; label = "SPD"; break;
+            case EFFECT_STRENGTH:        chip = (Color){215, 100,  90, 255}; label = "STR"; break;
+            case EFFECT_REGEN:           chip = (Color){235, 130, 170, 255}; label = "REG"; break;
+            case EFFECT_FIRE_RESISTANCE: chip = (Color){240, 160,  60, 255}; label = "FIR"; break;
+            case EFFECT_WATER_BREATHING: chip = (Color){ 80, 170, 220, 255}; label = "WTR"; break;
+            case EFFECT_POISON:          chip = (Color){110, 180,  70, 255}; label = "PSN"; break;
+            default:                     chip = (Color){160, 160, 160, 255}; label = "?";   break;
+        }
+        DrawRectangle(x, y, 4, 14, chip);
+        char buf[24];
+        if (player.effects[i].level > 1)
+            snprintf(buf, sizeof(buf), "%s %d %ds", label, player.effects[i].level, (int)(player.effects[i].time + 0.9f));
+        else
+            snprintf(buf, sizeof(buf), "%s %ds", label, (int)(player.effects[i].time + 0.9f));
+        DrawGameText(buf, x + 8, y + 2, 14, (Color){230, 230, 230, 255});
+        y += 18;
+        shown++;
+        if (shown >= 6) break;   // keep the column on screen
+    }
+}
+
+
 void DrawHotbar(void)
 {
     int slotSize = HUD_SLOT_SIZE;

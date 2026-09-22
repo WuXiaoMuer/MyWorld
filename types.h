@@ -468,6 +468,20 @@ typedef struct {
     bool breakable;
 } BlockInfo;
 
+// Status effects (potions, beacons, boss debuffs all use this)
+typedef enum {
+    EFFECT_SPEED,
+    EFFECT_STRENGTH,
+    EFFECT_REGEN,
+    EFFECT_FIRE_RESISTANCE,
+    EFFECT_WATER_BREATHING,
+    EFFECT_POISON,
+    EFFECT_COUNT
+} EffectType;
+
+#define MAX_PLAYER_EFFECTS 8
+typedef struct { uint8_t type; uint8_t level; float time; } StatusEffect;
+
 typedef struct {
     int x, y;
     uint8_t items[CHEST_SLOTS];
@@ -1259,6 +1273,7 @@ typedef struct {
     // Creative flight
     bool flying;             // true = creative flight active
     float lastJumpTapTimer;  // time since last jump tap (for double-tap toggle)
+    StatusEffect effects[MAX_PLAYER_EFFECTS];   // active status effects (potions etc.)
 } Player;
 
 //----------------------------------------------------------------------------------
@@ -1753,6 +1768,12 @@ void RebuildRedstoneDevices(void);
 void PressStoneButton(int bx, int by);
 bool IsButtonPressedAt(int bx, int by);
 void SetRedstoneDeviceState(int bx, int by, bool on);
+// Status effects (player.c)
+void ApplyEffect(Player *p, EffectType type, int level, float duration);
+bool HasEffect(const Player *p, EffectType type);
+int GetEffectLevel(const Player *p, EffectType type);
+void UpdatePlayerEffects(Player *p, float dt);
+void ClearEffects(Player *p);
 bool IsIronDoorOpen(int bx, int by);
 void NotifyLeverToggled(int x, int y);   // game.c: record + broadcast after a local toggle
 void UpdateRedstoneAt(int bx, int by);
@@ -1842,6 +1863,7 @@ void DrawFireEffects(float dt);
 void DrawWater(void);
 void DrawPlayerSprite(void);
 void DrawHotbar(void);
+void DrawActiveEffects(void);
 void DrawPlayerStatus(void);
 void DrawCrosshair(void);
 void DrawDebugInfo(void);

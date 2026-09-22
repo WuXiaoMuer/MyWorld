@@ -69,6 +69,7 @@ void InitPlayer(void)
     player.health = MAX_HEALTH;
     player.hunger = MAX_HUNGER;
     player.oxygen = MAX_OXYGEN;
+    ClearEffects(&player);
     player.xp = 0;
     player.oxygenTimer = 0.0f;
     player.hungerTimer = 0.0f;
@@ -200,6 +201,98 @@ int AddToInventoryCount(BlockType item, int count)
 // Single source of truth - AddToInventoryCount and the crafting/trading paths all
 // used to hardcode this rule separately.
 //----------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------
+// Status effects
+//----------------------------------------------------------------------------------
+void ApplyEffect(Player *p, EffectType type, int level, float duration)
+{
+    if (type < 0 || type >= EFFECT_COUNT || duration <= 0.0f) return;
+    if (level < 1) level = 1;
+    // Same effect: refresh and keep the stronger level / longer time
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++) {
+        if (p->effects[i].time > 0.0f && (EffectType)p->effects[i].type == type) {
+            p->effects[i].time = (duration > p->effects[i].time) ? duration : p->effects[i].time;
+            p->effects[i].level = (uint8_t)((level > p->effects[i].level) ? level : p->effects[i].level);
+            return;
+        }
+    }
+    // Free slot; overwrite the oldest expired one otherwise
+    int slot = -1;
+    for (int i = 0; i < MAX_PLAYER_EFFECTS && slot == -1; i++)
+        if (p->effects[i].time <= 0.0f) slot = i;
+    if (slot == -1) slot = 0;   // full: replace oldest (slot 0, effects are added in order)
+    p->effects[slot].type = (uint8_t)type;
+    p->effects[slot].level = (uint8_t)level;
+    p->effects[slot].time = duration;
+}
+
+bool HasEffect(const Player *p, EffectType type)
+{
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++)
+        if (p->effects[i].time > 0.0f && (EffectType)p->effects[i].type == type) return true;
+    return false;
+}
+
+int GetEffectLevel(const Player *p, EffectType type)
+{
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++)
+        if (p->effects[i].time > 0.0f && (EffectType)p->effects[i].type == type) return p->effects[i].level;
+    return 0;
+}
+
+void ClearEffects(Player *p)
+{
+    memset(p->effects, 0, sizeof(p->effects));
+}
+
+void UpdatePlayerEffects(Player *p, float dt)
+{
+    // Poison: 1 damage per tick, cannot kill (leaves 1 health, like MC)
+    float poisonTick = 1.5f;
+    float poisonAccum = 0.0f;
+    int poisonLevel = GetEffectLevel(p, EFFECT_POISON);
+    if (poisonLevel > 0 && !p->playerDead && gameMode != GAME_CREATIVE) {
+        // The accumulator rides on the effect time so it survives refreshes
+        static float poisonTimer = 0.0f;   // single-player local player only
+        poisonTimer += dt * poisonLevel;
+        while (poisonTimer >= poisonTick) {
+            poisonTimer -= poisonTick;
+            poisonAccum += 1.0f;
+        }
+    }
+    if (poisonAccum > 0.0f && p->health > 1) {
+        int dmg = (int)poisonAccum;
+        if (p->health - dmg < 1) dmg = p->health - 1;
+        if (dmg > 0) {
+            p->health -= dmg;
+            p->damageFlashTimer = 0.3f;
+            if (!p->netControlled) PlaySoundHurt();
+        }
+    }
+
+    // Regeneration: 1 health per (2.5 / level) seconds, independent of hunger
+    int regenLevel = GetEffectLevel(p, EFFECT_REGEN);
+    if (regenLevel > 0 && !p->playerDead && p->health > 0 && p->health < MAX_HEALTH) {
+        static float regenAccum = 0.0f;
+        regenAccum += dt;
+        float need = 2.5f / regenLevel;
+        while (regenAccum >= need) {
+            regenAccum -= need;
+            if (p->health < MAX_HEALTH) {
+                p->health++;
+                if (!p->netControlled) PlaySoundEat();
+            }
+        }
+    }
+
+    // Expire
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++) {
+        if (p->effects[i].time > 0.0f) {
+            p->effects[i].time -= dt;
+            if (p->effects[i].time < 0.0f) p->effects[i].time = 0.0f;
+        }
+    }
+}
 int GetMaxStack(BlockType item)
 {
     if (IsTool(item) || IsArmor(item)) return 1;
@@ -559,6 +652,10 @@ void PlayerPhysics(float dt)
         if (player.sneaking && targetSpeed != 0.0f) {
             targetSpeed *= SNEAK_SPEED_MULT;
         }
+        // Speed effect: +20% per level (applied after sprint so they stack)
+        if (HasEffect(&player, EFFECT_SPEED) && targetSpeed != 0.0f) {
+            targetSpeed *= 1.0f + 0.2f * GetEffectLevel(&player, EFFECT_SPEED);
+        }
 
         float accel = (targetSpeed != 0.0f) ? MOVE_ACCEL : MOVE_DECEL;
         float diff = targetSpeed - player.velocity.x;
@@ -893,6 +990,7 @@ void PlayerBlockInteraction(void)
                     mouseWorld.y >= mTop && mouseWorld.y <= mBottom) {
                     // Attack mob
                     int damage = IsTool(selectedTool) ? (IsSword(selectedTool) ? GetSwordDamage(selectedTool) : 2) : 1;
+                    if (HasEffect(&player, EFFECT_STRENGTH)) damage += 2 * GetEffectLevel(&player, EFFECT_STRENGTH);
                     // Sharpness enchantment bonus
                     uint16_t toolEnch = player.itemEnchantments[player.selectedSlot];
                     if (ENCH_TYPE(toolEnch) == ENCH_SHARPNESS) {
@@ -1992,6 +2090,7 @@ bool IsPlayerUnderwater(void)
 
 void UpdatePlayerStatus(float dt)
 {
+    UpdatePlayerEffects(&player, dt);
     if (gamePaused || inventoryOpen || creativeOpen || player.playerDead) return;
 
     bool underwater = IsPlayerUnderwater();
@@ -2009,6 +2108,7 @@ void UpdatePlayerStatus(float dt)
     // --- Oxygen ---
     if (underwater) {
         player.oxygenTimer += dt;
+        if (HasEffect(&player, EFFECT_WATER_BREATHING)) player.oxygenTimer = 0.0f;   // water breathing: no drain
         if (player.oxygenTimer >= 1.0f / OXYGEN_DRAIN_RATE) {
             player.oxygenTimer -= 1.0f / OXYGEN_DRAIN_RATE;
             if (player.oxygen > 0) player.oxygen--;
@@ -2042,7 +2142,7 @@ void UpdatePlayerStatus(float dt)
     {
         int pbx = (int)(player.position.x + PLAYER_WIDTH / 2) / BLOCK_SIZE;
         int pby = (int)(player.position.y + PLAYER_HEIGHT / 2) / BLOCK_SIZE;
-        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && GetBlock(pbx, pby) == BLOCK_LAVA && gameMode != GAME_CREATIVE) {
+        if (pbx >= 0 && pbx < WORLD_WIDTH && pby >= 0 && pby < WORLD_HEIGHT && GetBlock(pbx, pby) == BLOCK_LAVA && gameMode != GAME_CREATIVE && !HasEffect(&player, EFFECT_FIRE_RESISTANCE)) {
             player.lavaDamageAccum += 4.0f * dt;
             int damage = (int)player.lavaDamageAccum;
             if (damage > 0) {
@@ -2144,7 +2244,7 @@ void UpdatePlayerStatus(float dt)
     // --- Death ---
     if (player.health <= 0 && !player.playerDead) {
         player.playerDead = true;
-        player.health = 0;
+    ClearEffects(&player);        player.health = 0;
         if (!player.netControlled) {
             SetDeathCause(pendingDeathCause);
             PlaySoundDeath();

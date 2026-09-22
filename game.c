@@ -4146,6 +4146,7 @@ void DrawGame(void)
     bool deadModal = player.playerDead;
     if (!deadModal) {
         DrawHotbar();
+        DrawActiveEffects();
         DrawPlayerStatus();
         DrawDebugInfo();
         DrawMinimap();
