@@ -97,6 +97,8 @@ void InitWin32WheelHook(void);
 #define TERRAIN_AMPLITUDE   35
 #define CAVE_START          140
 #define CAVE_END            240
+#define ABYSS_START         236
+#define ABYSS_END           254   // abyss band bottom (bedrock at 255)
 
 #define PLAYER_WIDTH        12
 #define PLAYER_HEIGHT       28
@@ -466,6 +468,11 @@ typedef enum {
     ITEM_POTION_WATER_BREATHING,
     ITEM_POTION_POISON,
     BLOCK_BREWING_STAND,    // brews potions from a water bottle + ingredient
+    // Abyss layer (deep caves, y 236-254)
+    BLOCK_ABYSS_STONE,
+    BLOCK_ABYSS_CRYSTAL_ORE,
+    BLOCK_GLOWSHROOM,       // light-emitting cave plant
+    ITEM_ABYSS_CRYSTAL,     // deep-tier material (boss altar later)
     BLOCK_COUNT
 } BlockType;
 
@@ -937,7 +944,11 @@ typedef enum {
     STR_BREWING,
     STR_BOTTLE,
     STR_MSG_BREWING,
-    STR_RECIPE_BREWING_STAND,
+    STR_BLOCK_ABYSS_STONE,
+    STR_BLOCK_ABYSS_CRYSTAL_ORE,
+    STR_BLOCK_GLOWSHROOM,
+    STR_ITEM_ABYSS_CRYSTAL,
+    STR_ACH_ABYSS,    STR_RECIPE_BREWING_STAND,
     STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
@@ -1396,6 +1407,7 @@ typedef enum {
 typedef enum {
     ACH_FIRST_STEPS = 0,    // Craft a wooden pickaxe
     ACH_DEEP_DIG,           // Reach bedrock layer (y >= 240)
+    ACH_ABYSS,              // Descend into the abyss (y >= 248)
     ACH_MONSTER_HUNTER,     // Kill 100 mobs
     ACH_ARCHITECT,          // Place 1000 blocks
     ACH_REDSTONE_ENGINEER,  // Build a working redstone circuit

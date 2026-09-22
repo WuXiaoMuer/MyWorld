@@ -609,6 +609,8 @@ bool CanToolMineBlock(BlockType tool, BlockType block)
     float tier = GetToolTier(tool);
     // Diamond-tier blocks require iron+ pickaxe
     if ((block == BLOCK_DIAMOND_ORE || block == BLOCK_OBSIDIAN) && tier < 4.0f) return false;
+    // Abyss crystal needs a diamond pickaxe
+    if (block == BLOCK_ABYSS_CRYSTAL_ORE && tier < 4.0f) return false;
     // Gold/redstone/lapis require stone+ pickaxe
     if ((block == BLOCK_GOLD_ORE || block == BLOCK_REDSTONE_ORE || block == BLOCK_LAPIS_ORE) && tier < 2.5f) return false;
     // Iron ore requires stone+ pickaxe
@@ -1123,6 +1125,7 @@ void PlayerBlockInteraction(void)
                         else if (bt == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
                         else if (bt == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
                         else if (bt == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
+                        else if (bt == BLOCK_ABYSS_CRYSTAL_ORE) dropItem = ITEM_ABYSS_CRYSTAL;
                         else if (bt == BLOCK_CROPS) { dropItem = ITEM_WHEAT; }
                         else if (bt == BLOCK_FARMLAND) { dropItem = BLOCK_DIRT; }
                     }

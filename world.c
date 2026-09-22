@@ -1979,6 +1979,43 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
+    case BLOCK_ABYSS_STONE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 95);
+                if (h % 11 == 0) c = detail;
+                if (h % 23 == 0) c = (Color){70, 70, 92, 255};
+                if (y > 13) c = (Color){48, 48, 62, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    case BLOCK_ABYSS_CRYSTAL_ORE:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = base;
+                unsigned int h = hash2D(x, y, 96);
+                if (h % 11 == 0) c = detail;
+                int cx = 5 + (int)(h % 4), cy = 5 + (int)((h >> 4) % 4);
+                int dx2 = x - cx, dy2 = y - cy;
+                if (dx2 * dx2 + dy2 * dy2 <= 2) c = (Color){110, 235, 225, 255};
+                int cx2 = 11 - (int)(h % 3), cy2 = 11 - (int)((h >> 8) % 3);
+                int dx3 = x - cx2, dy3 = y - cy2;
+                if (dx3 * dx3 + dy3 * dy3 <= 1) c = (Color){160, 250, 240, 255};
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    case BLOCK_GLOWSHROOM:
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (x >= 7 && x <= 8 && y >= 9 && y <= 14) c = (Color){180, 230, 210, 255};
+                if (y >= 5 && y <= 8 && x >= 4 && x <= 11) c = base;
+                if (y == 5 && x >= 5 && x <= 10) c = (Color){170, 255, 230, 255};
+                if (y == 8 && x >= 4 && x <= 11) c = detail;
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
 
     case ITEM_GLASS_BOTTLE:
     case ITEM_POTION_WATER:
@@ -3808,6 +3845,54 @@ void GenerateWorld(unsigned int seed)
 
     // ============================================================
     // Pass 2: Caves (extended range, more variety)
+    // ============================================================
+    // Pass 2b: Abyss layer (y 236-254) - deep caverns, crystal ore,
+    // lava lakes and glowshrooms. Below the regular cave band, this is
+    // the endgame exploration zone (boss altar comes later).
+    // ============================================================
+    // 2b-1: the band is a distinct stone variant
+    for (int x = 0; x < WORLD_WIDTH; x++)
+        for (int y = ABYSS_START; y < ABYSS_END; y++)
+            if (GetBlock(x, y) == BLOCK_STONE) SetBlock(x, y, BLOCK_ABYSS_STONE);
+
+    // 2b-2: large caverns (lower threshold than the normal cave pass)
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = ABYSS_START - 2; y < ABYSS_END; y++) {
+            if (GetBlock(x, y) != BLOCK_ABYSS_STONE) continue;
+            float a1 = fbm(x * 0.03f, y * 0.05f, 3, 0.5f, seed + 15000);
+            float a2 = fbm(x * 0.07f, y * 0.09f, 2, 0.5f, seed + 16000);
+            if (a1 > 0.46f && a2 > 0.42f) SetBlock(x, y, BLOCK_AIR);
+        }
+    }
+
+    // 2b-3: lava pools on the lower abyss floor
+    for (int x = 2; x < WORLD_WIDTH - 2; x++) {
+        for (int y = ABYSS_END - 6; y < ABYSS_END; y++) {
+            if (GetBlock(x, y) != BLOCK_AIR) continue;
+            if (!IsBlockSolid(x, y + 1)) continue;
+            float lavaN = fbm(x * 0.05f, y * 0.05f, 2, 0.5f, seed + 17000);
+            if (lavaN > 0.58f) SetBlock(x, y, BLOCK_LAVA);
+        }
+    }
+
+    // 2b-4: abyss crystal ore - the deep-tier material
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = ABYSS_START + 2; y < ABYSS_END; y++) {
+            if (GetBlock(x, y) != BLOCK_ABYSS_STONE) continue;
+            float cn = fbm(x * 0.18f, y * 0.18f, 2, 0.5f, seed + 18000);
+            if (cn > 0.83f) SetBlock(x, y, BLOCK_ABYSS_CRYSTAL_ORE);
+        }
+    }
+
+    // 2b-5: glowshrooms on abyss floors (light sources for navigation)
+    for (int x = 1; x < WORLD_WIDTH - 1; x++) {
+        for (int y = ABYSS_START; y < ABYSS_END - 1; y++) {
+            if (GetBlock(x, y) != BLOCK_AIR) continue;
+            if (GetBlock(x, y + 1) != BLOCK_ABYSS_STONE) continue;
+            float gn = fbm(x * 0.2f, y * 0.2f, 2, 0.5f, seed + 19000);
+            if (gn > 0.74f) SetBlock(x, y, BLOCK_GLOWSHROOM);
+        }
+    }
     // ============================================================
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = CAVE_START; y < CAVE_END; y++) {

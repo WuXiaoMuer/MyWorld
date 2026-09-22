@@ -448,6 +448,7 @@ static StringId GetAchString(Achievement ach) {
     switch (ach) {
         case ACH_FIRST_STEPS: return STR_ACH_FIRST_STEPS;
         case ACH_DEEP_DIG: return STR_ACH_DEEP_DIG;
+        case ACH_ABYSS: return STR_ACH_ABYSS;
         case ACH_MONSTER_HUNTER: return STR_ACH_MONSTER_HUNTER;
         case ACH_ARCHITECT: return STR_ACH_ARCHITECT;
         case ACH_REDSTONE_ENGINEER: return STR_ACH_REDSTONE_ENGINEER;
@@ -500,6 +501,7 @@ static void CheckAchievements(void) {
     // Deep Dig - reach deep underground
     int playerBY = (int)(player.position.y + PLAYER_HEIGHT) / BLOCK_SIZE;
     if (playerBY >= 240) UnlockAchievement(ACH_DEEP_DIG);
+    if (playerBY >= 248) UnlockAchievement(ACH_ABYSS);
 
     // Monster Hunter - kill 100 mobs
     if (totalMobsKilled >= 100) UnlockAchievement(ACH_MONSTER_HUNTER);
@@ -3179,6 +3181,7 @@ void UpdateGame(float dt)
                                 else if (oldBlock == BLOCK_DIAMOND_ORE) dropItem = ITEM_DIAMOND;
                                 else if (oldBlock == BLOCK_REDSTONE_ORE) dropItem = ITEM_REDSTONE;
                                 else if (oldBlock == BLOCK_LAPIS_ORE) dropItem = ITEM_LAPIS;
+                                else if (oldBlock == BLOCK_ABYSS_CRYSTAL_ORE) dropItem = ITEM_ABYSS_CRYSTAL;
                                 SpawnItemEntity(dropItem, 1, bc->x * BLOCK_SIZE + 3, bc->y * BLOCK_SIZE + 3);
                             }
                         }

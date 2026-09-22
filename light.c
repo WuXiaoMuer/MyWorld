@@ -114,8 +114,8 @@ void RemoveLight(int startX, int startY)
     for (int x = startX - radius; x <= startX + radius; x++) {
         for (int y = startY - radius; y <= startY + radius; y++) {
             if (x >= 0 && x < WORLD_WIDTH && y >= 0 && y < WORLD_HEIGHT) {
-                if (GetBlock(x, y) == BLOCK_TORCH || GetBlock(x, y) == BLOCK_LANTERN) {
-                    PropagateLight(x, y, TORCH_LIGHT);
+                if (GetBlock(x, y) == BLOCK_TORCH || GetBlock(x, y) == BLOCK_LANTERN || GetBlock(x, y) == BLOCK_GLOWSHROOM) {
+                    PropagateLight(x, y, GetBlock(x, y) == BLOCK_GLOWSHROOM ? 9 : TORCH_LIGHT);
                 } else if (GetBlock(x, y) == BLOCK_REDSTONE_LAMP && IsRedstoneLampPowered(x, y)) {
                     PropagateLight(x, y, 12);
                 }
@@ -148,8 +148,8 @@ void RecalculateAllLight(void)
     // Second pass: propagate torch light and powered redstone lamps
     for (int x = 0; x < WORLD_WIDTH; x++) {
         for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (GetBlock(x, y) == BLOCK_TORCH || GetBlock(x, y) == BLOCK_LANTERN) {
-                PropagateLight(x, y, TORCH_LIGHT);
+            if (GetBlock(x, y) == BLOCK_TORCH || GetBlock(x, y) == BLOCK_LANTERN || GetBlock(x, y) == BLOCK_GLOWSHROOM) {
+                PropagateLight(x, y, GetBlock(x, y) == BLOCK_GLOWSHROOM ? 9 : TORCH_LIGHT);
             } else if (GetBlock(x, y) == BLOCK_REDSTONE_LAMP && IsRedstoneLampPowered(x, y)) {
                 PropagateLight(x, y, 12);
             }

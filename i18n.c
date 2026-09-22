@@ -185,6 +185,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Achievements
     [STR_ACH_FIRST_STEPS] = "First Steps - Craft a wooden pickaxe",
     [STR_ACH_DEEP_DIG] = "Deep Dig - Reach the depths",
+    [STR_ACH_ABYSS] = "Into the Abyss - Reach y 248",
     [STR_ACH_MONSTER_HUNTER] = "Monster Hunter - Slay 100 mobs",
     [STR_ACH_ARCHITECT] = "Architect - Place 1000 blocks",
     [STR_ACH_REDSTONE_ENGINEER] = "Redstone Engineer - Power a lamp",
@@ -553,6 +554,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ITEM_POTION_FIRE_RESISTANCE] = "Potion of Fire Resistance",
     [STR_ITEM_POTION_WATER_BREATHING] = "Potion of Water Breathing",
     [STR_ITEM_POTION_POISON] = "Potion of Poison",
+    [STR_BLOCK_ABYSS_STONE] = "Abyss Stone",
+    [STR_BLOCK_ABYSS_CRYSTAL_ORE] = "Abyss Crystal Ore",
+    [STR_BLOCK_GLOWSHROOM] = "Glowshroom",
+    [STR_ITEM_ABYSS_CRYSTAL] = "Abyss Crystal",
     [STR_BLOCK_BREWING_STAND] = "Brewing Stand",
     [STR_BREWING] = "Brewing Stand",
     [STR_BOTTLE] = "Bottle",
@@ -795,6 +800,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Achievements
     [STR_ACH_FIRST_STEPS] = "初出茅庐 - 制作木镐",
     [STR_ACH_DEEP_DIG] = "深入地底 - 到达基岩层",
+    [STR_ACH_ABYSS] = "深入深渊 - 到达 y 248",
     [STR_ACH_MONSTER_HUNTER] = "怪物猎人 - 击杀100只怪物",
     [STR_ACH_ARCHITECT] = "建筑师 - 放置1000个方块",
     [STR_ACH_REDSTONE_ENGINEER] = "红石工程师 - 点亮红石灯",
@@ -1157,6 +1163,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ITEM_POTION_FIRE_RESISTANCE] = "防火药水",
     [STR_ITEM_POTION_WATER_BREATHING] = "水下呼吸药水",
     [STR_ITEM_POTION_POISON] = "剧毒药水",
+    [STR_BLOCK_ABYSS_STONE] = "深渊石",
+    [STR_BLOCK_ABYSS_CRYSTAL_ORE] = "深渊水晶矿",
+    [STR_BLOCK_GLOWSHROOM] = "发光蘑菇",
+    [STR_ITEM_ABYSS_CRYSTAL] = "深渊水晶",
     [STR_BLOCK_BREWING_STAND] = "酿造台",
     [STR_BREWING] = "酿造台",
     [STR_BOTTLE] = "瓶子",
@@ -1399,6 +1409,7 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     // Achievements
     [STR_ACH_FIRST_STEPS] = "第一歩 - 木のピッケルをクラフト",
     [STR_ACH_DEEP_DIG] = "深掘り - 岩盤層に到達",
+    [STR_ACH_ABYSS] = "深淵へ - y 248に到達",
     [STR_ACH_MONSTER_HUNTER] = "モンスターハンター - 100体討伐",
     [STR_ACH_ARCHITECT] = "建築家 - 1000ブロック設置",
     [STR_ACH_REDSTONE_ENGINEER] = "レッドストーン技師 - ランプ点灯",
@@ -1761,6 +1772,10 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_ITEM_POTION_FIRE_RESISTANCE] = "火炎耐性のポーション",
     [STR_ITEM_POTION_WATER_BREATHING] = "水中呼吸のポーション",
     [STR_ITEM_POTION_POISON] = "毒のポーション",
+    [STR_BLOCK_ABYSS_STONE] = "深淵の石",
+    [STR_BLOCK_ABYSS_CRYSTAL_ORE] = "深淵水晶鉱石",
+    [STR_BLOCK_GLOWSHROOM] = "発光キノコ",
+    [STR_ITEM_ABYSS_CRYSTAL] = "深淵の水晶",
     [STR_BLOCK_BREWING_STAND] = "醸造台",
     [STR_BREWING] = "醸造台",
     [STR_BOTTLE] = "瓶",
@@ -2049,6 +2064,10 @@ static const StringId g_blockNameIds[BLOCK_COUNT] = {
     STR_ITEM_POTION_WATER_BREATHING,
     STR_ITEM_POTION_POISON,
     STR_BLOCK_BREWING_STAND,
+    STR_BLOCK_ABYSS_STONE,
+    STR_BLOCK_ABYSS_CRYSTAL_ORE,
+    STR_BLOCK_GLOWSHROOM,
+    STR_ITEM_ABYSS_CRYSTAL,
 };
 
 const char *GetBlockName(BlockType bt)
