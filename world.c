@@ -4316,326 +4316,7 @@ void GenerateWorld(unsigned int seed)
     }
 
     // ============================================================
-    // Pass 11: Trees (biome-aware density and type)
-    // ============================================================
-    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
-        int biome = GetBiomeAtX(x, seed);
-
-        // Biome-specific tree density
-        int treeChance;
-        switch (biome) {
-            case 1: treeChance = 999; break;  // desert: no trees
-            case 2: treeChance = 6; break;    // forest: dense
-            case 3: treeChance = 20; break;   // tundra: sparse
-            case 4: treeChance = 10; break;   // swamp: moderate
-            case 5: treeChance = 4; break;    // jungle: very dense
-            case 6: treeChance = 8; break;    // taiga: moderate-dense
-            case 7: treeChance = 26; break;   // savanna: sparse acacia
-            case 8: treeChance = 999; break;  // mesa: no trees
-            case 9: treeChance = 16; break;   // flower field: few trees
-            case 10: treeChance = 999; break; // mushroom island: giant mushrooms instead
-            default: treeChance = 12; break;  // plains
-        }
-        if (hash2D(x, 0, seed + 999) % treeChance != 0) continue;
-
-        // Find surface - check for grass, snowy grass, or mud
-        int surfaceY = -1;
-        for (int y = 0; y < WORLD_HEIGHT; y++) {
-            uint8_t b = GetBlock(x, y);
-            if (b == BLOCK_GRASS || b == BLOCK_SNOWY_GRASS || b == BLOCK_MUD) {
-                surfaceY = y;
-                break;
-            }
-        }
-        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
-
-        int trunkH;
-        BlockType trunkBlock = BLOCK_WOOD;
-        BlockType leafBlock = BLOCK_LEAVES;
-
-        switch (biome) {
-            case 3: // tundra: short sparse trees
-                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
-                break;
-            case 4: // swamp: short wide trees
-                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
-                break;
-            case 5: // jungle: tall trees
-                trunkH = 8 + (hash2D(x, 1, seed + 888) % 5);
-                trunkBlock = BLOCK_JUNGLE_WOOD;
-                leafBlock = BLOCK_JUNGLE_LEAVES;
-                break;
-            case 6: // taiga: medium narrow trees
-                trunkH = 5 + (hash2D(x, 1, seed + 888) % 3);
-                break;
-            case 7: // savanna: short acacia with flat wide canopy
-                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
-                break;
-            default: // plains/forest
-                trunkH = (biome == 2) ? (5 + (hash2D(x, 1, seed + 888) % 4)) : (4 + (hash2D(x, 1, seed + 888) % 3));
-                break;
-        }
-
-        // Place trunk
-        for (int i = 1; i <= trunkH && surfaceY - i >= 0; i++) {
-            SetBlock(x, surfaceY - i, trunkBlock);
-        }
-
-        int canopyTop = surfaceY - trunkH;
-
-        if (biome == 5) {
-            // Jungle: large canopy with vines
-            for (int dy = -3; dy <= 0; dy++) {
-                for (int dx = -3; dx <= 3; dx++) {
-                    int bx = x + dx;
-                    int by = canopyTop + dy;
-                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            SetBlock(bx, by, leafBlock);
-                        }
-                    }
-                }
-            }
-            // Top cap
-            for (int dx = -1; dx <= 1; dx++) {
-                int bx = x + dx;
-                int by = canopyTop - 2;
-                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
-                }
-            }
-            // Vines hanging from canopy edges
-            for (int dx = -3; dx <= 3; dx += 2) {
-                int bx = x + dx;
-                if (bx < 0 || bx >= WORLD_WIDTH) continue;
-                for (int dy = 1; dy <= 3; dy++) {
-                    int by = canopyTop + dy;
-                    if (by >= 0 && by < WORLD_HEIGHT && GetBlock(bx, by) == BLOCK_AIR) {
-                        if (hash2D(bx, by, seed + 998) % 3 == 0)
-                            SetBlock(bx, by, BLOCK_VINE);
-                    }
-                }
-            }
-        } else if (biome == 6) {
-            // Taiga: triangular/narrow canopy
-            for (int dy = -3; dy <= 0; dy++) {
-                int width = 1 + (dy + 3); // narrows toward top
-                for (int dx = -width; dx <= width; dx++) {
-                    int bx = x + dx;
-                    int by = canopyTop + dy;
-                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            SetBlock(bx, by, leafBlock);
-                        }
-                    }
-                }
-            }
-        } else if (biome == 3) {
-            // Tundra: small sparse canopy
-            for (int dy = -1; dy <= 0; dy++) {
-                for (int dx = -1; dx <= 1; dx++) {
-                    int bx = x + dx;
-                    int by = canopyTop + dy;
-                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            SetBlock(bx, by, leafBlock);
-                        }
-                    }
-                }
-            }
-        } else if (biome == 4) {
-            // Swamp: wide flat canopy
-            for (int dy = -1; dy <= 0; dy++) {
-                for (int dx = -3; dx <= 3; dx++) {
-                    int bx = x + dx;
-                    int by = canopyTop + dy;
-                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            SetBlock(bx, by, leafBlock);
-                        }
-                    }
-                }
-            }
-            // Moss patches under swamp trees
-            if (surfaceY + 1 < WORLD_HEIGHT && GetBlock(x, surfaceY + 1) != BLOCK_WATER) {
-                for (int dx = -2; dx <= 2; dx++) {
-                    int bx = x + dx;
-                    if (bx >= 0 && bx < WORLD_WIDTH && GetBlock(bx, surfaceY) == BLOCK_MUD) {
-                        if (hash2D(bx, surfaceY, seed + 997) % 3 == 0)
-                            SetBlock(bx, surfaceY, BLOCK_MOSS_BLOCK);
-                    }
-                }
-            }
-        } else if (biome == 7) {
-            // Savanna: acacia — flat wide canopy atop a short trunk
-            for (int dx = -3; dx <= 3; dx++) {
-                int bx = x + dx;
-                int by = canopyTop;
-                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
-                }
-            }
-            for (int dx = -2; dx <= 2; dx++) {
-                int bx = x + dx;
-                int by = canopyTop - 1;
-                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (GetBlock(bx, by) == BLOCK_AIR && dx != 0) SetBlock(bx, by, leafBlock);
-                }
-            }
-        } else {
-            // Default canopy (plains/forest)
-            for (int dy = -2; dy <= 0; dy++) {
-                for (int dx = -2; dx <= 2; dx++) {
-                    int bx = x + dx;
-                    int by = canopyTop + dy;
-                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
-                            SetBlock(bx, by, leafBlock);
-                        }
-                    }
-                }
-            }
-            for (int dx = -1; dx <= 1; dx++) {
-                int bx = x + dx;
-                int by = canopyTop - 1;
-                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
-                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
-                }
-            }
-        }
-    }
-
-    // ============================================================
-    // Pass 11b: Giant mushrooms on the mushroom island
-    // ============================================================
-    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
-        if (GetBiomeAtX(x, seed) != 10) continue;
-        if (hash2D(x, 0, seed + 1210) % 14 != 0) continue;
-
-        // Find mycelium surface
-        int surfaceY = -1;
-        for (int y = 0; y < WORLD_HEIGHT; y++) {
-            if (GetBlock(x, y) == BLOCK_MYCELIUM) { surfaceY = y; break; }
-        }
-        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
-
-        int stemH = 3 + (hash2D(x, 1, seed + 1211) % 3);
-        int capR = 2 + (hash2D(x, 2, seed + 1212) % 2);
-        int capTop = surfaceY - stemH;
-
-        // Stem
-        for (int i = 1; i <= stemH && surfaceY - i >= 0; i++)
-            SetBlock(x, surfaceY - i, BLOCK_MUSHROOM_STEM);
-
-        // Rounded cap
-        for (int dy = -capR; dy <= 0; dy++) {
-            int half = capR - (dy == -capR ? 1 : 0);
-            for (int dx = -half; dx <= half; dx++) {
-                int bx = x + dx, by = capTop + dy;
-                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT &&
-                    GetBlock(bx, by) == BLOCK_AIR)
-                    SetBlock(bx, by, BLOCK_MUSHROOM_BLOCK);
-            }
-        }
-    }
-
-    // ============================================================
-    // Pass 12: Flowers, tall grass, decorations (biome-aware)
-    // ============================================================
-    for (int x = 0; x < WORLD_WIDTH; x++) {
-        int biome = GetBiomeAtX(x, seed);
-
-        for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
-            uint8_t surface = GetBlock(x, y);
-            if (surface != BLOCK_GRASS && surface != BLOCK_SAND &&
-                surface != BLOCK_SNOWY_GRASS && surface != BLOCK_MUD &&
-                surface != BLOCK_RED_SAND && surface != BLOCK_MYCELIUM) continue;
-            if (GetBlock(x, y - 1) != BLOCK_AIR) continue;
-
-            unsigned int h = hash2D(x, y, seed + 6000);
-            switch (biome) {
-                case 1: // Desert: sparse tall grass, cactus
-                    if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    else if (h % 50 == 0 && GetBlock(x - 1, y) == BLOCK_SAND &&
-                             GetBlock(x + 1, y) == BLOCK_SAND && y > SEA_LEVEL + 2)
-                        SetBlock(x, y - 1, BLOCK_CACTUS);
-                    break;
-                case 2: // Forest: more flowers and grass
-                    if (h % 12 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    else if (h % 4 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    break;
-                case 3: // Tundra: very sparse, some flowers
-                    if (h % 25 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    else if (h % 15 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    break;
-                case 4: // Swamp: dense grass, pumpkins
-                    if (h % 5 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    else if (h % 40 == 0) SetBlock(x, y - 1, BLOCK_PUMPKIN);
-                    break;
-                case 5: // Jungle: very dense, melons
-                    if (h % 3 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    else if (h % 8 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    else if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_MELON);
-                    break;
-                case 6: // Taiga: moderate, flowers
-                    if (h % 10 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    else if (h % 20 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    break;
-                case 7: // Savanna: dry tall grass, occasional flowers
-                    if (h % 6 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    else if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    break;
-                case 8: // Mesa: nearly barren, rare cactus
-                    if (h % 60 == 0 && GetBlock(x - 1, y) == BLOCK_RED_SAND &&
-                        GetBlock(x + 1, y) == BLOCK_RED_SAND && y > SEA_LEVEL + 2)
-                        SetBlock(x, y - 1, BLOCK_CACTUS);
-                    else if (h % 40 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    break;
-                case 9: // Flower field: dense flowers
-                    if (h % 3 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    else if (h % 7 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    break;
-                case 10: // Mushroom island: sparse grass; giant mushrooms placed in a later pass
-                    if (surface == BLOCK_MYCELIUM && h % 9 == 0)
-                        SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    break;
-                default: // Plains
-                    if (h % 20 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
-                    else if (h % 8 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
-                    break;
-            }
-        }
-    }
-
-    // ============================================================
-    // Pass 12b: Sugar cane near water (warm biomes)
-    // ============================================================
-    for (int x = 2; x < WORLD_WIDTH - 2; x++) {
-        int biome = GetBiomeAtX(x, seed);
-
-        if (biome == 3 || biome == 8 || biome == 10) continue; // no cane in tundra/mesa/mushroom
-
-        for (int y = 1; y < SEA_LEVEL + 6 && y < WORLD_HEIGHT - 1; y++) {
-            if (GetBlock(x, y) != BLOCK_AIR) continue;
-            // Must have sand or grass below
-            uint8_t below = GetBlock(x, y - 1);
-            if (below != BLOCK_SAND && below != BLOCK_GRASS && below != BLOCK_MUD) continue;
-            // Must have water nearby
-            bool hasWater = false;
-            for (int dx = -1; dx <= 1 && !hasWater; dx++)
-                for (int dy = 0; dy <= 1 && !hasWater; dy++) {
-                    int nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT && GetBlock(nx, ny) == BLOCK_WATER)
-                        hasWater = true;
-                }
-            if (!hasWater) continue;
-            unsigned int h = hash2D(x, y, seed + 7000);
-            if (h % 12 == 0) SetBlock(x, y, BLOCK_SUGAR_CANE);
-        }
-    }
-
-    // ============================================================
-    // Pass 13: Villages
+    // Pass 10c: Villages (before trees so buildings never cut trunks)
     // ============================================================
     #define VILLAGE_SPACING 400
     #define MAX_VILLAGE_BUILDINGS 6
@@ -4943,6 +4624,345 @@ void GenerateWorld(unsigned int seed)
             }
         }
     }
+
+    // ============================================================
+    // Pass 11: Trees (biome-aware density and type; after villages)
+    // ============================================================
+    int lastTreeX = -10;   // enforce spacing so canopies never interleave
+    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
+        int biome = GetBiomeAtX(x, seed);
+
+        // Biome-specific tree density
+        int treeChance;
+        switch (biome) {
+            case 1: treeChance = 999; break;  // desert: no trees
+            case 2: treeChance = 6; break;    // forest: dense
+            case 3: treeChance = 20; break;   // tundra: sparse
+            case 4: treeChance = 10; break;   // swamp: moderate
+            case 5: treeChance = 4; break;    // jungle: very dense
+            case 6: treeChance = 8; break;    // taiga: moderate-dense
+            case 7: treeChance = 26; break;   // savanna: sparse acacia
+            case 8: treeChance = 999; break;  // mesa: no trees
+            case 9: treeChance = 16; break;   // flower field: few trees
+            case 10: treeChance = 999; break; // mushroom island: giant mushrooms instead
+            default: treeChance = 12; break;  // plains
+        }
+        if (hash2D(x, 0, seed + 999) % treeChance != 0) continue;
+        if (x - lastTreeX < 3) continue;   // keep canopies from interleaving
+
+        // Find surface - check for grass, snowy grass, or mud
+        int surfaceY = -1;
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            uint8_t b = GetBlock(x, y);
+            if (b == BLOCK_GRASS || b == BLOCK_SNOWY_GRASS || b == BLOCK_MUD) {
+                surfaceY = y;
+                break;
+            }
+        }
+        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
+        lastTreeX = x;
+
+        int trunkH;
+        BlockType trunkBlock = BLOCK_WOOD;
+        BlockType leafBlock = BLOCK_LEAVES;
+
+        switch (biome) {
+            case 3: // tundra: short sparse trees
+                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
+                break;
+            case 4: // swamp: short wide trees
+                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
+                break;
+            case 5: // jungle: tall trees
+                trunkH = 8 + (hash2D(x, 1, seed + 888) % 5);
+                trunkBlock = BLOCK_JUNGLE_WOOD;
+                leafBlock = BLOCK_JUNGLE_LEAVES;
+                break;
+            case 6: // taiga: medium narrow trees
+                trunkH = 5 + (hash2D(x, 1, seed + 888) % 3);
+                break;
+            case 7: // savanna: short acacia with flat wide canopy
+                trunkH = 3 + (hash2D(x, 1, seed + 888) % 2);
+                break;
+            default: // plains/forest
+                trunkH = (biome == 2) ? (5 + (hash2D(x, 1, seed + 888) % 4)) : (4 + (hash2D(x, 1, seed + 888) % 3));
+                break;
+        }
+
+        // Place trunk
+        for (int i = 1; i <= trunkH && surfaceY - i >= 0; i++) {
+            SetBlock(x, surfaceY - i, trunkBlock);
+        }
+
+        int canopyTop = surfaceY - trunkH;
+
+        if (biome == 5) {
+            // Jungle: large canopy with vines
+            for (int dy = -3; dy <= 0; dy++) {
+                for (int dx = -3; dx <= 3; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
+                        }
+                    }
+                }
+            }
+            // Top cap
+            for (int dx = -1; dx <= 1; dx++) {
+                int bx = x + dx;
+                int by = canopyTop - 2;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
+                }
+            }
+            // Vines hanging from canopy edges
+            for (int dx = -3; dx <= 3; dx += 2) {
+                int bx = x + dx;
+                if (bx < 0 || bx >= WORLD_WIDTH) continue;
+                for (int dy = 1; dy <= 3; dy++) {
+                    int by = canopyTop + dy;
+                    if (by >= 0 && by < WORLD_HEIGHT && GetBlock(bx, by) == BLOCK_AIR) {
+                        if (hash2D(bx, by, seed + 998) % 3 == 0)
+                            SetBlock(bx, by, BLOCK_VINE);
+                    }
+                }
+            }
+        } else if (biome == 6) {
+            // Taiga: triangular/narrow canopy
+            for (int dy = -3; dy <= 0; dy++) {
+                int width = 1 + (dy + 3); // narrows toward top
+                for (int dx = -width; dx <= width; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
+                        }
+                    }
+                }
+            }
+        } else if (biome == 3) {
+            // Tundra: small sparse canopy
+            for (int dy = -1; dy <= 0; dy++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
+                        }
+                    }
+                }
+            }
+        } else if (biome == 4) {
+            // Swamp: wide flat canopy
+            for (int dy = -1; dy <= 0; dy++) {
+                for (int dx = -3; dx <= 3; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
+                        }
+                    }
+                }
+            }
+            // Moss patches under swamp trees
+            if (surfaceY + 1 < WORLD_HEIGHT && GetBlock(x, surfaceY + 1) != BLOCK_WATER) {
+                for (int dx = -2; dx <= 2; dx++) {
+                    int bx = x + dx;
+                    if (bx >= 0 && bx < WORLD_WIDTH && GetBlock(bx, surfaceY) == BLOCK_MUD) {
+                        if (hash2D(bx, surfaceY, seed + 997) % 3 == 0)
+                            SetBlock(bx, surfaceY, BLOCK_MOSS_BLOCK);
+                    }
+                }
+            }
+        } else if (biome == 7) {
+            // Savanna: acacia — flat wide canopy atop a short trunk
+            for (int dx = -3; dx <= 3; dx++) {
+                int bx = x + dx;
+                int by = canopyTop;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
+                }
+            }
+            for (int dx = -2; dx <= 2; dx++) {
+                int bx = x + dx;
+                int by = canopyTop - 1;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (GetBlock(bx, by) == BLOCK_AIR && dx != 0) SetBlock(bx, by, leafBlock);
+                }
+            }
+        } else {
+            // Default canopy (plains/forest)
+            for (int dy = -2; dy <= 0; dy++) {
+                for (int dx = -2; dx <= 2; dx++) {
+                    int bx = x + dx;
+                    int by = canopyTop + dy;
+                    if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                        if (GetBlock(bx, by) == BLOCK_AIR && !(dx == 0 && dy == 0)) {
+                            SetBlock(bx, by, leafBlock);
+                        }
+                    }
+                }
+            }
+            for (int dx = -1; dx <= 1; dx++) {
+                int bx = x + dx;
+                int by = canopyTop - 1;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT) {
+                    if (GetBlock(bx, by) == BLOCK_AIR) SetBlock(bx, by, leafBlock);
+                }
+            }
+        }
+    }
+
+
+    // Orphan-leaf cleanup: houses and other clearings can remove trunks while
+    // the canopy above survives; drop any leaf with no trunk within 3 blocks.
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            uint8_t lb = GetBlock(x, y);
+            if (lb != BLOCK_LEAVES && lb != BLOCK_JUNGLE_LEAVES) continue;
+            bool nearWood = false;
+            for (int dx = -3; dx <= 3 && !nearWood; dx++)
+                for (int dy = -3; dy <= 3 && !nearWood; dy++) {
+                    uint8_t nb = GetBlock(x + dx, y + dy);
+                    if (nb == BLOCK_WOOD || nb == BLOCK_JUNGLE_WOOD) nearWood = true;
+                }
+            if (!nearWood) SetBlock(x, y, BLOCK_AIR);
+        }
+    }
+    // ============================================================
+    // Pass 11b: Giant mushrooms on the mushroom island
+    // ============================================================
+    for (int x = 5; x < WORLD_WIDTH - 5; x++) {
+        if (GetBiomeAtX(x, seed) != 10) continue;
+        if (hash2D(x, 0, seed + 1210) % 14 != 0) continue;
+
+        // Find mycelium surface
+        int surfaceY = -1;
+        for (int y = 0; y < WORLD_HEIGHT; y++) {
+            if (GetBlock(x, y) == BLOCK_MYCELIUM) { surfaceY = y; break; }
+        }
+        if (surfaceY < 0 || surfaceY >= SEA_LEVEL) continue;
+
+        int stemH = 3 + (hash2D(x, 1, seed + 1211) % 3);
+        int capR = 2 + (hash2D(x, 2, seed + 1212) % 2);
+        int capTop = surfaceY - stemH;
+
+        // Stem
+        for (int i = 1; i <= stemH && surfaceY - i >= 0; i++)
+            SetBlock(x, surfaceY - i, BLOCK_MUSHROOM_STEM);
+
+        // Rounded cap
+        for (int dy = -capR; dy <= 0; dy++) {
+            int half = capR - (dy == -capR ? 1 : 0);
+            for (int dx = -half; dx <= half; dx++) {
+                int bx = x + dx, by = capTop + dy;
+                if (bx >= 0 && bx < WORLD_WIDTH && by >= 0 && by < WORLD_HEIGHT &&
+                    GetBlock(bx, by) == BLOCK_AIR)
+                    SetBlock(bx, by, BLOCK_MUSHROOM_BLOCK);
+            }
+        }
+    }
+
+    // ============================================================
+    // Pass 12: Flowers, tall grass, decorations (biome-aware)
+    // ============================================================
+    for (int x = 0; x < WORLD_WIDTH; x++) {
+        int biome = GetBiomeAtX(x, seed);
+
+        for (int y = 1; y < WORLD_HEIGHT - 1; y++) {
+            uint8_t surface = GetBlock(x, y);
+            if (surface != BLOCK_GRASS && surface != BLOCK_SAND &&
+                surface != BLOCK_SNOWY_GRASS && surface != BLOCK_MUD &&
+                surface != BLOCK_RED_SAND && surface != BLOCK_MYCELIUM) continue;
+            if (GetBlock(x, y - 1) != BLOCK_AIR) continue;
+
+            unsigned int h = hash2D(x, y, seed + 6000);
+            switch (biome) {
+                case 1: // Desert: sparse tall grass, cactus
+                    if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 50 == 0 && GetBlock(x - 1, y) == BLOCK_SAND &&
+                             GetBlock(x + 1, y) == BLOCK_SAND && y > SEA_LEVEL + 2)
+                        SetBlock(x, y - 1, BLOCK_CACTUS);
+                    break;
+                case 2: // Forest: more flowers and grass
+                    if (h % 12 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 4 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    break;
+                case 3: // Tundra: very sparse, some flowers
+                    if (h % 25 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 15 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    break;
+                case 4: // Swamp: dense grass, pumpkins
+                    if (h % 5 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 40 == 0) SetBlock(x, y - 1, BLOCK_PUMPKIN);
+                    break;
+                case 5: // Jungle: very dense, melons
+                    if (h % 3 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 8 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_MELON);
+                    break;
+                case 6: // Taiga: moderate, flowers
+                    if (h % 10 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 20 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    break;
+                case 7: // Savanna: dry tall grass, occasional flowers
+                    if (h % 6 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    else if (h % 30 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    break;
+                case 8: // Mesa: nearly barren, rare cactus
+                    if (h % 60 == 0 && GetBlock(x - 1, y) == BLOCK_RED_SAND &&
+                        GetBlock(x + 1, y) == BLOCK_RED_SAND && y > SEA_LEVEL + 2)
+                        SetBlock(x, y - 1, BLOCK_CACTUS);
+                    else if (h % 40 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    break;
+                case 9: // Flower field: dense flowers
+                    if (h % 3 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 7 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    break;
+                case 10: // Mushroom island: sparse grass; giant mushrooms placed in a later pass
+                    if (surface == BLOCK_MYCELIUM && h % 9 == 0)
+                        SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    break;
+                default: // Plains
+                    if (h % 20 == 0) SetBlock(x, y - 1, BLOCK_FLOWER);
+                    else if (h % 8 == 0) SetBlock(x, y - 1, BLOCK_TALL_GRASS);
+                    break;
+            }
+        }
+    }
+
+    // ============================================================
+    // Pass 12b: Sugar cane near water (warm biomes)
+    // ============================================================
+    for (int x = 2; x < WORLD_WIDTH - 2; x++) {
+        int biome = GetBiomeAtX(x, seed);
+
+        if (biome == 3 || biome == 8 || biome == 10) continue; // no cane in tundra/mesa/mushroom
+
+        for (int y = 1; y < SEA_LEVEL + 6 && y < WORLD_HEIGHT - 1; y++) {
+            if (GetBlock(x, y) != BLOCK_AIR) continue;
+            // Must have sand or grass below
+            uint8_t below = GetBlock(x, y - 1);
+            if (below != BLOCK_SAND && below != BLOCK_GRASS && below != BLOCK_MUD) continue;
+            // Must have water nearby
+            bool hasWater = false;
+            for (int dx = -1; dx <= 1 && !hasWater; dx++)
+                for (int dy = 0; dy <= 1 && !hasWater; dy++) {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < WORLD_WIDTH && ny >= 0 && ny < WORLD_HEIGHT && GetBlock(nx, ny) == BLOCK_WATER)
+                        hasWater = true;
+                }
+            if (!hasWater) continue;
+            unsigned int h = hash2D(x, y, seed + 7000);
+            if (h % 12 == 0) SetBlock(x, y, BLOCK_SUGAR_CANE);
+        }
+    }
+
 }
 
 //----------------------------------------------------------------------------------

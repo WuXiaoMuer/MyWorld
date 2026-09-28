@@ -3211,9 +3211,10 @@ void DrawPlayerSprite(void)
         // front arm 8..12 - attached, no gap, symmetric about the torso.
         int backJointX = MX(0, 4) + 2;
         DrawLimb(backJointX, shoulderY, 4, 11, dir * (-swingDeg), skin);
-        // Front arm carries the swing/air/attack motion (one pixel further
-        // out than the back arm so the facing side reads clearly)
-        int frontJointX = MX(9, 4) + 2;
+        // Front arm carries the swing/air/attack motion. Joints are symmetric
+        // about the torso centre (spans 0..4 / 8..12 vs torso 1..11) so the
+        // body reads left-right balanced.
+        int frontJointX = MX(8, 4) + 2;
         DrawLimb(frontJointX, shoulderY, 4, 11, dir * (swingDeg + airDeg + attackDeg), skin);
     }
 
@@ -3269,7 +3270,7 @@ void DrawPlayerSprite(void)
         // Hand sits at the rotated far end of the arm
         float rad = armDeg * 3.141592653f / 180.0f;
         float shoulderYf = bobY + 8;
-        float shoulderX = px + (facing ? 11.0f : 1.0f);   // matches frontJointX = MX(9,4)+2
+        float shoulderX = px + (facing ? 10.0f : 2.0f);   // matches frontJointX = MX(8,4)+2
         float hx = shoulderX + sinf(rad) * 14.0f;   // a little past the hand so the block reads as held
         float hy = shoulderYf + cosf(rad) * 13.0f;
         float rot = itemAngle + armDeg * 0.6f;
