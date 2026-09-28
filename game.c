@@ -622,6 +622,35 @@ static void TryNewGameOnSlot(int slot)
     }
 }
 
+// Shared slot-select layout — the single source of truth for BOTH the drawn
+// panel (DrawSlotSelectScreen) and the mouse hit boxes (UpdateSlotSelect).
+// The two used to drift apart (old 340x80/96-spacing rects vs the redesigned
+// 360x78/88-spacing panel), which made every click land beside its button.
+void GetSlotSelectLayout(int *panelX, int *panelY, int *slotX, int *slotY, int *backX, int *backY)
+{
+    int isNew = (slotSelectMode == 0);
+    const int panelW = 520, slotW = 360;
+    const int titleH = 92, seedH = 46, spacing = 88, bottomPad = 56;
+    int panelH = titleH + (isNew ? seedH : 0) + SLOT_VISIBLE * spacing + bottomPad;
+    int px = (SCREEN_WIDTH - panelW) / 2;
+    int py = (SCREEN_HEIGHT - panelH) / 2;
+    if (panelX) *panelX = px;
+    if (panelY) *panelY = py;
+    if (slotX) *slotX = px + (panelW - slotW) / 2;
+    if (slotY) *slotY = py + titleH + (isNew ? seedH : 0);
+    if (backX) *backX = px + panelW - 100 - 28;
+    if (backY) *backY = py + panelH - 40;
+}
+
+// Seed-field row shared by drawing and hit-testing (new-game screen only).
+void GetSlotSelectSeedRow(int *seedBoxX, int *seedBoxY)
+{
+    int panelX = 0, panelY = 0;
+    GetSlotSelectLayout(&panelX, &panelY, NULL, NULL, NULL, NULL);
+    if (seedBoxX) *seedBoxX = panelX + 28;
+    if (seedBoxY) *seedBoxY = panelY + 92;
+}
+
 static void UpdateSlotSelect(float dt)
 {
     (void)dt;
@@ -711,10 +740,11 @@ static void UpdateSlotSelect(float dt)
     // Game mode toggle (new game only): Survival / Creative (same row as seed box)
     if (slotSelectMode == 0) {
         int seedBoxW = 200;
-        int seedBoxX = (SCREEN_WIDTH - seedBoxW) / 2;
+        int seedBoxX = 0, seedBoxY = 0;
+        GetSlotSelectSeedRow(&seedBoxX, &seedBoxY);
         int modeX = seedBoxX + seedBoxW + 6 + 56 + 16;
-        Rectangle survBtn = { (float)(modeX + 40), 126.0f, 72.0f, 22.0f };
-        Rectangle creatBtn = { (float)(modeX + 40 + 72 + 6), 126.0f, 72.0f, 22.0f };
+        Rectangle survBtn = { (float)(modeX + 40), (float)seedBoxY, 72.0f, 24.0f };
+        Rectangle creatBtn = { (float)(modeX + 40 + 72 + 6), (float)seedBoxY, 72.0f, 24.0f };
         Vector2 mmouse = Win32GetMousePosition();
         if (Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             if (CheckCollisionPointRec(mmouse, survBtn)) {
@@ -784,13 +814,14 @@ static void UpdateSlotSelect(float dt)
         }
     }
 
-    // Mouse hover + click
+    // Mouse hover + click (hit boxes come from the shared layout so they
+    // always match DrawSlotSelectScreen)
     {
         Vector2 mouse = Win32GetMousePosition();
-        int slotW = 340, slotH = 80;
-        int slotX = (SCREEN_WIDTH - slotW) / 2;
-        int slotY = (slotSelectMode == 0) ? 185 : 160;
-        int spacing = 96;
+        int panelX = 0, panelY = 0, slotX = 0, slotY = 0, backX = 0, backY = 0;
+        GetSlotSelectLayout(&panelX, &panelY, &slotX, &slotY, &backX, &backY);
+        int slotW = 360, slotH = 78;
+        int spacing = 88;
 
         // Scroll wheel on the slot area
         Rectangle slotArea = { (float)slotX, (float)slotY, (float)slotW, (float)(SLOT_VISIBLE * spacing) };
@@ -825,12 +856,8 @@ static void UpdateSlotSelect(float dt)
             }
         }
 
-        // Back button
-        int backBtnW = 160;
-        int backBtnH = 38;
-        int backBtnX = (SCREEN_WIDTH - backBtnW) / 2;
-        int backBtnY = slotY + SLOT_VISIBLE * spacing + 10;
-        Rectangle backBtn = { (float)backBtnX, (float)backBtnY, (float)backBtnW, (float)backBtnH };
+        // Back button (matches the drawn footer button)
+        Rectangle backBtn = { (float)backX, (float)backY, 100.0f, 28.0f };
         if (CheckCollisionPointRec(mouse, backBtn) && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             StartTransition(STATE_MENU);
             menuSelection = 0;

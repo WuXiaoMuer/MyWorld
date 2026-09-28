@@ -3066,7 +3066,9 @@ static void DrawLimb(int jointX, int jointY, int w, int h, float angleDeg, Color
 //----------------------------------------------------------------------------------
 void DrawPlayerSprite(void)
 {
-    float px = player.position.x;
+    // Visual anchor: the sprite bounding box (arms included) centers on the
+    // 12px-wide hitbox; without the 1px nudge it read as shifted right.
+    float px = player.position.x - 1.0f;
     float py = player.position.y;
     float walkT = player.walkTimer;
     bool moving = fabsf(player.velocity.x) > 10.0f;
@@ -4713,22 +4715,19 @@ void DrawSlotSelectScreen(void)
     // Background: flat MC dark backdrop
     DrawDirtBackground(40);
 
-    // ---- Layout: size the panel to its content and center it ----
+    // ---- Layout: from the shared helper so hit boxes always match ----
     int slotW = 360, slotH = 78;
     int spacing = 88;
     int isNew = (slotSelectMode == 0);
 
-    int titleH   = 92;                       // title + subtitle block
-    int seedH    = isNew ? 46 : 0;           // seed + game-mode row
     int listH    = SLOT_VISIBLE * spacing;
     int panelW   = 520;
-    int panelH   = titleH + seedH + listH + 56;
-    int panelX   = (SCREEN_WIDTH - panelW) / 2;
-    int panelY   = (SCREEN_HEIGHT - panelH) / 2;
+    int panelX   = 0, panelY = 0, slotX = 0, slotY0 = 0;
+    GetSlotSelectLayout(&panelX, &panelY, &slotX, &slotY0, NULL, NULL);
+    int panelH   = 92 + (isNew ? 46 : 0) + listH + 56;
     DrawUiPanel(panelX, panelY, panelW, panelH, 255);
 
     int contentX = panelX + 28;
-    int slotX    = panelX + (panelW - slotW) / 2;
 
     // Title — dark text with a light outline: the panel behind it is light gray
     const char *title = isNew ? S(STR_NEW_GAME_TITLE) : S(STR_LOAD_GAME_TITLE);
@@ -4751,7 +4750,7 @@ void DrawSlotSelectScreen(void)
 
     Vector2 mouse = Win32GetMousePosition();
 
-    int cursorY = panelY + titleH;
+    int cursorY = panelY + 92;
 
     // Seed input + game mode (new game mode only)
     if (isNew) {
@@ -4817,7 +4816,7 @@ void DrawSlotSelectScreen(void)
         DrawUiButton(creatRect.x, creatRect.y, creatRect.width, creatRect.height,
                      S(STR_MODE_CREATIVE), 13, creatHover, (pendingGameMode == GAME_CREATIVE), true, 1.0f);
 
-        cursorY += seedH;
+        cursorY += 46;
     }
 
     int slotY = cursorY;
