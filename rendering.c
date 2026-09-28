@@ -2967,7 +2967,7 @@ void DrawRemotePlayers(void)
         float legDeg = moving ? sinf(walkT + 3.141592653f) * (sprinting ? 32.0f : 24.0f) : 0.0f;
         float dirSign = facing ? 1.0f : -1.0f;
         float sneakShrink = players[i].sneaking ? 4.0f : 0;
-        float bobY = py - sneakShrink;
+        float bobY = py + sneakShrink;   // crouch: head down, legs shortened below
 
         // Different shirt colors per player
         Color skin = (Color){220, 180, 140, 255};
@@ -2992,16 +2992,17 @@ void DrawRemotePlayers(void)
         // Shadow
         DrawEllipse((int)centerX, (int)footY, 8, 3, (Color){0, 0, 0, 50});
 
-        // Legs — linear swing
-        DrawLimb((int)centerX - 2, (int)(bobY + 16), 4, 12, dirSign * legDeg, pants);
-        DrawLimb((int)centerX + 3, (int)(bobY + 16), 4, 12, dirSign * (-legDeg), pants);
+        // Legs — linear swing, shortened while sneaking to keep feet planted
+        int legLen = 12 - (int)sneakShrink;
+        DrawLimb((int)centerX - 4, (int)(bobY + 16), 4, legLen, dirSign * legDeg, pants);
+        DrawLimb((int)centerX + 0, (int)(bobY + 16), 4, legLen, dirSign * (-legDeg), pants);
 
         // Body
         DrawRectangle((int)(centerX - 5), (int)(bobY + 10), 11, 14, shirt);
 
-        // Arms — linear swing
-        DrawLimb((int)centerX - 5, (int)(bobY + 11), 3, 11, dirSign * (-armDeg), skin);
-        DrawLimb((int)centerX + 7, (int)(bobY + 11), 3, 11, dirSign * armDeg, skin);
+        // Arms — linear swing, hanging along the torso sides
+        DrawLimb((int)centerX - 4, (int)(bobY + 11), 3, 11, dirSign * (-armDeg), skin);
+        DrawLimb((int)centerX + 5, (int)(bobY + 11), 3, 11, dirSign * armDeg, skin);
 
         // Head
         DrawRectangle((int)(centerX - 4), (int)(bobY + 2), 9, 8, skin);
@@ -3098,9 +3099,11 @@ void DrawPlayerSprite(void)
 
     // Attack swing: 0 → 1 over the cooldown, peaks mid-swing.
 
-    // Total vertical offset: crouch + breathing + landing squash
+    // Total vertical offset: crouch + breathing + landing squat.
+    // Sneaking LOWERS the head while the legs shorten to keep the feet planted
+    // (a plain -offset would lift the whole sprite off the ground).
     float sneakShrink = player.sneaking ? 4.0f : 0;
-    float bobY = py - sneakShrink + breath + landSquash;
+    float bobY = py + sneakShrink + breath + landSquash;
 
     // Held item wobble + rotation
     float itemAngle = moving ? sinf(walkT) * (sprinting ? 10.0f : 8.0f) : 0;
@@ -3200,11 +3203,13 @@ void DrawPlayerSprite(void)
         float dir = facing ? 1.0f : -1.0f;
         int shoulderY = (int)(bobY + 8);
 
-        // Back arm leads the walk cycle in the opposite phase
-        int backJointX = MX(-2, 3) + 2;
+        // Back arm leads the walk cycle in the opposite phase. Joints sit ON
+        // the torso so the idle silhouette stays symmetric (the old px+13
+        // pivot made the character read as shifted right).
+        int backJointX = MX(0, 3) + 2;
         DrawLimb(backJointX, shoulderY, 3, 11, dir * (-swingDeg), skin);
         // Front arm carries the swing/air/attack motion
-        int frontJointX = MX(11, 3) + 2;
+        int frontJointX = MX(10, 3) + 2;
         DrawLimb(frontJointX, shoulderY, 3, 11, dir * (swingDeg + airDeg + attackDeg), skin);
     }
 
@@ -3214,15 +3219,16 @@ void DrawPlayerSprite(void)
         if (airborne) legDeg = 14.0f;
         float dir = facing ? 1.0f : -1.0f;
         int hipY = (int)(bobY + 17);
+        int legLen = 11 - (int)sneakShrink;   // shorten so feet stay planted while crouching
 
         int backHipX = MX(1, 4) + 2;
         int frontHipX = MX(7, 4) + 2;
-        DrawLimb(backHipX, hipY, 4, 11, dir * legDeg, pants);
-        DrawLimb(frontHipX, hipY, 4, 11, dir * (-legDeg), pants);
+        DrawLimb(backHipX, hipY, 4, legLen, dir * legDeg, pants);
+        DrawLimb(frontHipX, hipY, 4, legLen, dir * (-legDeg), pants);
         // Armor overlays follow the same pivot so the greaves stay on the leg
         if (legColor.a > 0) {
-            DrawLimb(backHipX, hipY, 5, 11, dir * legDeg, legColor);
-            DrawLimb(frontHipX, hipY, 5, 11, dir * (-legDeg), legColor);
+            DrawLimb(backHipX, hipY, 5, legLen, dir * legDeg, legColor);
+            DrawLimb(frontHipX, hipY, 5, legLen, dir * (-legDeg), legColor);
         }
         if (bootColor.a > 0) {
             // Boots sit at the far end of the leg; rotating the leg carries them
@@ -3230,8 +3236,8 @@ void DrawPlayerSprite(void)
                 float a = dir * (k == 0 ? legDeg : -legDeg);
                 int jx = (k == 0) ? backHipX : frontHipX;
                 float rad = a * 3.141592653f / 180.0f;
-                int bx2 = jx + (int)(sinf(rad) * 11.0f);
-                int by2 = hipY + (int)(cosf(rad) * 11.0f);
+                int bx2 = jx + (int)(sinf(rad) * (float)legLen);
+                int by2 = hipY + (int)(cosf(rad) * (float)legLen);
                 DrawRectangle(bx2 - 2, by2 - 3, 5, 3, bootColor);
             }
         }
@@ -3259,7 +3265,7 @@ void DrawPlayerSprite(void)
         // Hand sits at the rotated far end of the arm
         float rad = armDeg * 3.141592653f / 180.0f;
         float shoulderYf = bobY + 8;
-        float shoulderX = px + (facing ? 13.0f : 0.0f);   // matches frontJointX = MX(11,3)+2
+        float shoulderX = px + (facing ? 12.0f : 1.0f);   // matches frontJointX = MX(10,3)+2
         float hx = shoulderX + sinf(rad) * 14.0f;   // a little past the hand so the block reads as held
         float hy = shoulderYf + cosf(rad) * 13.0f;
         float rot = itemAngle + armDeg * 0.6f;

@@ -111,9 +111,12 @@ void UpdateWin32Input(void)
     win32MouseX = (int)pt[0];
     win32MouseY = (int)pt[1];
 
-    // Mouse buttons (only when foreground)
-    win32LMB = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-    win32RMB = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+    // Mouse buttons (only when foreground). Async key state is OR-ed with the
+    // window-message state: remote-desktop tools (e.g. game streaming) inject
+    // clicks as window messages without updating the async key state, which
+    // previously made every click invisible while hover still worked.
+    win32LMB = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 || IsMouseButtonDown(MOUSE_BUTTON_LEFT);
+    win32RMB = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0 || IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
 }
 
 bool IsMoveLeftDown(void)
