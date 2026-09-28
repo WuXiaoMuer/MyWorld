@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
 #ifdef _WIN32
 __declspec(dllimport) int __stdcall MoveFileExA(const char*, const char*, unsigned long);
 #define MOVEFILE_REPLACE_EXISTING 1
@@ -210,7 +211,12 @@ bool SaveWorld(const char *path)
         ok = ok && fwrite(&gm, sizeof(uint8_t), 1, f) == 1;
     }
 
-    // Achievements (v9+)
+    // Achievements (v9+). v20+ prefixes an explicit count byte so future
+    // additions to the achievement enum cannot shift the file layout.
+    if (version >= 20) {
+        uint8_t achN = (uint8_t)ACH_COUNT;
+        ok = ok && fwrite(&achN, sizeof(achN), 1, f) == 1;
+    }
     ok = ok && fwrite(achievements, sizeof(bool), ACH_COUNT, f) == ACH_COUNT;
     ok = ok && fwrite(&totalMobsKilled, sizeof(int), 1, f) == 1;
     ok = ok && fwrite(&totalBlocksPlaced, sizeof(int), 1, f) == 1;
@@ -313,7 +319,8 @@ bool SaveWorld(const char *path)
             ok = ok && fwrite(&src, sizeof(src), 1, f) == 1;
         }
     }
-    // Brewing stands (v19+): per-stand slot contents and progress
+
+    // Brewing stands (v19+): per-stand slot contents and progress
     if (ok) {
         if (brewingOpen && activeBrewing >= 0 && activeBrewing < brewingCount) SyncActiveToBrewing(activeBrewing);
         uint32_t bcount = (uint32_t)brewingCount;
@@ -596,14 +603,57 @@ bool LoadWorld(const char *path)
         } else {
             gameMode = GAME_SURVIVAL;
         }
-        // v9+: achievements. v9-v13 stored 6 achievements; v14+ stores ACH_COUNT.
+        // v9+: achievements. v9-v13 stored 6; v14-v19 stored ACH_COUNT of the
+        // writing build, which drifted (10 -> 11 with ACH_ABYSS -> 12 with
+        // ACH_WARDEN) without a version bump, so the stored count is unknown.
+        // v20+ writes the count explicitly. For older saves, probe the known
+        // historical counts: a correct alignment yields a sane mob count right
+        // after, and the final trailer check rejects any mis-probe.
         if (version >= 9) {
-            int achStored = (version >= 14) ? ACH_COUNT : 6;
             for (int i = 0; i < ACH_COUNT; i++) achievements[i] = false;
-            for (int i = 0; i < achStored; i++) {
-                bool b;
-                if (fread(&b, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
-                if (i < ACH_COUNT) achievements[i] = b;
+            int achStored = -1;
+            long achPos = ftell(f);
+            if (version >= 20) {
+                // Explicit count byte (self-describing from v20 on)
+                uint8_t achN = 0;
+                if (fread(&achN, 1, 1, f) != 1) { fclose(f); return false; }
+                achStored = (int)achN;
+                for (int i = 0; i < achStored; i++) {
+                    bool b;
+                    if (fread(&b, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
+                    if (i < ACH_COUNT) achievements[i] = b;
+                }
+            } else {
+                static const int candidates[] = { 12, 11, 10, 9, 8, 7, 6 };
+                for (unsigned ci = 0; ci < sizeof(candidates) / sizeof(candidates[0]) && achStored < 0; ci++) {
+                    int n = candidates[ci];
+                    if (fseek(f, achPos, SEEK_SET) != 0) { fclose(f); return false; }
+                    bool probeOk = true;
+                    for (int i = 0; i < n && probeOk; i++) {
+                        bool b;
+                        if (fread(&b, sizeof(bool), 1, f) != 1) probeOk = false;
+                        else if (i < ACH_COUNT) achievements[i] = b;
+                    }
+                    // Skip the two stat counters, then sanity-check the mob
+                    // count that follows: correct alignment reads a small
+                    // non-negative number, misalignment reads garbage.
+                    int skipA = 0, skipB = 0, mobN = -1;
+                    if (probeOk && fread(&skipA, sizeof(int), 1, f) != 1) probeOk = false;
+                    if (probeOk && fread(&skipB, sizeof(int), 1, f) != 1) probeOk = false;
+                    if (probeOk && fread(&mobN, sizeof(int), 1, f) == 1) {
+                        if (mobN < 0 || mobN > MAX_MOBS) probeOk = false;
+                    } else probeOk = false;
+                    if (probeOk) achStored = n;
+                }
+                if (achStored < 0) { fclose(f); return false; }
+                // Re-read achievements from the winning probe position, then
+                // continue at the counters.
+                if (fseek(f, achPos, SEEK_SET) != 0) { fclose(f); return false; }
+                for (int i = 0; i < achStored; i++) {
+                    bool b;
+                    if (fread(&b, sizeof(bool), 1, f) != 1) { fclose(f); return false; }
+                    if (i < ACH_COUNT) achievements[i] = b;
+                }
             }
             if (fread(&totalMobsKilled, sizeof(int), 1, f) != 1) { fclose(f); return false; }
             if (fread(&totalBlocksPlaced, sizeof(int), 1, f) != 1) { fclose(f); return false; }
@@ -782,7 +832,8 @@ bool LoadWorld(const char *path)
         }
         QueueFluidSources();
     }
-    // Brewing stands (v19+). Older saves have none.
+
+    // Brewing stands (v19+). Older saves have none.
     brewingCount = 0;
     if (version >= 19) {
         uint32_t bcount = 0;
