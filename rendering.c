@@ -3066,9 +3066,10 @@ static void DrawLimb(int jointX, int jointY, int w, int h, float angleDeg, Color
 //----------------------------------------------------------------------------------
 void DrawPlayerSprite(void)
 {
-    // Visual anchor: sprite nudged 2px left of the hitbox per user feedback
-    // (the composition reads right-heavy; arms + held item sit on the right).
-    float px = player.position.x - 2.0f;
+    // Visual anchor: sprite nudged 7px left of the hitbox per user feedback
+    // (iterated: -2 then -5 more). All sprite parts derive from px so the
+    // whole composition moves together.
+    float px = player.position.x - 7.0f;
     float py = player.position.y;
     float walkT = player.walkTimer;
     bool moving = fabsf(player.velocity.x) > 10.0f;
@@ -3205,14 +3206,13 @@ void DrawPlayerSprite(void)
         float dir = facing ? 1.0f : -1.0f;
         int shoulderY = (int)(bobY + 8);
 
-        // Back arm leads the walk cycle in the opposite phase. Joints sit ON
-        // the torso so the idle silhouette stays symmetric (the old px+13
-        // pivot made the character read as shifted right).
-        int backJointX = MX(0, 3) + 2;
-        DrawLimb(backJointX, shoulderY, 3, 11, dir * (-swingDeg), skin);
+        // Back arm leads the walk cycle in the opposite phase. 4px-wide arms
+        // hang symmetrically at the torso sides (centers +-4 from body centre).
+        int backJointX = MX(0, 4) + 2;
+        DrawLimb(backJointX, shoulderY, 4, 11, dir * (-swingDeg), skin);
         // Front arm carries the swing/air/attack motion
-        int frontJointX = MX(10, 3) + 2;
-        DrawLimb(frontJointX, shoulderY, 3, 11, dir * (swingDeg + airDeg + attackDeg), skin);
+        int frontJointX = MX(8, 4) + 2;
+        DrawLimb(frontJointX, shoulderY, 4, 11, dir * (swingDeg + airDeg + attackDeg), skin);
     }
 
     // Legs pivot at the hip, opposite phase to the arms. In the air they tuck.
@@ -3267,7 +3267,7 @@ void DrawPlayerSprite(void)
         // Hand sits at the rotated far end of the arm
         float rad = armDeg * 3.141592653f / 180.0f;
         float shoulderYf = bobY + 8;
-        float shoulderX = px + (facing ? 12.0f : 1.0f);   // matches frontJointX = MX(10,3)+2
+        float shoulderX = px + (facing ? 10.0f : 2.0f);   // matches frontJointX = MX(8,4)+2
         float hx = shoulderX + sinf(rad) * 14.0f;   // a little past the hand so the block reads as held
         float hy = shoulderYf + cosf(rad) * 13.0f;
         float rot = itemAngle + armDeg * 0.6f;
@@ -4743,10 +4743,10 @@ void DrawSlotSelectScreen(void)
         DrawGameText(title, titleX, titleY, titleSize, (Color){58, 58, 58, 255});
     }
 
-    // Subtitle
+    // Subtitle — white + hard shadow so it reads on the dirt backdrop
     const char *sub = isNew ? S(STR_NEW_GAME_SUB) : S(STR_LOAD_GAME_SUB);
-    int subW = MeasureGameTextWidth(sub, 15);
-    DrawGameText(sub, (SCREEN_WIDTH - subW) / 2, titleY + 50, 14, (Color){110, 110, 110, 220});
+    int subW = MeasureGameTextWidth(sub, 14);
+    DrawTextMC(sub, (SCREEN_WIDTH - subW) / 2, titleY + 50, 14, (Color){235, 235, 235, 255});
 
     Vector2 mouse = Win32GetMousePosition();
 
@@ -4761,7 +4761,7 @@ void DrawSlotSelectScreen(void)
         Rectangle seedBox = { (float)seedBoxX, (float)seedBoxY, (float)seedBoxW, (float)seedBoxH };
         bool seedHover = CheckCollisionPointRec(mouse, seedBox);
 
-        DrawGameText(S(STR_SEED), seedBoxX, seedBoxY - 16, 14, (Color){90, 90, 90, 220});
+        DrawGameText(S(STR_SEED), seedBoxX, seedBoxY - 16, 14, (Color){45, 45, 45, 255});
         // Recessed MC text field
         DrawRectangle(seedBoxX, seedBoxY, seedBoxW, seedBoxH, (Color){60, 60, 60, 255});
         DrawRectangle(seedBoxX, seedBoxY, seedBoxW, 1, (Color){30, 30, 30, 255});
@@ -4798,7 +4798,7 @@ void DrawSlotSelectScreen(void)
         int rndBtnX = seedBoxX + seedBoxW + 6;
         Rectangle rndBtn = { (float)rndBtnX, (float)seedBoxY, (float)rndBtnW, (float)seedBoxH };
         bool rndHover = CheckCollisionPointRec(mouse, rndBtn);
-        DrawUiButton(rndBtn.x, rndBtn.y, rndBtn.width, rndBtn.height, S(STR_RANDOM), 13, rndHover, false, true, 1.0f);
+        DrawUiButton(rndBtn.x, rndBtn.y, rndBtn.width, rndBtn.height, S(STR_RANDOM), 14, rndHover, false, true, 1.0f);
         if (rndHover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
             PlaySoundUIClick();
             unsigned int rs = (unsigned int)(GetTime() * 100000.0) ^ (unsigned int)rand();
@@ -4806,15 +4806,15 @@ void DrawSlotSelectScreen(void)
             snprintf(seedInputBuf, sizeof(seedInputBuf), "%u", rs);
             seedInputLen = (int)strlen(seedInputBuf);
         }
-        DrawGameText(S(STR_GAMEMODE), modeX, seedBoxY + 6, 14, (Color){90, 90, 90, 220});
+        DrawGameText(S(STR_GAMEMODE), modeX, seedBoxY + 6, 14, (Color){45, 45, 45, 255});
         Rectangle survRect = { (float)(modeX + lblW), (float)seedBoxY, (float)survW, (float)seedBoxH };
         Rectangle creatRect = { (float)(modeX + lblW + survW + gap), (float)seedBoxY, (float)creatW, (float)seedBoxH };
         bool survHover = CheckCollisionPointRec(mouse, survRect);
         bool creatHover = CheckCollisionPointRec(mouse, creatRect);
         DrawUiButton(survRect.x, survRect.y, survRect.width, survRect.height,
-                     S(STR_MODE_SURVIVAL), 13, survHover, (pendingGameMode == GAME_SURVIVAL), true, 1.0f);
+                     S(STR_MODE_SURVIVAL), 14, survHover, (pendingGameMode == GAME_SURVIVAL), true, 1.0f);
         DrawUiButton(creatRect.x, creatRect.y, creatRect.width, creatRect.height,
-                     S(STR_MODE_CREATIVE), 13, creatHover, (pendingGameMode == GAME_CREATIVE), true, 1.0f);
+                     S(STR_MODE_CREATIVE), 14, creatHover, (pendingGameMode == GAME_CREATIVE), true, 1.0f);
 
         cursorY += 46;
     }
@@ -4865,8 +4865,8 @@ void DrawSlotSelectScreen(void)
         // Slot number
         char slotLabel[24];
         snprintf(slotLabel, sizeof(slotLabel), S(STR_SLOT), i + 1);
-        Color labelColor = usable ? (Color){48, 48, 48, 255} : (Color){130, 130, 130, 190};
-        DrawGameText(slotLabel, slotX + 14, sy + 12, 22, labelColor);
+        Color labelColor = usable ? (Color){38, 38, 38, 255} : (Color){95, 95, 95, 230};
+        DrawGameText(slotLabel, slotX + 14, sy + 10, 28, labelColor);
 
         if (info.exists) {
             char seedText[40];
@@ -4967,7 +4967,7 @@ void DrawConfirmDialog(void)
 
     const char *warn = S(STR_CANNOT_UNDO);
     int warnW = MeasureGameTextWidth(warn,14);
-    DrawGameText(warn, dlgX + (dlgW - warnW) / 2, dlgY + 74,14, (Color){210, 130, 110, 220});
+    DrawGameText(warn, dlgX + (dlgW - warnW) / 2, dlgY + 74,14, (Color){168, 84, 64, 255});
 
     // Buttons
     Vector2 mouse = Win32GetMousePosition();
@@ -4979,14 +4979,14 @@ void DrawConfirmDialog(void)
         Rectangle r = { (float)(dlgX + 30), (float)btnY, (float)btnW, (float)btnH };
         bool hover = CheckCollisionPointRec(mouse, r);
         const char *t = isDelete ? S(STR_YES_DELETE) : S(STR_YES_OVERWRITE);
-        DrawUiButton(r.x, r.y, r.width, r.height, t, 16, hover, false, true, 1.0f);
+        DrawUiButton(r.x, r.y, r.width, r.height, t, 14, hover, false, true, 1.0f);
     }
 
     // No button (MC-style, same rect as hit-testing)
     {
         Rectangle r = { (float)(dlgX + dlgW - btnW - 30), (float)btnY, (float)btnW, (float)btnH };
         bool hover = CheckCollisionPointRec(mouse, r);
-        DrawUiButton(r.x, r.y, r.width, r.height, S(STR_CANCEL), 16, hover, false, true, 1.0f);
+        DrawUiButton(r.x, r.y, r.width, r.height, S(STR_CANCEL), 14, hover, false, true, 1.0f);
     }
 
     // Key hints
