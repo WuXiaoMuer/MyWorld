@@ -4505,6 +4505,14 @@ void DrawGame(void)
     DrawRemotePlayers();
     if (!inventoryOpen && !gamePaused && !player.playerDead) DrawCrosshair();
     DrawPlayerSprite();
+    // F10: draw the player hitbox so sprite-vs-collision alignment is visible
+    if (showInputDebug && !player.playerDead) {
+        DrawRectangleLines((int)player.position.x - 1, (int)player.position.y - 1,
+                           PLAYER_WIDTH + 2, PLAYER_HEIGHT + 2, (Color){0, 255, 80, 230});
+        // Body centre line (where the camera and the hitbox middle sit)
+        DrawRectangle((int)(player.position.x + PLAYER_WIDTH / 2), (int)player.position.y - 4, 1, 4,
+                      (Color){0, 255, 80, 200});
+    }
     EndMode2D();
 
     // Weather effects (rain, lightning)
