@@ -3000,9 +3000,9 @@ void DrawRemotePlayers(void)
         // Body
         DrawRectangle((int)(centerX - 5), (int)(bobY + 10), 11, 14, shirt);
 
-        // Arms — linear swing, hanging along the torso sides
-        DrawLimb((int)centerX - 4, (int)(bobY + 11), 3, 11, dirSign * (-armDeg), skin);
-        DrawLimb((int)centerX + 5, (int)(bobY + 11), 3, 11, dirSign * armDeg, skin);
+        // Arms — linear swing, 4px wide, overlapping the torso edges
+        DrawLimb((int)centerX - 4, (int)(bobY + 11), 4, 11, dirSign * (-armDeg), skin);
+        DrawLimb((int)centerX + 4, (int)(bobY + 11), 4, 11, dirSign * armDeg, skin);
 
         // Head
         DrawRectangle((int)(centerX - 4), (int)(bobY + 2), 9, 8, skin);
@@ -3066,10 +3066,10 @@ static void DrawLimb(int jointX, int jointY, int w, int h, float angleDeg, Color
 //----------------------------------------------------------------------------------
 void DrawPlayerSprite(void)
 {
-    // Visual anchor: sprite nudged 7px left of the hitbox per user feedback
-    // (iterated: -2 then -5 more). All sprite parts derive from px so the
-    // whole composition moves together.
-    float px = player.position.x - 7.0f;
+    // Sprite anchor == hitbox origin: collision and visuals align exactly.
+    // The arms are what attach to the torso (see the joint comments below);
+    // no whole-sprite offset is applied.
+    float px = player.position.x;
     float py = player.position.y;
     float walkT = player.walkTimer;
     bool moving = fabsf(player.velocity.x) > 10.0f;
@@ -3207,7 +3207,8 @@ void DrawPlayerSprite(void)
         int shoulderY = (int)(bobY + 8);
 
         // Back arm leads the walk cycle in the opposite phase. 4px-wide arms
-        // hang symmetrically at the torso sides (centers +-4 from body centre).
+        // overlap the torso edges (torso spans px+1..px+11): back arm 0..4,
+        // front arm 8..12 - attached, no gap, symmetric about the torso.
         int backJointX = MX(0, 4) + 2;
         DrawLimb(backJointX, shoulderY, 4, 11, dir * (-swingDeg), skin);
         // Front arm carries the swing/air/attack motion
