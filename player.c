@@ -1000,10 +1000,12 @@ void PlayerPhysics(float dt)
                                      player.velocity.y / 400.0f);
                 }
             }
-            // Fall damage: MC-style, 1 damage per block fallen beyond 3 blocks.
+            // Fall damage: 1 damage per block fallen beyond the safe-fall
+            // threshold (above the ~4.6-block jump apex, so your own jumps
+            // never hurt; deeper falls still scale).
             float fallBlocks = player.fallDistance / BLOCK_SIZE;
-            if (fallBlocks > 3.0f && gameMode != GAME_CREATIVE) {
-                int damage = (int)(fallBlocks - 3.0f);
+            if (fallBlocks > FALL_SAFE_BLOCKS && gameMode != GAME_CREATIVE) {
+                int damage = (int)(fallBlocks - FALL_SAFE_BLOCKS);
                 if (damage > 0) {
                     float reduction = GetArmorDamageReduction();
                     damage = (int)(damage * (1.0f - reduction));

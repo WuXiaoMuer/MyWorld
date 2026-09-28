@@ -108,6 +108,9 @@ bool Win32IsForeground(void);
 #define PLAYER_HEIGHT       28
 #define GRAVITY             980.0f
 #define JUMP_VELOCITY       -380.0f
+// Full jump apex is ~4.6 blocks (JUMP_VELOCITY^2 / 2 / GRAVITY), so a plain
+// max-height jump must never count as a fall: safe-fall threshold sits above it.
+#define FALL_SAFE_BLOCKS    4.5f
 #define MOVE_SPEED          120.0f
 #define SPRINT_SPEED_MULT   1.6f
 #define SNEAK_SPEED_MULT    0.3f
