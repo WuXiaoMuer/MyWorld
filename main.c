@@ -77,6 +77,12 @@ void UpdateLogicalViewport(void)
 void UpdateWin32Input(void)
 {
     UpdateLogicalViewport();
+    // Snapshot + clear the hook click latches FIRST so clicks that arrive
+    // between frame polls are never lost, regardless of early returns below.
+    int hookL = Win32HookLMBDown();
+    int hookR = Win32HookRMBDown();
+    Win32ClearHookClickLatches();
+
     // Save previous mouse state
     win32MousePrevX = win32MouseX;
     win32MousePrevY = win32MouseY;
@@ -111,12 +117,15 @@ void UpdateWin32Input(void)
     win32MouseX = (int)pt[0];
     win32MouseY = (int)pt[1];
 
-    // Mouse buttons (only when foreground). Async key state is OR-ed with the
-    // window-message state: remote-desktop tools (e.g. game streaming) inject
-    // clicks as window messages without updating the async key state, which
-    // previously made every click invisible while hover still worked.
-    win32LMB = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 || IsMouseButtonDown(MOUSE_BUTTON_LEFT);
-    win32RMB = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0 || IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+    // Mouse buttons (only when foreground). Three sources OR-ed together:
+    // 1) async key state (physical mouse),
+    // 2) raylib's window-message state (GLFW),
+    // 3) the message-hook capture (raw queued messages: streaming injection,
+    //    touch synthesis, anything the first two might miss).
+    win32LMB = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0
+               || IsMouseButtonDown(MOUSE_BUTTON_LEFT) || hookL;
+    win32RMB = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0
+               || IsMouseButtonDown(MOUSE_BUTTON_RIGHT) || hookR;
 }
 
 bool IsMoveLeftDown(void)
@@ -294,8 +303,15 @@ int Win32GetCharPressed(void)
     return 0;
 }
 
-// Mouse wheel via thread-specific WH_GETMESSAGE hook on GLFW's thread
+// Mouse wheel + click capture via thread-specific WH_GETMESSAGE hook on
+// GLFW's thread. The hook sees every message queued to the game window, so
+// clicks injected as raw window messages (remote-desktop streaming, touch
+// synthesis, anything GLFW's own path might miss) are still counted.
 static volatile float wheelAccum = 0.0f;
+static volatile int hookLMBLevel = 0;   // WM_LBUTTONDOWN currently queued state
+static volatile int hookLMBSeen = 0;    // latch: a press happened since last frame
+static volatile int hookRMBLevel = 0;
+static volatile int hookRMBSeen = 0;
 static void *wheelHookHandle = NULL;
 
 __declspec(dllimport) void __stdcall Sleep(unsigned long);
@@ -305,22 +321,39 @@ __declspec(dllimport) int __stdcall UnhookWindowsHookEx(void*);
 __declspec(dllimport) long long __stdcall CallNextHookEx(void*, int, long long, long long);
 #define WH_GETMESSAGE 3
 #define WM_MOUSEWHEEL 0x020A
+#define WM_LBUTTONDOWN 0x0201
+#define WM_LBUTTONUP 0x0202
+#define WM_LBUTTONDBLCLK 0x0203
+#define WM_RBUTTONDOWN 0x0204
+#define WM_RBUTTONUP 0x0205
+#define WM_RBUTTONDBLCLK 0x0206
 #define HC_ACTION 0
 
 static long long __stdcall WheelGetMsgProc(int nCode, long long wParam, long long lParam)
 {
-    if (nCode >= 0 && wParam == 1) {
+    if (nCode >= 0) {
         unsigned int *raw = (unsigned int *)lParam;
         unsigned int msgType = raw[2];
-        if (msgType == WM_MOUSEWHEEL) {
+        if (msgType == WM_MOUSEWHEEL && wParam == 1) {
             size_t *fields = (size_t *)lParam;
             size_t wp = fields[2];
             short delta = (short)(wp >> 16);
             wheelAccum += (float)delta / 120.0f;
         }
+        // Click capture: level tracks the current button state, the latch
+        // remembers presses that happen entirely between two frame polls.
+        if (msgType == WM_LBUTTONDOWN || msgType == WM_LBUTTONDBLCLK) { hookLMBLevel = 1; hookLMBSeen = 1; }
+        else if (msgType == WM_LBUTTONUP) hookLMBLevel = 0;
+        if (msgType == WM_RBUTTONDOWN || msgType == WM_RBUTTONDBLCLK) { hookRMBLevel = 1; hookRMBSeen = 1; }
+        else if (msgType == WM_RBUTTONUP) hookRMBLevel = 0;
     }
     return CallNextHookEx(wheelHookHandle, nCode, wParam, lParam);
 }
+
+int Win32HookLMBDown(void) { return hookLMBLevel || hookLMBSeen; }
+int Win32HookRMBDown(void) { return hookRMBLevel || hookRMBSeen; }
+void Win32ClearHookClickLatches(void) { hookLMBSeen = 0; hookRMBSeen = 0; }
+bool Win32IsForeground(void) { return g_windowForeground; }
 
 void InitWin32WheelHook(void)
 {
@@ -358,6 +391,7 @@ DayNightCycle dayNight = { 0 };
 Texture2D blockAtlas = { 0 };
 Texture2D crackTextures[CRACK_STAGES] = { 0 };
 bool showDebug = false;
+bool showInputDebug = false;
 bool showLargeMap = false;
 bool inventoryOpen = false;
 EnchantSession localEnchantSession = {0};

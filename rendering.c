@@ -3066,9 +3066,9 @@ static void DrawLimb(int jointX, int jointY, int w, int h, float angleDeg, Color
 //----------------------------------------------------------------------------------
 void DrawPlayerSprite(void)
 {
-    // Visual anchor: the sprite bounding box (arms included) centers on the
-    // 12px-wide hitbox; without the 1px nudge it read as shifted right.
-    float px = player.position.x - 1.0f;
+    // Visual anchor: sprite nudged 2px left of the hitbox per user feedback
+    // (the composition reads right-heavy; arms + held item sit on the right).
+    float px = player.position.x - 2.0f;
     float py = player.position.y;
     float walkT = player.walkTimer;
     bool moving = fabsf(player.velocity.x) > 10.0f;

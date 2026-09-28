@@ -3099,6 +3099,9 @@ void UpdateGame(float dt)
 
     if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F3)) showDebug = !showDebug;
 
+    // F10: input diagnostics (for investigating mouse issues over streaming)
+    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F10)) showInputDebug = !showInputDebug;
+
     // M: toggle large map
     if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_M) && !inventoryOpen && !player.playerDead) {
         showLargeMap = !showLargeMap;
@@ -4549,6 +4552,28 @@ void DrawGame(void)
         DrawMinimap();
         DrawMessage();
         DrawChatUI();
+
+        // F10 input diagnostics: live view of every mouse-button source and
+        // the cursor mapping, for debugging clicks over remote streaming.
+        if (showInputDebug) {
+            int bx = 10, by = 10, bw = 330, bh = 118;
+            DrawRectangle(bx, by, bw, bh, (Color){0, 0, 0, 190});
+            DrawRectangleLines(bx, by, bw, bh, (Color){120, 220, 120, 220});
+            Vector2 lg = Win32GetMousePosition();
+            char line[96];
+            snprintf(line, sizeof(line), "FG=%d  asyncL=%d msgL=%d hookL=%d",
+                     Win32IsForeground(), win32LMB, IsMouseButtonDown(MOUSE_BUTTON_LEFT), Win32HookLMBDown());
+            DrawGameText(line, bx + 8, by + 8, 14, (Color){140, 240, 140, 255});
+            snprintf(line, sizeof(line), "asyncR=%d msgR=%d hookR=%d",
+                     win32RMB, IsMouseButtonDown(MOUSE_BUTTON_RIGHT), Win32HookRMBDown());
+            DrawGameText(line, bx + 8, by + 26, 14, (Color){140, 240, 140, 255});
+            snprintf(line, sizeof(line), "raw=(%d,%d) logical=(%.0f,%.0f) scale=%.2f",
+                     win32MouseX, win32MouseY, lg.x, lg.y, logicalScale);
+            DrawGameText(line, bx + 8, by + 44, 14, (Color){200, 220, 255, 255});
+            snprintf(line, sizeof(line), "state=%d paused=%d inv=%d", (int)gameState, gamePaused, inventoryOpen);
+            DrawGameText(line, bx + 8, by + 62, 14, (Color){200, 220, 255, 255});
+            DrawGameText("F10 close", bx + 8, by + 92, 14, (Color){160, 160, 160, 220});
+        }
 
         DrawInventoryScreen();
         DrawCreativeScreen();

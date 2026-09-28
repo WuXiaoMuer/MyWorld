@@ -73,6 +73,10 @@ bool Win32IsKeyDown(int key);
 int Win32GetCharPressed(void);
 float Win32GetMouseWheelMove(void);
 void InitWin32WheelHook(void);
+int Win32HookLMBDown(void);
+int Win32HookRMBDown(void);
+void Win32ClearHookClickLatches(void);
+bool Win32IsForeground(void);
 
 //----------------------------------------------------------------------------------
 // Constants
@@ -1589,6 +1593,7 @@ extern Texture2D blockAtlas;
 #define CRACK_STAGES 10
 extern Texture2D crackTextures[CRACK_STAGES];
 extern bool showDebug;
+extern bool showInputDebug;
 extern bool showLargeMap;
 extern bool inventoryOpen;
 extern bool gamePaused;
