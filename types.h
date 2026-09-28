@@ -474,6 +474,7 @@ typedef enum {
     BLOCK_GLOWSHROOM,       // light-emitting cave plant
     ITEM_ABYSS_CRYSTAL,     // deep-tier material (boss altar later)
     BLOCK_ABYSS_ALTAR,      // summon the Abyss Warden (abyss layer only)
+    BLOCK_LADDER,           // climbable vertical transport
     BLOCK_COUNT
 } BlockType;
 
@@ -958,6 +959,7 @@ typedef enum {
     STR_MSG_WARDEN_ALREADY,
     STR_BLOCK_ABYSS_ALTAR,
     STR_RECIPE_ABYSS_ALTAR,    STR_RECIPE_BREWING_STAND,
+    STR_BLOCK_LADDER,          STR_RECIPE_LADDER,
     STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
@@ -1505,6 +1507,7 @@ typedef struct {
     bool active;
     float interpX, interpY; // Interpolation targets
     char playerName[32];    // display name (received from peer)
+    uint16_t effectBits;    // packed status effects (2 bits per type: 0=none, 1-3=level)
 } RemotePlayer;
 
 //----------------------------------------------------------------------------------
@@ -1686,6 +1689,9 @@ int GetOrCreateBrewing(int x, int y);
 void SyncFurnaceToHost(void);
 void SyncFurnaceToAll(void);
 void CloseFurnaceNetwork(void);
+void SyncBrewingToHost(void);
+void SyncBrewingToAll(void);
+void CloseBrewingNetwork(void);
 
 // Inventory multiplayer sync helpers
 void SyncInventoryToHost(void);

@@ -228,6 +228,35 @@ int AddToInventoryCount(BlockType item, int count)
 //----------------------------------------------------------------------------------
 // Status effects
 //----------------------------------------------------------------------------------
+// Clients push their local effect list to the host: the host simulates remote
+// players' physics, so without this a speed potion (or poison/regen) would not
+// apply to the drinking player in multiplayer.
+static void SendEffectSyncToHost(const Player *p)
+{
+    if (!NetIsConnected()) return;
+    uint8_t buf[NET_PACKET_MAX];
+    PktEffectSync *es = (PktEffectSync *)(buf + 1);
+    memset(es, 0, sizeof(PktEffectSync));
+    es->playerId = (uint8_t)localPlayerId;
+    es->count = 0;
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++) {
+        if (p->effects[i].time <= 0.0f) continue;
+        if (p->effects[i].type >= EFFECT_COUNT) continue;
+        es->effects[es->count].type = p->effects[i].type;
+        es->effects[es->count].level = p->effects[i].level;
+        int secs = (int)(p->effects[i].time + 0.9f);
+        if (secs < 1) secs = 1;
+        if (secs > 60000) secs = 60000;
+        es->effects[es->count].timeSec = (uint16_t)secs;
+        es->count++;
+    }
+    buf[0] = PKT_EFFECT_SYNC;
+    NetSendToServer(buf, 1 + sizeof(PktEffectSync), false);
+}
+
+// Notify the host that this player's effects changed (drink, expiry, clear).
+void NotifyEffectsChanged(Player *p);
+
 void ApplyEffect(Player *p, EffectType type, int level, float duration)
 {
     if (type < 0 || type >= EFFECT_COUNT || duration <= 0.0f) return;
@@ -237,6 +266,7 @@ void ApplyEffect(Player *p, EffectType type, int level, float duration)
         if (p->effects[i].time > 0.0f && (EffectType)p->effects[i].type == type) {
             p->effects[i].time = (duration > p->effects[i].time) ? duration : p->effects[i].time;
             p->effects[i].level = (uint8_t)((level > p->effects[i].level) ? level : p->effects[i].level);
+            NotifyEffectsChanged(p);
             return;
         }
     }
@@ -248,6 +278,7 @@ void ApplyEffect(Player *p, EffectType type, int level, float duration)
     p->effects[slot].type = (uint8_t)type;
     p->effects[slot].level = (uint8_t)level;
     p->effects[slot].time = duration;
+    NotifyEffectsChanged(p);
 }
 
 bool HasEffect(const Player *p, EffectType type)
@@ -267,6 +298,12 @@ int GetEffectLevel(const Player *p, EffectType type)
 void ClearEffects(Player *p)
 {
     memset(p->effects, 0, sizeof(p->effects));
+}
+
+// Notify the host that this player's effects changed (drink, expiry, clear).
+void NotifyEffectsChanged(Player *p)
+{
+    if (NetIsClient() && p == &players[localPlayerId]) SendEffectSyncToHost(p);
 }
 
 void UpdatePlayerEffects(Player *p, float dt)
@@ -310,10 +347,26 @@ void UpdatePlayerEffects(Player *p, float dt)
     }
 
     // Expire
+    bool expiredAny = false;
     for (int i = 0; i < MAX_PLAYER_EFFECTS; i++) {
         if (p->effects[i].time > 0.0f) {
             p->effects[i].time -= dt;
-            if (p->effects[i].time < 0.0f) p->effects[i].time = 0.0f;
+            if (p->effects[i].time < 0.0f) { p->effects[i].time = 0.0f; expiredAny = true; }
+        }
+    }
+    if (expiredAny) NotifyEffectsChanged(p);
+
+    // Clients: refresh the host's copy once a second while any effect is active,
+    // so a lost sync packet can't desync the authoritative simulation.
+    if (NetIsClient() && p == &players[localPlayerId]) {
+        static float effectResendTimer = 0.0f;
+        bool anyActive = false;
+        for (int i = 0; i < MAX_PLAYER_EFFECTS && !anyActive; i++)
+            if (p->effects[i].time > 0.0f) anyActive = true;
+        effectResendTimer += dt;
+        if (anyActive && effectResendTimer >= 1.0f) {
+            effectResendTimer = 0.0f;
+            SendEffectSyncToHost(p);
         }
     }
 }
@@ -645,6 +698,17 @@ bool CanToolMineBlock(BlockType tool, BlockType block)
 //----------------------------------------------------------------------------------
 // Player Physics
 //----------------------------------------------------------------------------------
+// True while any part of the player's body column overlaps a ladder cell.
+static bool IsPlayerOnLadder(void)
+{
+    int bx = (int)((player.position.x + PLAYER_WIDTH / 2.0f) / BLOCK_SIZE);
+    if (bx < 0 || bx >= WORLD_WIDTH) return false;
+    int byFeet = (int)((player.position.y + PLAYER_HEIGHT - 1.0f) / BLOCK_SIZE);
+    int byMid  = (int)((player.position.y + PLAYER_HEIGHT / 2.0f) / BLOCK_SIZE);
+    if (byFeet < 0 || byFeet >= WORLD_HEIGHT || byMid < 0 || byMid >= WORLD_HEIGHT) return false;
+    return GetBlock(bx, byMid) == BLOCK_LADDER || GetBlock(bx, byFeet) == BLOCK_LADDER;
+}
+
 void PlayerPhysics(float dt)
 {
     // Knockback preserves horizontal velocity
@@ -774,11 +838,31 @@ void PlayerPhysics(float dt)
     }
     player.jumpBufferTimer -= dt;
 
+    bool onLadder = IsPlayerOnLadder();
     if (inWater) {
         player.velocity.x *= WATER_SPEED_MULT;
         if (jumpHeld) {
             player.velocity.y = WATER_SWIM_VEL;
         }
+    } else if (onLadder) {
+        // Climbing: W/Space climbs up, Shift climbs down, no input hangs still.
+        float climb = MOVE_SPEED * 0.9f;
+        if (jumpHeld && !player.sneaking) {
+            player.velocity.y = -climb;
+        } else if (player.sneaking) {
+            player.velocity.y = climb;
+        } else {
+            player.velocity.y = 0.0f;
+        }
+        // Fresh jump press while moving sideways: leap off the ladder
+        if (jumpPressed && player.velocity.x != 0.0f) {
+            player.velocity.y = JUMP_VELOCITY * 0.9f;
+            player.onGround = false;
+        }
+        // Hanging on a ladder cancels any fall
+        player.fallDistance = 0.0f;
+        player.fallPeakVel = 0.0f;
+        player.coyoteTimer = COYOTE_TIME;
     } else {
         // Jump with coyote time + buffering
         if (player.jumpBufferTimer > 0.0f && player.coyoteTimer > 0.0f) {
@@ -795,8 +879,10 @@ void PlayerPhysics(float dt)
         }
     }
 
-    float gravityScale = inWater ? WATER_GRAVITY_MULT : 1.0f;
-    player.velocity.y += GRAVITY * gravityScale * dt;
+    if (!onLadder) {
+        float gravityScale = inWater ? WATER_GRAVITY_MULT : 1.0f;
+        player.velocity.y += GRAVITY * gravityScale * dt;
+    }
     float maxFall = inWater ? WATER_MAX_FALL : 800.0f;
     if (player.velocity.y > maxFall) player.velocity.y = maxFall;
 

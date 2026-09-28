@@ -353,6 +353,28 @@ static void NetSendWorldToClient(int clientId)
     }
 }
 
+// Pack a player's active effects into 2 bits per type (0=absent, 1-3=level)
+// for piggybacking on PKT_PLAYER_STATE so clients can render other players'
+// effect chips.
+static uint16_t PackEffectBits(const Player *p)
+{
+    uint16_t bits = 0;
+    for (int i = 0; i < MAX_PLAYER_EFFECTS; i++) {
+        if (p->effects[i].time <= 0.0f) continue;
+        int t = p->effects[i].type;
+        if (t < 0 || t >= EFFECT_COUNT) continue;
+        int lvl = p->effects[i].level;
+        if (lvl < 1) lvl = 1;
+        if (lvl > 3) lvl = 3;
+        bits |= (uint16_t)(lvl << (2 * t));
+    }
+    return bits;
+}
+
+// Which client (players[] id) is currently viewing each stand, -1 = none.
+// Runtime-only: not saved, host-side view tracking for the periodic sync push.
+int brewingViewer[MAX_BREWING_STANDS];
+
 void InitGame(void)
 {
     modifiedBlockCount = 0;
@@ -368,6 +390,7 @@ void InitGame(void)
     brewingOpen = false;
     brewingCount = 0;
     activeBrewing = -1;
+    for (int i = 0; i < MAX_BREWING_STANDS; i++) brewingViewer[i] = -1;
     craftingTableOpen = false;
     chestOpen = false;
     srand((unsigned int)time(NULL));
@@ -1253,6 +1276,8 @@ int FindBrewing(int x, int y)
         if (brewingStands[i].x == x && brewingStands[i].y == y) return i;
     return -1;
 }
+// Which client (players[] id) is currently viewing each stand, -1 = none.
+// (defined before InitGame; see brewingViewer there)
 int GetOrCreateBrewing(int x, int y)
 {
     int idx = FindBrewing(x, y);
@@ -1262,6 +1287,7 @@ int GetOrCreateBrewing(int x, int y)
     memset(&brewingStands[idx], 0, sizeof(BrewingData));
     brewingStands[idx].x = x;
     brewingStands[idx].y = y;
+    brewingViewer[idx] = -1;
     return idx;
 }
 void RemoveBrewing(int x, int y)
@@ -1269,6 +1295,7 @@ void RemoveBrewing(int x, int y)
     for (int i = 0; i < brewingCount; i++) {
         if (brewingStands[i].x == x && brewingStands[i].y == y) {
             brewingStands[i] = brewingStands[brewingCount - 1];
+            brewingViewer[i] = brewingViewer[brewingCount - 1];
             brewingCount--;
             if (activeBrewing == i) { activeBrewing = -1; brewingOpen = false; }
             return;
@@ -1294,19 +1321,91 @@ void SyncActiveToBrewing(int idx)
     b->progress = brewProgress;
 }
 
+//----------------------------------------------------------------------------------
+// Brewing multiplayer sync helpers (same request/sync pattern as the furnace)
+//----------------------------------------------------------------------------------
+static void PackBrewingSync(PktBrewingSync *pkt, int idx)
+{
+    BrewingData *b = &brewingStands[idx];
+    pkt->x = (int16_t)b->x;
+    pkt->y = (int16_t)b->y;
+    pkt->bottle = b->bottle;             pkt->bottleCount = b->bottleCount;
+    pkt->ingredient = b->ingredient;     pkt->ingredientCount = b->ingredientCount;
+    pkt->output = b->output;             pkt->outputCount = b->outputCount;
+    pkt->progress = b->progress;
+}
+
+static void ApplyBrewingSync(const PktBrewingSync *pkt)
+{
+    int idx = GetOrCreateBrewing((int)pkt->x, (int)pkt->y);
+    if (idx < 0) return;
+    BrewingData *b = &brewingStands[idx];
+    b->bottle = pkt->bottle;             b->bottleCount = pkt->bottleCount;
+    b->ingredient = pkt->ingredient;     b->ingredientCount = pkt->ingredientCount;
+    b->output = pkt->output;             b->outputCount = pkt->outputCount;
+    b->progress = pkt->progress;
+    if (activeBrewing == idx) SyncBrewingToActive(idx);
+}
+
+void SyncBrewingToHost(void)
+{
+    if (!NetIsClient()) return;
+    if (activeBrewing < 0 || activeBrewing >= brewingCount) return;
+    SyncActiveToBrewing(activeBrewing);
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_BREWING_SYNC;
+    PktBrewingSync pkt;
+    PackBrewingSync(&pkt, activeBrewing);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    NetSendToServer(buf, 1 + sizeof(pkt), true);
+}
+
+void SyncBrewingToAll(void)
+{
+    if (!NetIsHost()) return;
+    if (activeBrewing < 0 || activeBrewing >= brewingCount) return;
+    SyncActiveToBrewing(activeBrewing);
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_BREWING_SYNC;
+    PktBrewingSync pkt;
+    PackBrewingSync(&pkt, activeBrewing);
+    memcpy(buf + 1, &pkt, sizeof(pkt));
+    for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+        if (players[r].netControlled) {
+            NetSendTo(r, buf, 1 + sizeof(pkt), true);
+        }
+    }
+}
+
+void CloseBrewingNetwork(void)
+{
+    if (NetIsClient()) {
+        uint8_t buf[NET_PACKET_MAX];
+        buf[0] = PKT_BREWING_CLOSE;
+        PktBrewingOpen po;
+        po.x = (int16_t)brewingBlockX; po.y = (int16_t)brewingBlockY;
+        memcpy(buf + 1, &po, sizeof(po));
+        NetSendToServer(buf, 1 + sizeof(po), true);
+    }
+}
+
 void RequestOpenBrewing(int bx, int by)
 {
     brewingBlockX = bx; brewingBlockY = by;
-    // Stand contents are per-machine, so restrict to host/local to avoid item
-    // duplication in multiplayer. Clients keep using the crafting recipes.
-    if (NetIsClient()) {
-        ShowMessage(S(STR_MSG_HOST_ONLY), (Color){240, 200, 120, 255});
+    if (!NetIsConnected() || NetIsHost()) {
+        activeBrewing = GetOrCreateBrewing(bx, by);
+        if (activeBrewing >= 0) SyncBrewingToActive(activeBrewing);
+        brewingOpen = true; inventoryOpen = true; gamePaused = false;
+        PlaySoundCraft();
         return;
     }
-    activeBrewing = GetOrCreateBrewing(bx, by);
-    if (activeBrewing >= 0) SyncBrewingToActive(activeBrewing);
-    brewingOpen = true; inventoryOpen = true; gamePaused = false;
-    PlaySoundCraft();
+    // Client: ask host for stand contents; UI opens when PKT_BREWING_SYNC arrives.
+    uint8_t buf[NET_PACKET_MAX];
+    buf[0] = PKT_BREWING_OPEN;
+    PktBrewingOpen po;
+    po.x = (int16_t)bx; po.y = (int16_t)by;
+    memcpy(buf + 1, &po, sizeof(po));
+    NetSendToServer(buf, 1 + sizeof(po), true);
 }
 void ReturnBrewingItems(void)
 {
@@ -1354,9 +1453,12 @@ void DestroyBrewing(int x, int y)
 }
 
 // Brew one potion per 8s wherever the ingredients match; runs for every placed
-// stand, not just the open one.
+// stand, not just the open one. Host-authoritative in multiplayer: clients'
+// stand copies only move via PKT_BREWING_SYNC.
 void UpdateBrewingTick(float dt)
 {
+    // Clients don't tick stands; the host pushes authoritative state instead.
+    if (NetIsClient()) return;
     for (int i = 0; i < brewingCount; i++) {
         BrewingData *b = &brewingStands[i];
         BlockType out = BLOCK_AIR;
@@ -1378,6 +1480,25 @@ void UpdateBrewingTick(float dt)
             b->progress = 0.0f;
         }
         if (brewingOpen && activeBrewing == i) SyncBrewingToActive(i);
+    }
+
+    // Push authoritative state to clients viewing a stand (~2x/sec) so their
+    // progress bar and slot contents stay current.
+    static float brewingPushTimer = 0.0f;
+    brewingPushTimer += dt;
+    if (brewingPushTimer >= 0.5f) {
+        brewingPushTimer = 0.0f;
+        for (int i = 0; i < brewingCount; i++) {
+            int viewer = brewingViewer[i];
+            if (viewer <= 0 || viewer >= NET_MAX_PLAYERS) continue;
+            if (!players[viewer].netControlled) { brewingViewer[i] = -1; continue; }
+            uint8_t buf[NET_PACKET_MAX];
+            buf[0] = PKT_BREWING_SYNC;
+            PktBrewingSync pkt;
+            PackBrewingSync(&pkt, i);
+            memcpy(buf + 1, &pkt, sizeof(pkt));
+            NetSendTo(viewer, buf, 1 + sizeof(pkt), true);
+        }
     }
 }
 
@@ -2846,10 +2967,13 @@ void UpdateGame(float dt)
 
         } else if (brewingOpen) {
             // Close brewing stand
+            CloseBrewingNetwork();
             CloseBrewingUI();
             inventoryOpen = false;
             ReturnHeldItem();
-            craftSearchLen = 0;        } else if (chestOpen) {
+            craftSearchLen = 0;
+            craftSearchBuf[0] = '\0';
+        } else if (chestOpen) {
             // Close chest
             CloseChestNetwork();
             chestOpen = false;
@@ -2906,6 +3030,15 @@ void UpdateGame(float dt)
         } else if (chestOpen) {
             CloseChestNetwork();
             chestOpen = false;
+            inventoryOpen = false;
+            ReturnHeldItem();
+            craftSearchLen = 0;
+            craftSearchBuf[0] = '\0';
+        } else if (brewingOpen) {
+            // ESC path: brewing used to fall through to the plain-inventory
+            // branch and left the stand screen stuck open.
+            CloseBrewingNetwork();
+            CloseBrewingUI();
             inventoryOpen = false;
             ReturnHeldItem();
             craftSearchLen = 0;
@@ -3169,6 +3302,20 @@ void UpdateGame(float dt)
                             }
                         }
                     }
+                } else if (type == PKT_EFFECT_SYNC && size >= 1 + (int)sizeof(PktEffectSync)) {
+                    // Client pushes its own effect list; the host stores it so the
+                    // authoritative simulation (PlayerPhysics speed, poison/regen
+                    // ticks) sees what the drinking client sees.
+                    const PktEffectSync *es = (const PktEffectSync *)((const uint8_t *)data + 1);
+                    Player *ep = &players[fromId];
+                    ClearEffects(ep);
+                    for (int k = 0; k < es->count && k < MAX_PLAYER_EFFECTS; k++) {
+                        int et = es->effects[k].type;
+                        if (et < 0 || et >= EFFECT_COUNT) continue;
+                        int secs = es->effects[k].timeSec;
+                        if (secs <= 0) continue;
+                        ApplyEffect(ep, (EffectType)et, es->effects[k].level, (float)secs);
+                    }
                 } else if (type == PKT_BLOCK_CHANGE && size >= 1 + (int)sizeof(PktBlockChange)) {
                     const PktBlockChange *bc = (const PktBlockChange *)((const uint8_t *)data + 1);
                     if (bc->x < WORLD_WIDTH && bc->y < WORLD_HEIGHT) {
@@ -3339,6 +3486,45 @@ void UpdateGame(float dt)
                     }
                 } else if (type == PKT_FURNACE_CLOSE && size >= 1 + (int)sizeof(PktFurnaceOpen)) {
                     // Host can track per-player open furnaces here if needed; currently no-op.
+                } else if (type == PKT_BREWING_OPEN && size >= 1 + (int)sizeof(PktBrewingOpen)) {
+                    const PktBrewingOpen *po = (const PktBrewingOpen *)((const uint8_t *)data + 1);
+                    int idx = GetOrCreateBrewing((int)po->x, (int)po->y);
+                    if (idx >= 0) {
+                        brewingViewer[idx] = fromId;
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_BREWING_SYNC;
+                        PktBrewingSync pkt;
+                        PackBrewingSync(&pkt, idx);
+                        memcpy(sbuf + 1, &pkt, sizeof(pkt));
+                        NetSendTo(fromId, sbuf, 1 + sizeof(pkt), true);
+                    }
+                } else if (type == PKT_BREWING_SYNC && size >= 1 + (int)sizeof(PktBrewingSync)) {
+                    const PktBrewingSync *pkt = (const PktBrewingSync *)((const uint8_t *)data + 1);
+                    int idx = GetOrCreateBrewing((int)pkt->x, (int)pkt->y);
+                    if (idx >= 0) {
+                        // Authoritative host: apply client's edits, then broadcast to others.
+                        // Slot contents only; progress stays host-owned so a stale client
+                        // copy can't rewind the brew.
+                        BrewingData *b = &brewingStands[idx];
+                        b->bottle = pkt->bottle;         b->bottleCount = pkt->bottleCount;
+                        b->ingredient = pkt->ingredient; b->ingredientCount = pkt->ingredientCount;
+                        b->output = pkt->output;         b->outputCount = pkt->outputCount;
+                        if (activeBrewing == idx) SyncBrewingToActive(idx);
+                        uint8_t sbuf[NET_PACKET_MAX];
+                        sbuf[0] = PKT_BREWING_SYNC;
+                        PktBrewingSync relay;
+                        PackBrewingSync(&relay, idx);
+                        memcpy(sbuf + 1, &relay, sizeof(relay));
+                        for (int r = 1; r < NET_MAX_PLAYERS; r++) {
+                            if (r != fromId && players[r].netControlled) {
+                                NetSendTo(r, sbuf, 1 + sizeof(relay), true);
+                            }
+                        }
+                    }
+                } else if (type == PKT_BREWING_CLOSE && size >= 1 + (int)sizeof(PktBrewingOpen)) {
+                    const PktBrewingOpen *po = (const PktBrewingOpen *)((const uint8_t *)data + 1);
+                    int idx = FindBrewing((int)po->x, (int)po->y);
+                    if (idx >= 0 && brewingViewer[idx] == fromId) brewingViewer[idx] = -1;
                 } else if (type == PKT_INVENTORY_SYNC && size >= 1 + (int)sizeof(PktInventorySync)) {
                     const PktInventorySync *pkt = (const PktInventorySync *)((const uint8_t *)data + 1);
                     if (fromId > 0 && fromId < MAX_NET_PLAYERS && players[fromId].netControlled) {
@@ -3657,6 +3843,7 @@ void UpdateGame(float dt)
                             pi->selectedSlot = players[i].selectedSlot;
                             pi->health = players[i].health;
                             memcpy(pi->armor, players[i].armor, 4);
+                            pi->effectBits = PackEffectBits(&players[i]);
                             snprintf(pi->playerName, sizeof(pi->playerName), "%s", players[i].playerName);
                         }
                     }
@@ -3794,6 +3981,7 @@ void UpdateGame(float dt)
                             players[pid].selectedSlot = pi->selectedSlot;
                             players[pid].health = pi->health;
                             memcpy(players[pid].armor, pi->armor, 4);
+                            remotePlayers[pid].effectBits = pi->effectBits;
                             snprintf(players[pid].playerName, sizeof(players[pid].playerName), "%s", pi->playerName);
                             remotePlayers[pid].active = true;
                         } else if (pid == localPlayerId) {
@@ -3981,6 +4169,20 @@ void UpdateGame(float dt)
                             PlaySoundCraft();
                         }
                     }
+                } else if (type == PKT_BREWING_SYNC && size >= 1 + (int)sizeof(PktBrewingSync)) {
+                    const PktBrewingSync *pkt = (const PktBrewingSync *)((const uint8_t *)data + 1);
+                    ApplyBrewingSync(pkt);
+                    // If we have a pending open request for this stand, open the UI now.
+                    if (!brewingOpen && pkt->x == brewingBlockX && pkt->y == brewingBlockY) {
+                        activeBrewing = FindBrewing((int)pkt->x, (int)pkt->y);
+                        if (activeBrewing >= 0) {
+                            SyncBrewingToActive(activeBrewing);
+                            brewingOpen = true;
+                            inventoryOpen = true;
+                            gamePaused = false;
+                            PlaySoundCraft();
+                        }
+                    }
                 } else if (type == PKT_INVENTORY_SYNC && size >= 1 + (int)sizeof(PktInventorySync)) {
                     const PktInventorySync *pkt = (const PktInventorySync *)((const uint8_t *)data + 1);
                     int pid = pkt->playerId;
@@ -4089,6 +4291,7 @@ void UpdateGame(float dt)
                 furnaceOpen = false;
             }
             if (brewingOpen) {
+                CloseBrewingNetwork();
                 CloseBrewingUI();
                 inventoryOpen = false;
                 ReturnHeldItem();

@@ -58,7 +58,11 @@ typedef enum {
     PKT_GAMEMODE_SYNC,      // Server -> Client: game mode changed
     PKT_FLUID_REQUEST,       // Client -> host: validated bucket action
     PKT_FLUID_DELTA,         // Host -> clients: authoritative fluid cells
-    PKT_FLUID_SNAPSHOT       // Host -> joining client: fluid state batch
+    PKT_FLUID_SNAPSHOT,      // Host -> joining client: fluid state batch
+    PKT_EFFECT_SYNC,         // Client -> host: local player's status effects
+    PKT_BREWING_OPEN,        // Client -> host: request stand contents
+    PKT_BREWING_SYNC,        // Bidirectional: stand slot data + progress
+    PKT_BREWING_CLOSE        // Client -> host: closed stand UI
 } PacketType;
 
 //----------------------------------------------------------------------------------
@@ -138,6 +142,7 @@ typedef struct {
     int selectedSlot;
     int health;
     uint8_t armor[4];
+    uint16_t effectBits;    // packed status effects for HUD display (2 bits/type)
     char playerName[32];
 } PktPlayerInfo;
 
@@ -145,6 +150,21 @@ typedef struct {
     uint8_t count;
     PktPlayerInfo players[NET_MAX_PLAYERS];
 } PktPlayerState;
+
+// PKT_EFFECT_SYNC - client tells the host about its own status effects so the
+// host's authoritative simulation (speed on movement, poison/regen ticks) sees them.
+#ifndef MAX_PLAYER_EFFECTS
+#define MAX_PLAYER_EFFECTS 8    // keep in sync with types.h
+#endif
+typedef struct {
+    uint8_t playerId;       // informational; host always uses the sender's id
+    uint8_t count;
+    struct {
+        uint8_t type;
+        uint8_t level;
+        uint16_t timeSec;   // remaining seconds (ceil), 0 = expired
+    } effects[MAX_PLAYER_EFFECTS];
+} PktEffectSync;
 
 // PKT_MOB_STATE - sent as array
 typedef struct {
@@ -268,6 +288,20 @@ typedef struct {
     float fuelBurn;
     float fuelBurnMax;
 } PktFurnaceSync;
+
+// PKT_BREWING_OPEN / PKT_BREWING_CLOSE
+typedef struct {
+    int16_t x, y;
+} PktBrewingOpen;
+
+// PKT_BREWING_SYNC
+typedef struct {
+    int16_t x, y;
+    uint8_t bottle; int bottleCount;
+    uint8_t ingredient; int ingredientCount;
+    uint8_t output; int outputCount;
+    float progress;
+} PktBrewingSync;
 
 // PKT_INVENTORY_SYNC - full inventory + armor state (server <-> client)
 typedef struct {

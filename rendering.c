@@ -584,6 +584,9 @@ void DrawInventoryScreen(void)
     if (brewingOpen && !furnaceOpen) {
         // Snapshot active furnace state at the start of the frame so we can detect
         // modifications and sync them to the host in multiplayer.
+        uint8_t snapBrewBottle = brewBottle;         int snapBrewBottleCount = brewBottleCount;
+        uint8_t snapBrewIngr = brewIngredient;       int snapBrewIngrCount = brewIngredientCount;
+        uint8_t snapBrewOut = brewOutput;            int snapBrewOutCount = brewOutputCount;
 
         int padding = 3;
         int armorSlotSize = 40;
@@ -973,6 +976,16 @@ void DrawInventoryScreen(void)
         // Sync slot edits back to the stand array (per-machine data)
         if (activeBrewing >= 0 && activeBrewing < brewingCount) {
             SyncActiveToBrewing(activeBrewing);
+        }
+        // If the stand mirror changed this frame (user edit), push it: clients
+        // to the host, host to everyone. Progress is excluded from the diff —
+        // it is host-authoritative and refreshed by the periodic stand push.
+        if (NetIsConnected() &&
+            (snapBrewBottle != brewBottle || snapBrewBottleCount != brewBottleCount ||
+             snapBrewIngr != brewIngredient || snapBrewIngrCount != brewIngredientCount ||
+             snapBrewOut != brewOutput || snapBrewOutCount != brewOutputCount)) {
+            if (NetIsClient()) SyncBrewingToHost();
+            else if (NetIsHost()) SyncBrewingToAll();
         }
         // If inventory/armor changed inside the furnace UI, sync that too.
         if (doInvSync) {
@@ -3003,6 +3016,29 @@ void DrawRemotePlayers(void)
         int nameW = MeasureGameTextWidth(nameTag, 12);
         DrawGameText(nameTag, (int)(centerX - nameW / 2), (int)(bobY - 6), 14,
                      (Color){255, 255, 255, 200});
+
+        // Status-effect chips above the name (packed by the host, 2 bits/type)
+        uint16_t bits = remotePlayers[i].effectBits;
+        if (bits) {
+            int chipX = (int)centerX - (EFFECT_COUNT * 8) / 2;
+            for (int t = 0; t < EFFECT_COUNT; t++) {
+                int lvl = (bits >> (2 * t)) & 0x3;
+                if (!lvl) continue;
+                Color chip;
+                switch ((EffectType)t) {
+                    case EFFECT_SPEED:           chip = (Color){120, 190, 250, 255}; break;
+                    case EFFECT_STRENGTH:        chip = (Color){215, 100,  90, 255}; break;
+                    case EFFECT_REGEN:           chip = (Color){235, 130, 170, 255}; break;
+                    case EFFECT_FIRE_RESISTANCE: chip = (Color){240, 160,  60, 255}; break;
+                    case EFFECT_WATER_BREATHING: chip = (Color){ 80, 170, 220, 255}; break;
+                    case EFFECT_POISON:          chip = (Color){110, 180,  70, 255}; break;
+                    default:                     chip = (Color){160, 160, 160, 255}; break;
+                }
+                DrawRectangle(chipX, (int)(bobY - 20), 6, 12, chip);
+                if (lvl > 1) DrawRectangle(chipX + 1, (int)(bobY - 22), 4, 2, chip);
+                chipX += 8;
+            }
+        }
     }
 }
 

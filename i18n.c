@@ -566,6 +566,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_WARDEN_SUMMONED] = "The Abyss Warden has awakened!",
     [STR_MSG_ALTAR_DEEP_ONLY] = "The altar only resonates in the abyss (y 236+)",
     [STR_MSG_WARDEN_ALREADY] = "The Warden already walks this world!",
+    [STR_BLOCK_LADDER] = "Ladder",
+    [STR_RECIPE_LADDER] = "Ladder",
     [STR_BLOCK_BREWING_STAND] = "Brewing Stand",
     [STR_BREWING] = "Brewing Stand",
     [STR_BOTTLE] = "Bottle",
@@ -1183,6 +1185,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_WARDEN_SUMMONED] = "深渊守望者苏醒了！",
     [STR_MSG_ALTAR_DEEP_ONLY] = "祭坛只在深渊层共鸣（y 236 以上）",
     [STR_MSG_WARDEN_ALREADY] = "守望者已在世上游荡！",
+    [STR_BLOCK_LADDER] = "梯子",
+    [STR_RECIPE_LADDER] = "梯子",
     [STR_BLOCK_BREWING_STAND] = "酿造台",
     [STR_BREWING] = "酿造台",
     [STR_BOTTLE] = "瓶子",
@@ -1800,6 +1804,8 @@ static const char *strings[LANG_COUNT][STR_COUNT] = {
     [STR_MSG_WARDEN_SUMMONED] = "深淵の守護者が目覚めた！",
     [STR_MSG_ALTAR_DEEP_ONLY] = "祭壇は深淵層でのみ共鳴する（y 236以上）",
     [STR_MSG_WARDEN_ALREADY] = "守護者はすでにこの世界を彷徨っている！",
+    [STR_BLOCK_LADDER] = "はしご",
+    [STR_RECIPE_LADDER] = "はしご",
     [STR_BLOCK_BREWING_STAND] = "醸造台",
     [STR_BREWING] = "醸造台",
     [STR_BOTTLE] = "瓶",
@@ -2093,6 +2099,7 @@ static const StringId g_blockNameIds[BLOCK_COUNT] = {
     STR_BLOCK_GLOWSHROOM,
     STR_ITEM_ABYSS_CRYSTAL,
     STR_BLOCK_ABYSS_ALTAR,
+    STR_BLOCK_LADDER,
 };
 
 const char *GetBlockName(BlockType bt)

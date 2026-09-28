@@ -210,6 +210,7 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Glowshroom",             {120,240,200,255}, {80,200,160,255}, false, true,  true},
     {"Abyss Crystal",          {110,235,225,255}, {80,200,190,255}, false, false, false},
     {"Abyss Altar",            {70, 60, 96,255},  {140,120,200,255},true,  false, true},
+    {"Ladder",                 {160,120,60,255},  {110,80,40,255},  false, true,  true},
 };
 
 //----------------------------------------------------------------------------------
@@ -2041,6 +2042,17 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 // Solid rim at the bottom
                 if (y >= 14) c = (Color){40, 34, 56, 255};
                 ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_LADDER:
+        // Wooden ladder: two side rails with rungs, transparent background
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (x <= 2 || x >= 13) c = base;             // rails
+                if ((y % 5) == 2 && x >= 3 && x <= 12) c = detail; // rungs
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
 
