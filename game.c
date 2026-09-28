@@ -405,6 +405,7 @@ void InitGame(void)
     InitMobs();
     InitParticles();
     InitEntities();
+    InitCarts();
     InitProjectiles();
     InitXpOrbs();
     InitLightMap();
@@ -2888,6 +2889,7 @@ void UpdateGame(float dt)
             UpdateMobs(dt);
             UpdateProjectiles(dt);
             UpdateEntities(dt);
+            UpdateCarts(dt);
             UpdateParticles(dt);
         }
         if (GetDeathFadeTimer() > 1.0f) {
@@ -3813,6 +3815,7 @@ void UpdateGame(float dt)
             ProcessPendingProjectileHits();
             UpdateXpOrbs(dt);
             UpdateEntities(dt);
+            UpdateCarts(dt);
             UpdateParticles(dt);
             // Pickup items for host player only (clients pick up on their side)
             PickupAndSyncItems(player.position.x, player.position.y, 0);
@@ -4246,6 +4249,7 @@ void UpdateGame(float dt)
             ProcessPendingProjectileHits();
             UpdateXpOrbs(dt);
             UpdateEntities(dt);
+            UpdateCarts(dt);
             UpdateParticles(dt);
             PickupNearbyItems(player.position.x, player.position.y);
             UpdateCameraSystem(dt);
@@ -4466,6 +4470,7 @@ void DrawGame(void)
     DrawProjectiles();
     DrawXpOrbs();
     DrawEntities();
+    DrawCarts();
     DrawParticles();
     DrawRemotePlayers();
     if (!inventoryOpen && !gamePaused && !player.playerDead) DrawCrosshair();

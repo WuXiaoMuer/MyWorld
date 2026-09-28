@@ -31,6 +31,7 @@ __declspec(dllimport) int __stdcall MoveFileExA(const char*, const char*, unsign
 //                Currently always 1. Reserved so adding a second dimension later
 //                does not require another save-version bump; readers that predate
 //                it simply stop before this field.
+//   Carts:       uint32 count + per-cart position/rail/dir/speed             (v20+)
 //   Trailer:     uint32 SAVE_TRAILER_MAGIC
 // NOTE: Cauldrons/Crops/Fluids are written AFTER World+Modified; LoadWorld reads them before the trailer.
 //----------------------------------------------------------------------------------
@@ -352,6 +353,26 @@ bool SaveWorld(const char *path)
     if (ok) {
         uint8_t dimensionCount = CURRENT_DIMENSION_COUNT;
         ok = ok && fwrite(&dimensionCount, sizeof(dimensionCount), 1, f) == 1;
+    }
+
+    // Minecarts (v20+): active carts with their rail cell and motion state.
+    if (ok) {
+        uint32_t cartCount = 0;
+        for (int i = 0; i < MAX_CARTS; i++) {
+            if (carts[i].active) cartCount++;
+        }
+        ok = ok && fwrite(&cartCount, sizeof(cartCount), 1, f) == 1;
+        for (int i = 0; ok && i < MAX_CARTS; i++) {
+            if (!carts[i].active) continue;
+            Minecart *c = &carts[i];
+            ok = ok && fwrite(&c->position.x, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&c->position.y, sizeof(float), 1, f) == 1;
+            ok = ok && fwrite(&c->railX, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&c->railY, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&c->dirX, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&c->dirY, sizeof(int), 1, f) == 1;
+            ok = ok && fwrite(&c->speed, sizeof(float), 1, f) == 1;
+        }
     }
 
 
@@ -811,6 +832,32 @@ bool LoadWorld(const char *path)
             // A save from a build that had a different number of dimensions.
             TraceLog(LOG_WARNING, "SAVE: file has %u dimensions, this build supports %u",
                      (unsigned)dimensionCount, (unsigned)CURRENT_DIMENSION_COUNT);
+        }
+    }
+
+    // Minecarts (v20+). Older saves simply have none.
+    InitCarts();
+    if (version >= 20) {
+        uint32_t cartCount = 0;
+        if (fread(&cartCount, sizeof(cartCount), 1, f) != 1) { fclose(f); return false; }
+        if (cartCount > MAX_CARTS) { fclose(f); return false; }
+        for (uint32_t ci = 0; ci < cartCount; ci++) {
+            // Find a free slot (all are free right after InitCarts)
+            int slot = -1;
+            for (int i = 0; i < MAX_CARTS && slot < 0; i++)
+                if (!carts[i].active) slot = i;
+            if (slot < 0) break;
+            Minecart *c = &carts[slot];
+            memset(c, 0, sizeof(Minecart));
+            if (fread(&c->position.x, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&c->position.y, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&c->railX, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&c->railY, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&c->dirX, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&c->dirY, sizeof(int), 1, f) != 1) { fclose(f); return false; }
+            if (fread(&c->speed, sizeof(float), 1, f) != 1) { fclose(f); return false; }
+            c->passengerId = -1;   // never persist who was riding
+            c->active = true;
         }
     }
 

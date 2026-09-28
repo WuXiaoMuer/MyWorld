@@ -211,6 +211,9 @@ const BlockInfo blockInfo[BLOCK_COUNT] = {
     {"Abyss Crystal",          {110,235,225,255}, {80,200,190,255}, false, false, false},
     {"Abyss Altar",            {70, 60, 96,255},  {140,120,200,255},true,  false, true},
     {"Ladder",                 {160,120,60,255},  {110,80,40,255},  false, true,  true},
+    {"Rail",                   {120,120,130,255}, {90, 90,100,255}, false, true,  true},
+    {"Powered Rail",           {120,120,130,255}, {220,120,70,255}, false, true,  true},
+    {"Minecart",               {140,140,150,255}, {100,100,110,255},false, false, false},
 };
 
 //----------------------------------------------------------------------------------
@@ -2052,6 +2055,58 @@ void DrawBlockPattern(Image *img, int px, int py, BlockType bt, int worldX, int 
                 Color c = {0, 0, 0, 0};
                 if (x <= 2 || x >= 13) c = base;             // rails
                 if ((y % 5) == 2 && x >= 3 && x <= 12) c = detail; // rungs
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+
+    case BLOCK_RAIL:
+    case BLOCK_POWERED_RAIL: {
+        // Track segment, neighbor-aware: connects to adjacent rails. Chunk
+        // texture passes real world coords; atlas generation falls back to a
+        // horizontal segment (fake coords, no neighbors).
+        bool hasL = (worldX > 0 && IsRailBlockAt(worldX - 1, worldY));
+        bool hasR = (worldX < WORLD_WIDTH - 1 && IsRailBlockAt(worldX + 1, worldY));
+        bool hasU = (worldY > 0 && IsRailBlockAt(worldX, worldY - 1));
+        bool hasD = (worldY < WORLD_HEIGHT - 1 && IsRailBlockAt(worldX, worldY + 1));
+        bool hasUL = (worldX > 0 && worldY > 0 && IsRailBlockAt(worldX - 1, worldY - 1));
+        bool hasUR = (worldX < WORLD_WIDTH - 1 && worldY > 0 && IsRailBlockAt(worldX + 1, worldY - 1));
+        bool hasDL = (worldX > 0 && worldY < WORLD_HEIGHT - 1 && IsRailBlockAt(worldX - 1, worldY + 1));
+        bool hasDR = (worldX < WORLD_WIDTH - 1 && worldY < WORLD_HEIGHT - 1 && IsRailBlockAt(worldX + 1, worldY + 1));
+        bool horiz = (hasL || hasR) && !hasU && !hasD;
+        bool vert  = (hasU || hasD) && !hasL && !hasR;
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                // Ties across the running direction
+                if (vert ? (x >= 6 && x <= 9 && (y % 5) == 2)
+                         : (y >= 6 && y <= 9 && (x % 5) == 2)) c = (Color){96, 66, 40, 255};
+                // Running rails
+                if (vert ? (x <= 2 || x >= 13)
+                         : (y <= 2 || y >= 13)) c = base;
+                // Diagonal corner connectors
+                if (!horiz && !vert) {
+                    if ((hasUL && x + y <= 6) || (hasDR && x + y >= 25) ||
+                        (hasUR && x - y >= 9) || (hasDL && y - x >= 9)) c = base;
+                }
+                // Powered rail: glowing energy line between the rails
+                if (bt == BLOCK_POWERED_RAIL && vert ? (x >= 7 && x <= 8)
+                                                     : (y >= 7 && y <= 8)) {
+                    c = detail;
+                }
+                if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
+            }
+        break;
+    }
+
+    case ITEM_MINECART:
+        // Small cart: dark metal body with wheels
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++) {
+                Color c = {0, 0, 0, 0};
+                if (y >= 5 && y <= 12 && x >= 2 && x <= 13) c = base;
+                if (y == 5 && x >= 2 && x <= 13) c = detail;
+                if ((y >= 13 && y <= 14) && ((x >= 3 && x <= 6) || (x >= 9 && x <= 12))) c = (Color){40, 40, 44, 255};
+                if (y >= 8 && x >= 7 && x <= 8) c = detail;
                 if (c.a > 0) ImageDrawPixel(img, px + x, py + y, c);
             }
         break;
@@ -5080,4 +5135,12 @@ bool IsBlockSolid(int bx, int by)
     uint8_t b = GetBlock(bx, by);
     if (b == BLOCK_IRON_DOOR) return doorOpen[bx][by] == 0;   // open doors do not block
     return blockInfo[b].solid;
+}
+
+// Track blocks a minecart can run on.
+bool IsRailBlockAt(int bx, int by)
+{
+    if (bx < 0 || bx >= WORLD_WIDTH || by < 0 || by >= WORLD_HEIGHT) return false;
+    uint8_t b = GetBlock(bx, by);
+    return b == BLOCK_RAIL || b == BLOCK_POWERED_RAIL;
 }

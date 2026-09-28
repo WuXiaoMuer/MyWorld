@@ -140,7 +140,7 @@ void InitWin32WheelHook(void);
 #define MAX_NET_PLAYERS     4
 
 #define SAVE_MAGIC          "MWSV"
-#define SAVE_VERSION        19
+#define SAVE_VERSION        20
 #define MAX_SAVED_LEVERS    1024   // cap on levers persisted per save (sparse x,y list)
 
 // Number of world dimensions. Only the overworld exists today; the save format
@@ -475,6 +475,9 @@ typedef enum {
     ITEM_ABYSS_CRYSTAL,     // deep-tier material (boss altar later)
     BLOCK_ABYSS_ALTAR,      // summon the Abyss Warden (abyss layer only)
     BLOCK_LADDER,           // climbable vertical transport
+    BLOCK_RAIL,             // minecart track
+    BLOCK_POWERED_RAIL,     // redstone-powered track booster
+    ITEM_MINECART,          // rideable cart, place on rails
     BLOCK_COUNT
 } BlockType;
 
@@ -960,6 +963,8 @@ typedef enum {
     STR_BLOCK_ABYSS_ALTAR,
     STR_RECIPE_ABYSS_ALTAR,    STR_RECIPE_BREWING_STAND,
     STR_BLOCK_LADDER,          STR_RECIPE_LADDER,
+    STR_BLOCK_RAIL,            STR_RECIPE_RAIL,
+    STR_BLOCK_POWERED_RAIL,    STR_ITEM_MINECART,    STR_RECIPE_MINECART,
     STR_MSG_IRON_DOOR_HINT,
 
     // Recipe Names
@@ -1338,6 +1343,7 @@ typedef struct {
     bool flying;             // true = creative flight active
     float lastJumpTapTimer;  // time since last jump tap (for double-tap toggle)
     StatusEffect effects[MAX_PLAYER_EFFECTS];   // active status effects (potions etc.)
+    int ridingCart;          // minecart index being ridden, -1 = none (appended: unsaved, defaults to none)
 } Player;
 
 //----------------------------------------------------------------------------------
@@ -1368,6 +1374,35 @@ typedef struct {
     float pickupDelay;
     bool active;
 } ItemEntity;
+
+//----------------------------------------------------------------------------------
+// Minecart System
+//----------------------------------------------------------------------------------
+#define MAX_CARTS           16
+#define CART_SPEED_MIN      40.0f     // start speed when pushed while riding
+#define CART_SPEED_MAX      320.0f
+#define CART_BOOST_SPEED    260.0f    // powered-rail target speed
+#define CART_FRICTION       22.0f     // flat-track decel (px/s^2)
+#define CART_SLOPE_DECEL    150.0f    // uphill decel
+#define CART_SLOPE_ACCEL    130.0f    // downhill accel
+#define CART_BOX_W          26        // cart hitbox (pixels)
+#define CART_BOX_H          16
+
+typedef struct {
+    Vector2 position;   // top-left of the cart box
+    int railX, railY;   // current rail cell
+    int dirX, dirY;     // unit direction along the rail
+    float speed;        // scalar speed (px/s) along (dirX, dirY)
+    int passengerId;    // players[] index riding, -1 = none
+    bool active;
+} Minecart;
+extern Minecart carts[MAX_CARTS];
+void InitCarts(void);
+bool SpawnMinecartAt(int bx, int by);
+void UpdateCarts(float dt);
+void DrawCarts(void);
+void RemoveCartDrop(int idx);
+int FindCartNear(float wx, float wy, float radius);
 
 //----------------------------------------------------------------------------------
 // XP Orb System
@@ -1780,6 +1815,7 @@ void InvalidateChunkAt(int worldBlockX, int worldBlockY);
 void InitChunkTable(void);
 void UpdateChunks(void);
 bool IsBlockSolid(int bx, int by);
+bool IsRailBlockAt(int bx, int by);
 
 // Block access layer (world.c). All block reads/writes should go through these;
 // they are the single place a dimension index would be threaded through.

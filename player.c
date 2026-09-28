@@ -1975,6 +1975,41 @@ void PlayerBlockInteraction(void)
             }
         }
 
+        // --- Minecart interactions (after block UI interactions so chests,
+        // altars, brewing stands etc. keep priority over mounting) ---
+        // Mount: cursor near an unoccupied cart
+        {
+            int cartIdx = FindCartNear(mouseWorld.x, mouseWorld.y, 26.0f);
+            if (cartIdx >= 0) {
+                float ccx = carts[cartIdx].position.x + CART_BOX_W / 2.0f;
+                float ccy = carts[cartIdx].position.y + CART_BOX_H / 2.0f;
+                float dx = ccx - playerCenterX, dy = ccy - playerCenterY;
+                if (dx * dx + dy * dy <= PLACE_RANGE * BLOCK_SIZE * PLACE_RANGE * BLOCK_SIZE) {
+                    carts[cartIdx].passengerId = localPlayerId;
+                    player.ridingCart = cartIdx;
+                    PlaySoundUIClick();
+                    return;
+                }
+            }
+        }
+        // Place: minecart item onto a rail block
+        if (selectedTool == ITEM_MINECART && IsRailBlockAt(blockX, blockY)) {
+            bool occupied = false;
+            for (int i = 0; i < MAX_CARTS; i++) {
+                if (carts[i].active && carts[i].railX == blockX && carts[i].railY == blockY) { occupied = true; break; }
+            }
+            if (!occupied && SpawnMinecartAt(blockX, blockY)) {
+                if (gameMode != GAME_CREATIVE) {
+                    player.inventoryCount[player.selectedSlot]--;
+                    if (player.inventoryCount[player.selectedSlot] <= 0) {
+                        player.inventory[player.selectedSlot] = BLOCK_AIR;
+                    }
+                }
+                PlaySoundPlace(BLOCK_RAIL);
+                return;
+            }
+        }
+
         if (IsTool(selectedTool) || IsFood(selectedTool) || IsArmor(selectedTool)) return; // Can't place tools, food, or armor
         if (selectedTool >= BLOCK_COUNT || !blockInfo[selectedTool].breakable) return; // Can't place non-block items
         // Creative mode: can place from the palette even with an empty slot (infinite blocks)
@@ -2174,6 +2209,21 @@ static void FireBowWithCharge(float charge)
 void UpdatePlayer(float dt)
 {
     if (player.playerDead) return;
+
+    // Riding a minecart: the cart drives the body; right-click dismounts.
+    if (player.ridingCart >= 0) {
+        if (player.ridingCart >= MAX_CARTS || !carts[player.ridingCart].active) {
+            player.ridingCart = -1;
+        } else {
+            UpdatePlayerEffects(&player, dt);
+            if (Win32IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+                carts[player.ridingCart].passengerId = -1;
+                player.ridingCart = -1;
+                player.velocity.y = JUMP_VELOCITY * 0.5f;   // small hop off the cart
+            }
+            return;
+        }
+    }
 
     // Creative mode: fully healthy (no damage, hunger, or drowning can persist)
     if (gameMode == GAME_CREATIVE) {
