@@ -8,7 +8,6 @@
 #include "net.h"
 #include <process.h>
 #include <string.h>
-#include <stdio.h>
 
 //----------------------------------------------------------------------------------
 // Win32 Input Override Implementation
@@ -74,18 +73,6 @@ void UpdateLogicalViewport(void)
     logicalViewport.height = SCREEN_HEIGHT * logicalScale;
     logicalViewport.x = (outputW - logicalViewport.width) * 0.5f;
     logicalViewport.y = (outputH - logicalViewport.height) * 0.5f;
-
-    // TEMP: verify the viewport follows window resizes (removed before ship)
-    {
-        static int lastW = -1, lastH = -1;
-        if (outputW != lastW || outputH != lastH) {
-            lastW = outputW; lastH = outputH;
-            fprintf(stderr, "RESIZE %dx%d scale=%.4f vp=(%.1f,%.1f %.1fx%.1f)\n",
-                    outputW, outputH, logicalScale, logicalViewport.x, logicalViewport.y,
-                    logicalViewport.width, logicalViewport.height);
-            fflush(stderr);
-        }
-    }
 }
 
 void UpdateWin32Input(void)
@@ -551,23 +538,9 @@ static void AudioLoadThread(void *arg)
 //----------------------------------------------------------------------------------
 int main(void)
 {
-    // Per-monitor-v2 DPI awareness, set before GLFW initializes. Without it a
-    // >100% display scale makes DWM bitmap-stretch the whole frame (blurry
-    // text) and distorts cursor coordinates on mixed-DPI multi-monitor setups
-    // (click ranges landing beside their targets). Falls back gracefully.
-    {
-        void *user32 = GetModuleHandleA("user32.dll");
-        int (__stdcall *setCtx)(void *) =
-            (int (__stdcall *)(void *))GetProcAddress(user32, "SetProcessDpiAwarenessContext");
-        if (setCtx) {
-            if (!setCtx((void *)(intptr_t)-4)) SetProcessDPIAware();   // PER_MONITOR_AWARE_V2
-        } else {
-            SetProcessDPIAware();
-        }
-    }
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "MyWorld");
-    SetWindowMinSize(960, 540);   // logical canvas letterboxes below this
+    SetWindowMinSize(960, 540);
     UpdateLogicalViewport();
     logicalCanvas = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
     logicalCanvasReady = logicalCanvas.texture.id != 0;

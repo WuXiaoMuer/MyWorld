@@ -3080,6 +3080,10 @@ void DrawPlayerSprite(void)
     // --- Animation drivers -------------------------------------------------
     // Walk cycle: forward arm goes UP, back arm goes DOWN (2D side view)
 
+    // What the player holds decides the front-arm carry pose (shared by the
+    // arm render and the held-item anchor below).
+    int slotItem = player.inventory[player.selectedSlot];
+
     // Idle breathing: gentle torso rise/fall when standing still on the ground
     float breath = (!moving && player.onGround) ? sinf((float)GetTime() * 2.0f) * 0.8f : 0.0f;
 
@@ -3208,6 +3212,13 @@ void DrawPlayerSprite(void)
         float dir = facing ? 1.0f : -1.0f;
         int shoulderY = (int)(bobY + 8);
 
+        // Carrying an item angles the front arm forward so the hand (and the
+        // item drawn on it) rest beside the chest, instead of the item draping
+        // over the hip and reading as part of the body. raylib rotates
+        // counterclockwise-positive on screen, so "forward" is NEGATIVE here.
+        bool holdingItem = (slotItem != BLOCK_AIR && slotItem < BLOCK_COUNT);
+        float carryDeg = (holdingItem && attackDeg == 0.0f) ? -dir * 46.0f : 0.0f;
+
         // Back arm leads the walk cycle in the opposite phase. 4px-wide arms
         // hang outside the 8-wide torso: back arm 0..4, front arm 8..12 -
         // each flush with its silhouette edge (hitbox 0..12), symmetric +-4
@@ -3216,7 +3227,7 @@ void DrawPlayerSprite(void)
         DrawLimb(backJointX, shoulderY, 4, 11, dir * (-swingDeg), skin);
         // Front arm carries the swing/air/attack motion
         int frontJointX = MX(8, 4) + 2;
-        DrawLimb(frontJointX, shoulderY, 4, 11, dir * (swingDeg + airDeg + attackDeg), skin);
+        DrawLimb(frontJointX, shoulderY, 4, 11, dir * (swingDeg + airDeg + attackDeg) + carryDeg, skin);
     }
 
     // Legs pivot at the hip, opposite phase to the arms. In the air they tuck.
@@ -3252,7 +3263,6 @@ void DrawPlayerSprite(void)
 
     // Draw held item - hangs off the front hand, so it inherits the arm's angle
     // and rotates with it instead of sliding alongside.
-    int slotItem = player.inventory[player.selectedSlot];
     if (slotItem != BLOCK_AIR && slotItem < BLOCK_COUNT && blockAtlas.id > 0) {
         int itemSize = 13;
         // Same angle the front arm used above, recomputed so the item tracks it
@@ -3266,14 +3276,17 @@ void DrawPlayerSprite(void)
             if (p > 1.0f) p = 1.0f;
             attackDeg = sinf(p * 3.141592653f) * 95.0f;
         }
-        float armDeg = (facing ? 1.0f : -1.0f) * (swingDeg + airDeg + attackDeg);
+        float carryDeg = (attackDeg == 0.0f) ? -(facing ? 1.0f : -1.0f) * 46.0f : 0.0f;
+        float armDeg = (facing ? 1.0f : -1.0f) * (swingDeg + airDeg + attackDeg) + carryDeg;
 
-        // Hand sits at the rotated far end of the arm
+        // Hand sits at the rotated far end of the arm. DrawRectanglePro's
+        // rotation moves the hanging limb to (-sin, +cos): mirror the x term
+        // so the anchor lands ON the drawn hand.
         float rad = armDeg * 3.141592653f / 180.0f;
         float shoulderYf = bobY + 8;
         float shoulderX = px + (facing ? 10.0f : 2.0f);   // matches frontJointX = MX(8,4)+2
-        float hx = shoulderX + sinf(rad) * 10.0f;   // pulled in so the item doesn't drag the silhouette sideways
-        float hy = shoulderYf + cosf(rad) * 10.0f;
+        float hx = shoulderX - sinf(rad) * 11.0f;
+        float hy = shoulderYf + cosf(rad) * 11.0f;
         float rot = itemAngle + armDeg * 0.6f;
         Rectangle src = { (float)(slotItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { hx, hy, (float)itemSize, (float)itemSize };
