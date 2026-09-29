@@ -216,6 +216,29 @@ void DrawTransition(void)
         unsigned char a = (unsigned char)(transitionAlpha * 255);
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, (Color){0, 0, 0, a});
     }
+
+    // F10 input diagnostics: live view of every mouse-button source and the
+    // cursor mapping, drawn in every state (menus included) so click problems
+    // can be diagnosed anywhere. Toggle via UpdateGlobalHotkeys.
+    if (showInputDebug) {
+        int bx = 10, by = 10, bw = 330, bh = 118;
+        DrawRectangle(bx, by, bw, bh, (Color){0, 0, 0, 190});
+        DrawRectangleLines(bx, by, bw, bh, (Color){120, 220, 120, 220});
+        Vector2 lg = Win32GetMousePosition();
+        char line[96];
+        snprintf(line, sizeof(line), "FG=%d  asyncL=%d msgL=%d hookL=%d",
+                 Win32IsForeground(), win32LMB, IsMouseButtonDown(MOUSE_BUTTON_LEFT), Win32HookLMBDown());
+        DrawGameText(line, bx + 8, by + 8, 14, (Color){140, 240, 140, 255});
+        snprintf(line, sizeof(line), "asyncR=%d msgR=%d hookR=%d",
+                 win32RMB, IsMouseButtonDown(MOUSE_BUTTON_RIGHT), Win32HookRMBDown());
+        DrawGameText(line, bx + 8, by + 26, 14, (Color){140, 240, 140, 255});
+        snprintf(line, sizeof(line), "raw=(%d,%d) logical=(%.0f,%.0f) scale=%.2f",
+                 win32MouseX, win32MouseY, lg.x, lg.y, logicalScale);
+        DrawGameText(line, bx + 8, by + 44, 14, (Color){200, 220, 255, 255});
+        snprintf(line, sizeof(line), "state=%d paused=%d inv=%d", (int)gameState, gamePaused, inventoryOpen);
+        DrawGameText(line, bx + 8, by + 62, 14, (Color){200, 220, 255, 255});
+        DrawGameText("F10 close", bx + 8, by + 92, 14, (Color){160, 160, 160, 220});
+    }
 }
 
 bool IsTransitioning(void)
@@ -3100,23 +3123,13 @@ void UpdateGame(float dt)
         }
         PlaySoundUIClick();
     }
-
-    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F3)) showDebug = !showDebug;
-
-    // F10: input diagnostics (for investigating mouse issues over streaming)
-    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F10)) showInputDebug = !showInputDebug;
+    // (F3/F10/F11 moved to UpdateGlobalHotkeys so they work in every state)
 
     // M: toggle large map
     if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_M) && !inventoryOpen && !player.playerDead) {
         showLargeMap = !showLargeMap;
         if (showLargeMap) gamePaused = true;
         else gamePaused = false;
-    }
-
-    // F11: toggle fullscreen (any non-windowed mode -> windowed, windowed -> borderless fullscreen)
-    // Use borderless instead of exclusive fullscreen to avoid DPI issues with desktop icons
-    if (!chatOpen && !chatJustClosed && Win32IsKeyPressed(KEY_F11)) {
-        ApplyWindowMode(windowMode != 0 ? 0 : 2);
     }
 
     // XP healing
@@ -4565,28 +4578,6 @@ void DrawGame(void)
         DrawMessage();
         DrawChatUI();
 
-        // F10 input diagnostics: live view of every mouse-button source and
-        // the cursor mapping, for debugging clicks over remote streaming.
-        if (showInputDebug) {
-            int bx = 10, by = 10, bw = 330, bh = 118;
-            DrawRectangle(bx, by, bw, bh, (Color){0, 0, 0, 190});
-            DrawRectangleLines(bx, by, bw, bh, (Color){120, 220, 120, 220});
-            Vector2 lg = Win32GetMousePosition();
-            char line[96];
-            snprintf(line, sizeof(line), "FG=%d  asyncL=%d msgL=%d hookL=%d",
-                     Win32IsForeground(), win32LMB, IsMouseButtonDown(MOUSE_BUTTON_LEFT), Win32HookLMBDown());
-            DrawGameText(line, bx + 8, by + 8, 14, (Color){140, 240, 140, 255});
-            snprintf(line, sizeof(line), "asyncR=%d msgR=%d hookR=%d",
-                     win32RMB, IsMouseButtonDown(MOUSE_BUTTON_RIGHT), Win32HookRMBDown());
-            DrawGameText(line, bx + 8, by + 26, 14, (Color){140, 240, 140, 255});
-            snprintf(line, sizeof(line), "raw=(%d,%d) logical=(%.0f,%.0f) scale=%.2f",
-                     win32MouseX, win32MouseY, lg.x, lg.y, logicalScale);
-            DrawGameText(line, bx + 8, by + 44, 14, (Color){200, 220, 255, 255});
-            snprintf(line, sizeof(line), "state=%d paused=%d inv=%d", (int)gameState, gamePaused, inventoryOpen);
-            DrawGameText(line, bx + 8, by + 62, 14, (Color){200, 220, 255, 255});
-            DrawGameText("F10 close", bx + 8, by + 92, 14, (Color){160, 160, 160, 220});
-        }
-
         DrawInventoryScreen();
         DrawCreativeScreen();
         DrawTradeUI();
@@ -4696,9 +4687,27 @@ void LoadSettings(void)
     fclose(f);
 }
 
+//----------------------------------------------------------------------------------
+// Global hotkeys, active in every state (menus included). F10 toggles the
+// input diagnostics overlay, F3 the FPS readout, F11 cycles window/fullscreen.
+// Each key is detected through BOTH input paths - the Win32 async-state edge
+// detector and raylib's message-driven IsKeyPressed - because streaming tools
+// inject keys as window messages (which GetAsyncKeyState misses) while focus
+// quirks can hide keys from GLFW. OR-ing is toggle-safe: each path reports at
+// most one edge per physical press.
+//----------------------------------------------------------------------------------
+static void UpdateGlobalHotkeys(void)
+{
+    if (chatOpen) return;   // typing in chat must not toggle overlays
+    if (Win32IsKeyPressed(KEY_F3) || IsKeyPressed(KEY_F3)) showDebug = !showDebug;
+    if (Win32IsKeyPressed(KEY_F10) || IsKeyPressed(KEY_F10)) showInputDebug = !showInputDebug;
+    if (Win32IsKeyPressed(KEY_F11) || IsKeyPressed(KEY_F11)) ApplyWindowMode(windowMode != 0 ? 0 : 2);
+}
+
 void UpdateDrawFrame(void)
 {
 
+    UpdateGlobalHotkeys();
     float dt = GetFrameTime();
     if (dt > 0.05f) dt = 0.05f;
     simulationAccumulator += dt;

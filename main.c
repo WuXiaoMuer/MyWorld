@@ -47,6 +47,7 @@ static int MapRaylibToVK(int key)
     if (key == KEY_LEFT_ALT) return VK_MENU;
     if (key == KEY_RIGHT_ALT) return VK_MENU;
     if (key == KEY_F3) return VK_F3;
+    if (key == KEY_F10) return VK_F10;
     if (key == KEY_F11) return VK_F11;
     if (key == VK_OEM_PERIOD) return VK_OEM_PERIOD;
     if (key == VK_OEM_2) return VK_OEM_2;
@@ -537,7 +538,23 @@ static void AudioLoadThread(void *arg)
 //----------------------------------------------------------------------------------
 int main(void)
 {
+    // Per-monitor-v2 DPI awareness, set before GLFW initializes. Without it a
+    // >100% display scale makes DWM bitmap-stretch the whole frame (blurry
+    // text) and distorts cursor coordinates on mixed-DPI multi-monitor setups
+    // (click ranges landing beside their targets). Falls back gracefully.
+    {
+        void *user32 = GetModuleHandleA("user32.dll");
+        int (__stdcall *setCtx)(void *) =
+            (int (__stdcall *)(void *))GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+        if (setCtx) {
+            if (!setCtx((void *)(intptr_t)-4)) SetProcessDPIAware();   // PER_MONITOR_AWARE_V2
+        } else {
+            SetProcessDPIAware();
+        }
+    }
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "MyWorld");
+    SetWindowMinSize(960, 540);   // logical canvas letterboxes below this
     UpdateLogicalViewport();
     logicalCanvas = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
     logicalCanvasReady = logicalCanvas.texture.id != 0;

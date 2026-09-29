@@ -4934,6 +4934,33 @@ void DrawSlotSelectScreen(void)
         DrawGameText(hint, hx + 1, hy + 1, 14, (Color){0, 0, 0, 200});
         DrawGameText(hint, hx, hy, 14, (Color){235, 235, 235, 235});
     }
+
+    // F10: draw the actual hit boxes (green) so draw-vs-hit alignment can be
+    // verified directly. Geometry comes from the same shared helpers the
+    // input handler uses, so these outlines ARE the clickable areas.
+    if (showInputDebug) {
+        int hitPanelX, hitPanelY, hitSlotX, hitSlotY, hitBackX, hitBackY;
+        GetSlotSelectLayout(&hitPanelX, &hitPanelY, &hitSlotX, &hitSlotY, &hitBackX, &hitBackY);
+        Color hb = {0, 255, 80, 230};
+        for (int vi = 0; vi < SLOT_VISIBLE; vi++) {
+            int i = vi + slotScrollOffset;
+            if (i >= MAX_SAVE_SLOTS) break;
+            DrawRectangleLines(hitSlotX, hitSlotY + vi * spacing, slotW, slotH, hb);
+        }
+        if (isNew) {
+            int sbx = 0, sby = 0;
+            GetSlotSelectSeedRow(&sbx, &sby);
+            int modeX2 = sbx + 200 + 6 + 56 + 16;
+            DrawRectangleLines(sbx, sby, 200, 24, hb);                 // seed field
+            DrawRectangleLines(sbx + 206, sby, 56, 24, hb);            // random button
+            DrawRectangleLines(modeX2 + 40, sby, 72, 24, hb);          // survival
+            DrawRectangleLines(modeX2 + 118, sby, 72, 24, hb);         // creative
+        }
+        DrawRectangleLines(hitBackX, hitBackY, 100, 28, hb);           // back
+        // Logical-space cursor crosshair: where the game THINKS the pointer is
+        DrawRectangle((int)mouse.x - 6, (int)mouse.y, 13, 1, hb);
+        DrawRectangle((int)mouse.x, (int)mouse.y - 6, 1, 13, hb);
+    }
 }
 
 //----------------------------------------------------------------------------------

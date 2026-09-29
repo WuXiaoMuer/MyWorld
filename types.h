@@ -21,6 +21,9 @@ __declspec(dllimport) short __stdcall GetAsyncKeyState(int);
 __declspec(dllimport) short __stdcall GetKeyState(int);
 __declspec(dllimport) void* __stdcall GetForegroundWindow(void);
 __declspec(dllimport) void* __stdcall GetFocus(void);
+__declspec(dllimport) void* __stdcall GetModuleHandleA(const char*);
+__declspec(dllimport) void* __stdcall GetProcAddress(void*, const char*);
+__declspec(dllimport) int __stdcall SetProcessDPIAware(void);
 #ifndef VK_LBUTTON
 #define VK_LBUTTON  0x01
 #define VK_RBUTTON  0x02
@@ -39,6 +42,7 @@ __declspec(dllimport) void* __stdcall GetFocus(void);
 #define VK_RIGHT    0x27
 #define VK_DOWN     0x28
 #define VK_F3       0x72
+#define VK_F10      0x79
 #define VK_F11      0x7A
 #define VK_OEM_PERIOD 0xBE
 #define VK_OEM_2    0xBF
