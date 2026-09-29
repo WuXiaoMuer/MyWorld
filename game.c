@@ -1,5 +1,6 @@
 #include "types.h"
 #include "net.h"
+#include <rlgl.h>
 #include <stdlib.h>
 #include <time.h>
 #include <stdio.h>
@@ -12,7 +13,7 @@
 //----------------------------------------------------------------------------------
 // Window Mode Management
 //----------------------------------------------------------------------------------
-static int savedWinX = 0, savedWinY = 0, savedWinW = SCREEN_WIDTH, savedWinH = SCREEN_HEIGHT;
+static int savedWinX = 0, savedWinY = 0, savedWinW = 1280, savedWinH = 720;
 static const int resolutionWidths[] = { 960, 1280, 1600 };
 static const int resolutionHeights[] = { 540, 720, 900 };
 
@@ -4365,9 +4366,28 @@ void UpdateGame(float dt)
 
 void DrawGame(void)
 {
+    // Recreate the render canvas at the true client size on resize: the GUI
+    // projection then rasterizes every element at native resolution.
+    if (IsWindowResized()) {
+        int cw = GetScreenWidth(), ch = GetScreenHeight();
+        if (cw > 0 && ch > 0) {
+            if (logicalCanvasReady) UnloadRenderTexture(logicalCanvas);
+            logicalCanvas = LoadRenderTexture(cw, ch);
+            logicalCanvasReady = logicalCanvas.texture.id != 0;
+        }
+        UpdateLogicalViewport();
+    }
     BeginDrawing();
     if (logicalCanvasReady) {
         BeginTextureMode(logicalCanvas);
+        // UI projection: GUI units (SCREEN_*) -> native canvas pixels. Pushed
+        // on the projection stack so nested BeginMode2D (world camera) keeps
+        // working; popped just before EndTextureMode in draw_finish.
+        rlMatrixMode(RL_PROJECTION);
+        rlPushMatrix();
+        rlScalef(guiScale, guiScale, 1.0f);
+        rlMatrixMode(RL_MODELVIEW);
+        rlLoadIdentity();
     }
     ClearBackground(GetSkyColor());
 
@@ -4601,11 +4621,16 @@ void DrawGame(void)
     DrawTransition();
 draw_finish:
     if (logicalCanvasReady) {
+        // Undo the UI projection, then blit 1:1 - the canvas is already at
+        // native client resolution.
+        rlMatrixMode(RL_PROJECTION);
+        rlPopMatrix();
+        rlMatrixMode(RL_MODELVIEW);
+        rlLoadIdentity();
         EndTextureMode();
-        UpdateLogicalViewport();
         ClearBackground((Color){ 8, 10, 18, 255 });
         Rectangle source = { 0, 0, (float)logicalCanvas.texture.width, -(float)logicalCanvas.texture.height };
-        Rectangle dest = logicalViewport;
+        Rectangle dest = { 0, 0, (float)logicalCanvas.texture.width, (float)logicalCanvas.texture.height };
         DrawTexturePro(logicalCanvas.texture, source, dest, (Vector2){ 0, 0 }, 0.0f, WHITE);
     }
 
@@ -4627,6 +4652,7 @@ void UnloadGame(void)
             fprintf(f, "sfx_volume=%.2f\n", sfxVolumeSlider);
             fprintf(f, "window_mode=%d\n", windowMode);
             fprintf(f, "resolution=%d\n", resolutionPreset);
+            fprintf(f, "ui_scale=%.2f\n", uiScaleUser);
             fprintf(f, "difficulty=%d\n", (int)gameDifficulty);
             fprintf(f, "font_custom=%d\n", useCustomFont ? 1 : 0);
             if (customFontPath[0]) fprintf(f, "font_path=%s\n", customFontPath);
@@ -4677,6 +4703,9 @@ void LoadSettings(void)
         } else if (strncmp(line, "resolution=", 11) == 0) {
             int v = atoi(line + 11);
             if (v >= 0 && v < 3) resolutionPreset = v;
+        } else if (strncmp(line, "ui_scale=", 9) == 0) {
+            float v = (float)atof(line + 9);
+            if (v >= 1.0f && v <= 2.0f) uiScaleUser = v;
         } else if (strncmp(line, "font_custom=", 12) == 0) {
             // Will be applied after font loading
         } else if (strncmp(line, "font_path=", 10) == 0) {

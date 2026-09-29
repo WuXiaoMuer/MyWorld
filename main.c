@@ -64,15 +64,28 @@ static void ResetAllInputState(void)
 
 void UpdateLogicalViewport(void)
 {
-    int outputW = GetScreenWidth();
-    int outputH = GetScreenHeight();
-    if (outputW <= 0 || outputH <= 0) return;
-    logicalScale = fminf((float)outputW / SCREEN_WIDTH, (float)outputH / SCREEN_HEIGHT);
-    if (logicalScale <= 0.0f) logicalScale = 1.0f;
-    logicalViewport.width = SCREEN_WIDTH * logicalScale;
-    logicalViewport.height = SCREEN_HEIGHT * logicalScale;
-    logicalViewport.x = (outputW - logicalViewport.width) * 0.5f;
-    logicalViewport.y = (outputH - logicalViewport.height) * 0.5f;
+    int cw = GetScreenWidth();
+    int ch = GetScreenHeight();
+    if (cw <= 0 || ch <= 0) return;
+
+    // GUI scale: fit the 1280x720 design into the canvas, times the user's
+    // preferred UI size. The canvas is kept at the client size (recreated on
+    // resize), so every element rasterizes at native resolution - crisp text
+    // and UI at any window size, display scale factor or platform DPI policy.
+    float fit = fminf((float)cw / 1280.0f, (float)ch / 720.0f);
+    if (fit <= 0.0f) fit = 1.0f;
+    guiScale = fit * uiScaleUser;
+    if (guiScale < 0.5f) guiScale = 0.5f;
+    SCREEN_WIDTH = (int)(cw / guiScale);
+    SCREEN_HEIGHT = (int)(ch / guiScale);
+
+    // Mouse space == GUI space: the projection maps GUI units onto the whole
+    // canvas, so there is no letterbox - plain division.
+    logicalScale = guiScale;
+    logicalViewport.x = 0.0f;
+    logicalViewport.y = 0.0f;
+    logicalViewport.width = (float)cw;
+    logicalViewport.height = (float)ch;
 }
 
 void UpdateWin32Input(void)
@@ -444,8 +457,14 @@ int windowMode = 0; // 0=windowed, 1=fullscreen, 2=borderless
 int resolutionPreset = 1;
 RenderTexture2D logicalCanvas = { 0 };
 bool logicalCanvasReady = false;
-Rectangle logicalViewport = { 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT };
+Rectangle logicalViewport = { 0, 0, 1280, 720 };
 float logicalScale = 1.0f;
+// GUI-space viewport + scale (canvas pixels per GUI unit, times the user's
+// preferred UI size). Recomputed every frame from the real canvas size.
+int SCREEN_WIDTH = 1280;
+int SCREEN_HEIGHT = 720;
+float guiScale = 1.0f;
+float uiScaleUser = 1.0f;
 char seedInputBuf[32] = { 0 };
 int seedInputLen = 0;
 bool seedFieldFocused = false;   // true while the seed text field owns keyboard input

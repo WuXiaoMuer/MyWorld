@@ -578,7 +578,7 @@ void DrawInventoryScreen(void)
         memcpy(snapArmorEnch, player.armorEnchantments, sizeof(snapArmorEnch));
     }
 
-    int slotSize = 40;
+    int slotSize = 46;
 
     // --- Minecraft-style combined furnace + inventory screen ---
     if (brewingOpen && !furnaceOpen) {
@@ -589,7 +589,7 @@ void DrawInventoryScreen(void)
         uint8_t snapBrewOut = brewOutput;            int snapBrewOutCount = brewOutputCount;
 
         int padding = 3;
-        int armorSlotSize = 40;
+        int armorSlotSize = 46;
         int armorPad = 3;
         int armorColW = armorSlotSize + armorPad;
         int previewW = 60;
@@ -597,7 +597,7 @@ void DrawInventoryScreen(void)
         int gridW = INVENTORY_COLS * slotSize + (INVENTORY_COLS - 1) * padding;
 
         int contW = 14 + previewW + previewPad + armorColW + gridW + 14;
-        int brewH = 175;
+        int brewH = 195;
         int dividerH = 2;
         int invTitleH = 20;
         int gridH = INVENTORY_ROWS * slotSize + (INVENTORY_ROWS - 1) * padding;
@@ -618,7 +618,7 @@ void DrawInventoryScreen(void)
         DrawUiPanel(contX, contY, contW, contH, 255);
 
         // --- Furnace section ---
-        int fuSlotSize = 40;
+        int fuSlotSize = 46;
         int fuY = contY + panelPad;
         DrawGameText(S(STR_BREWING), contX + contW / 2 - MeasureGameTextWidth(S(STR_BREWING), 16) / 2, fuY, 16, (Color){62, 62, 62, 255});
         fuY += 28;
@@ -1016,7 +1016,7 @@ void DrawInventoryScreen(void)
         float snapFuelBurnMax = furnaceFuelBurnMax;
 
         int padding = 3;
-        int armorSlotSize = 40;
+        int armorSlotSize = 46;
         int armorPad = 3;
         int armorColW = armorSlotSize + armorPad;
         int previewW = 60;
@@ -1045,7 +1045,7 @@ void DrawInventoryScreen(void)
         DrawUiPanel(contX, contY, contW, contH, 255);
 
         // --- Furnace section ---
-        int fuSlotSize = 40;
+        int fuSlotSize = 46;
         int fuY = contY + panelPad;
         DrawGameText(S(STR_FURNACE), contX + contW / 2 - MeasureGameTextWidth(S(STR_FURNACE), 16) / 2, fuY, 16, (Color){62, 62, 62, 255});
         fuY += 28;
@@ -1801,7 +1801,7 @@ void DrawInventoryScreen(void)
     int previewPad = 6;
 
     // Armor slots: vertical column to the left of inventory
-    int armorSlotSize = 40;
+    int armorSlotSize = 46;
     int armorPad = 3;
     int armorColW = armorSlotSize + armorPad;
 
@@ -2565,7 +2565,7 @@ void DrawCreativeScreen(void)
         palette[paletteCount++] = ITEM_LAVA_BUCKET;
     }
 
-    int slotSize = 40, padding = 4, cols = 10, rows = 5;
+    int slotSize = 46, padding = 4, cols = 10, rows = 5;
     int gridW = cols * slotSize + (cols - 1) * padding;
     int gridH = rows * slotSize + (rows - 1) * padding;
     int titleH = 26;
@@ -5182,6 +5182,31 @@ void DrawSettingsScreen(void)
         }
     }
     sectionY += btnH + 10;
+
+    // UI scale: multiplies the whole GUI (bigger menus/inventory/hotbar),
+    // rasterized at native resolution so it stays crisp at any size.
+    {
+        DrawGameText("UI Scale", leftX, sectionY, 14, (Color){70, 70, 70, 230});
+        sectionY += 20;
+        const char *uiNames[] = { "100%", "125%", "150%" };
+        const float uiVals[] = { 1.0f, 1.25f, 1.5f };
+        int uiBtnW = resolutionBtnW;
+        int uiSel = (uiScaleUser > 1.12f) ? ((uiScaleUser > 1.37f) ? 2 : 1) : 0;
+        for (int i = 0; i < 3; i++) {
+            int bx = leftX + i * (uiBtnW + btnGap);
+            Rectangle btn = { (float)bx, (float)sectionY, (float)uiBtnW, (float)btnH };
+            bool hover = CheckCollisionPointRec(mouse, btn);
+            bool sel = (uiSel == i);
+            char uiLabel[24];
+            snprintf(uiLabel, sizeof(uiLabel), "UI %s", uiNames[i]);
+            DrawUiButton(bx, sectionY, uiBtnW, btnH, uiLabel, 14, hover, sel, true, 1.0f);
+            if (hover && Win32IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !sel) {
+                uiScaleUser = uiVals[i];
+                PlaySoundUIClick();
+            }
+        }
+        sectionY += btnH + 10;
+    }
     Vector2 dpiScale = GetWindowScaleDPI();
     int mon = GetCurrentMonitor();
     int monW = GetMonitorWidth(mon);

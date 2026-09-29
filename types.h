@@ -85,8 +85,13 @@ bool Win32IsForeground(void);
 //----------------------------------------------------------------------------------
 // Constants
 //----------------------------------------------------------------------------------
-#define SCREEN_WIDTH        1280
-#define SCREEN_HEIGHT       720
+// GUI-space viewport, in GUI units (canvas pixels / gui scale). Runtime
+// variables so the whole UI reflows at any window size and DPI scale factor
+// (cross-platform ready); see guiScale in main.c.
+extern int SCREEN_WIDTH;
+extern int SCREEN_HEIGHT;
+extern float guiScale;      // canvas pixels per GUI unit this frame
+extern float uiScaleUser;   // user multiplier from settings (1.0 / 1.25 / 1.5)
 #define SIM_TICK_RATE       20
 #define SIM_TICK_DT         (1.0f / SIM_TICK_RATE)
 
