@@ -2994,13 +2994,13 @@ void DrawRemotePlayers(void)
 
         // Legs — linear swing, shortened while sneaking to keep feet planted
         int legLen = 12 - (int)sneakShrink;
-        DrawLimb((int)centerX - 4, (int)(bobY + 16), 4, legLen, dirSign * legDeg, pants);
-        DrawLimb((int)centerX + 0, (int)(bobY + 16), 4, legLen, dirSign * (-legDeg), pants);
+        DrawLimb((int)centerX - 2, (int)(bobY + 16), 4, legLen, dirSign * legDeg, pants);
+        DrawLimb((int)centerX + 2, (int)(bobY + 16), 4, legLen, dirSign * (-legDeg), pants);
 
-        // Body
-        DrawRectangle((int)(centerX - 5), (int)(bobY + 10), 11, 14, shirt);
+        // Body — slim MC-proportioned torso so the arms read at the sides
+        DrawRectangle((int)(centerX - 3), (int)(bobY + 10), 7, 14, shirt);
 
-        // Arms — linear swing, 4px wide, overlapping the torso edges
+        // Arms — linear swing, 4px wide, hanging outside the torso edges
         DrawLimb((int)centerX - 4, (int)(bobY + 11), 4, 11, dirSign * (-armDeg), skin);
         DrawLimb((int)centerX + 4, (int)(bobY + 11), 4, 11, dirSign * armDeg, skin);
 
@@ -3173,11 +3173,13 @@ void DrawPlayerSprite(void)
     DrawRectangle(MX(3, 2), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
     DrawRectangle(MX(7, 2), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
 
-    // Torso
-    DrawRectangle(MX(1, 10), (int)(bobY + 7), 10, 10, shirt);
+    // Torso — slim MC-proportioned body (6 wide, centred) so the 4-wide arms
+    // read as hanging at the SIDES of the silhouette (3px past the torso each),
+    // not buried inside a 10-wide body mass.
+    DrawRectangle(MX(3, 6), (int)(bobY + 7), 6, 10, shirt);
     if (chestColor.a > 0) {
-        DrawRectangle(MX(0, 12), (int)(bobY + 6), 12, 11, chestColor);
-        DrawRectangle(MX(1, 10), (int)(bobY + 7), 10, 9, (Color){
+        DrawRectangle(MX(2, 8), (int)(bobY + 6), 8, 11, chestColor);
+        DrawRectangle(MX(3, 6), (int)(bobY + 7), 6, 9, (Color){
             (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
         });
     }
@@ -3207,13 +3209,12 @@ void DrawPlayerSprite(void)
         int shoulderY = (int)(bobY + 8);
 
         // Back arm leads the walk cycle in the opposite phase. 4px-wide arms
-        // overlap the torso edges (torso spans px+1..px+11): back arm 0..4,
-        // front arm 8..12 - attached, no gap, symmetric about the torso.
+        // hang OUTSIDE the slim 3..8 torso: back arm 0..4, front arm 8..12 -
+        // each flush with its silhouette edge (hitbox 0..12), symmetric +-4
+        // about the centre, attached to the torso with no gap.
         int backJointX = MX(0, 4) + 2;
         DrawLimb(backJointX, shoulderY, 4, 11, dir * (-swingDeg), skin);
-        // Front arm carries the swing/air/attack motion. Joints are symmetric
-        // about the torso centre (spans 0..4 / 8..12 vs torso 1..11) so the
-        // body reads left-right balanced.
+        // Front arm carries the swing/air/attack motion
         int frontJointX = MX(8, 4) + 2;
         DrawLimb(frontJointX, shoulderY, 4, 11, dir * (swingDeg + airDeg + attackDeg), skin);
     }
