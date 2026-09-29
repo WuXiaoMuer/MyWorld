@@ -564,6 +564,17 @@ static void CheckAchievements(void) {
 
 int menuSelection = 0; // 0=New, 1=Load, 2=Settings, 3=Quit
 
+// Shared main-menu button layout — single source of truth for the drawn
+// buttons (DrawMainMenu) and the hit boxes (UpdateMainMenu). They used to
+// drift apart, so clicking a button triggered the one drawn above it.
+void GetMainMenuButtons(Rectangle *btns)
+{
+    const int btnW = 260, btnH = 42, btnY = 196, spacing = 58;
+    int btnX = (SCREEN_WIDTH - btnW) / 2;
+    for (int i = 0; i < 6; i++)
+        btns[i] = (Rectangle){ (float)btnX, (float)(btnY + i * spacing), (float)btnW, (float)btnH };
+}
+
 static void StartGameFromSlot(int slot, bool isNew)
 {
     selectedSaveSlot = slot;
@@ -971,18 +982,11 @@ static void UpdateMainMenu(float dt)
         }
     }
 
-    // Mouse hover + click
+    // Mouse hover + click (hit boxes from the shared layout)
     {
         Vector2 mouse = Win32GetMousePosition();
-        int btnW = 280, btnH = 46;
-        int btnX = (SCREEN_WIDTH - btnW) / 2;
-        int btnY = 225;
-        int spacing = 66;
-
         Rectangle btns[6];
-        for (int i = 0; i < 6; i++) {
-            btns[i] = (Rectangle){ (float)btnX, (float)(btnY + i * spacing), (float)btnW, (float)btnH };
-        }
+        GetMainMenuButtons(btns);
 
         // Hover highlight
         for (int i = 0; i < 6; i++) {

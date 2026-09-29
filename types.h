@@ -2020,6 +2020,7 @@ void DrawLoadingScreen(const char *message, float progress);
 void DrawSlotSelectScreen(void);
 void GetSlotSelectLayout(int *panelX, int *panelY, int *slotX, int *slotY, int *backX, int *backY);
 void GetSlotSelectSeedRow(int *seedBoxX, int *seedBoxY);
+void GetMainMenuButtons(Rectangle *btns);
 void DrawConfirmDialog(void);
 void DrawBackground(void);
 void DrawMinimap(void);

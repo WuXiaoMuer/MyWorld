@@ -4611,11 +4611,9 @@ void DrawMainMenu(void)
     // ================================================================
     // Buttons — Minecraft-style chunky gray buttons
     // ================================================================
-    // These MUST match game.c UpdateMainMenu exactly
+    // Geometry comes from the shared helper so hit boxes always match.
     int btnW = 260, btnH = 42;
     int btnX = (SCREEN_WIDTH - btnW) / 2;
-    int btnY = 196;
-    int spacing = 58;
     float btnDelay0 = titleTotalDur + 0.15f;
 
     Vector2 mouse = Win32GetMousePosition();
@@ -4628,6 +4626,8 @@ void DrawMainMenu(void)
         if (GetSlotInfo(i, &info) && info.exists) { hasAnySave = true; break; }
     }
     bool btnEnabled[] = { true, hasAnySave, true, true, true, true };
+    Rectangle btns[6];
+    GetMainMenuButtons(btns);
 
     for (int i = 0; i < btnCount; i++) {
         // Staggered entrance
@@ -4640,13 +4640,13 @@ void DrawMainMenu(void)
         float slideX = 0.0f;
         float btnAlpha = bp;
 
-        int by = btnY + i * spacing;
+        int by = (int)btns[i].y;
         int drawX = btnX + (int)slideX;
 
         bool hover = CheckCollisionPointRec(mouse, (Rectangle){(float)drawX, (float)by, (float)btnW, (float)btnH});
         bool sel = (menuSelection == i) && btnEnabled[i];
 
-        DrawUiButton(drawX, by, btnW, btnH, btnLabels[i], 19,
+        DrawUiButton(drawX, by, btnW, btnH, btnLabels[i], 14,
                      hover && btnEnabled[i], sel, btnEnabled[i], btnAlpha);
     }
 
