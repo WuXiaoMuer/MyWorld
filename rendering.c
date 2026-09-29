@@ -3173,13 +3173,13 @@ void DrawPlayerSprite(void)
     DrawRectangle(MX(3, 2), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
     DrawRectangle(MX(7, 2), (int)(bobY + 4), 2, 2, (Color){40, 40, 40, 255});
 
-    // Torso — slim MC-proportioned body (6 wide, centred) so the 4-wide arms
-    // read as hanging at the SIDES of the silhouette (3px past the torso each),
-    // not buried inside a 10-wide body mass.
-    DrawRectangle(MX(3, 6), (int)(bobY + 7), 6, 10, shirt);
+    // Torso — 8 wide, centred (same span as the head) so the character is not
+    // a stick, while the 4-wide arms still read at the sides (2px past the
+    // torso each) instead of buried inside the body mass.
+    DrawRectangle(MX(2, 8), (int)(bobY + 7), 8, 10, shirt);
     if (chestColor.a > 0) {
-        DrawRectangle(MX(2, 8), (int)(bobY + 6), 8, 11, chestColor);
-        DrawRectangle(MX(3, 6), (int)(bobY + 7), 6, 9, (Color){
+        DrawRectangle(MX(1, 10), (int)(bobY + 6), 10, 11, chestColor);
+        DrawRectangle(MX(2, 8), (int)(bobY + 7), 8, 9, (Color){
             (unsigned char)(chestColor.r * 0.8f), (unsigned char)(chestColor.g * 0.8f), (unsigned char)(chestColor.b * 0.8f), 255
         });
     }
@@ -3209,7 +3209,7 @@ void DrawPlayerSprite(void)
         int shoulderY = (int)(bobY + 8);
 
         // Back arm leads the walk cycle in the opposite phase. 4px-wide arms
-        // hang OUTSIDE the slim 3..8 torso: back arm 0..4, front arm 8..12 -
+        // hang outside the 8-wide torso: back arm 0..4, front arm 8..12 -
         // each flush with its silhouette edge (hitbox 0..12), symmetric +-4
         // about the centre, attached to the torso with no gap.
         int backJointX = MX(0, 4) + 2;
@@ -4708,6 +4708,15 @@ void DrawMainMenu(void)
 
     // Version text intentionally omitted from the playable UI; keep the footer quiet.
 
+    // F10: logical-space cursor crosshair - where the game THINKS the pointer
+    // is. If this crosshair does not sit under the real cursor, the window->
+    // logical mapping is off (report the F10 panel's raw=/logical= numbers).
+    if (showInputDebug) {
+        Vector2 lg = Win32GetMousePosition();
+        Color hb = {0, 255, 80, 230};
+        DrawRectangle((int)lg.x - 6, (int)lg.y, 13, 1, hb);
+        DrawRectangle((int)lg.x, (int)lg.y - 6, 1, 13, hb);
+    }
 }
 
 //----------------------------------------------------------------------------------

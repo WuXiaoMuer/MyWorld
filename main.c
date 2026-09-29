@@ -8,6 +8,7 @@
 #include "net.h"
 #include <process.h>
 #include <string.h>
+#include <stdio.h>
 
 //----------------------------------------------------------------------------------
 // Win32 Input Override Implementation
@@ -73,6 +74,18 @@ void UpdateLogicalViewport(void)
     logicalViewport.height = SCREEN_HEIGHT * logicalScale;
     logicalViewport.x = (outputW - logicalViewport.width) * 0.5f;
     logicalViewport.y = (outputH - logicalViewport.height) * 0.5f;
+
+    // TEMP: verify the viewport follows window resizes (removed before ship)
+    {
+        static int lastW = -1, lastH = -1;
+        if (outputW != lastW || outputH != lastH) {
+            lastW = outputW; lastH = outputH;
+            fprintf(stderr, "RESIZE %dx%d scale=%.4f vp=(%.1f,%.1f %.1fx%.1f)\n",
+                    outputW, outputH, logicalScale, logicalViewport.x, logicalViewport.y,
+                    logicalViewport.width, logicalViewport.height);
+            fflush(stderr);
+        }
+    }
 }
 
 void UpdateWin32Input(void)
