@@ -3271,8 +3271,8 @@ void DrawPlayerSprite(void)
         float rad = armDeg * 3.141592653f / 180.0f;
         float shoulderYf = bobY + 8;
         float shoulderX = px + (facing ? 10.0f : 2.0f);   // matches frontJointX = MX(8,4)+2
-        float hx = shoulderX + sinf(rad) * 14.0f;   // a little past the hand so the block reads as held
-        float hy = shoulderYf + cosf(rad) * 13.0f;
+        float hx = shoulderX + sinf(rad) * 10.0f;   // pulled in so the item doesn't drag the silhouette sideways
+        float hy = shoulderYf + cosf(rad) * 10.0f;
         float rot = itemAngle + armDeg * 0.6f;
         Rectangle src = { (float)(slotItem * BLOCK_SIZE), 0, BLOCK_SIZE, BLOCK_SIZE };
         Rectangle dst = { hx, hy, (float)itemSize, (float)itemSize };
